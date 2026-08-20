@@ -28,6 +28,10 @@ jobs:
             echo "::error::Le tag v${tag} ne correspond pas à la version de mcp_ha/package.json"
             exit 1
           fi
+          if ! grep -q "VERSION = \"${tag}\"" mcp_ha/src/config.ts; then
+            echo "::error::Le tag v${tag} ne correspond pas à VERSION dans mcp_ha/src/config.ts (source de /health et des logs)"
+            exit 1
+          fi
 
   build:
     name: Build des images (${{ matrix.arch }})
@@ -51,7 +55,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build et push de l'image
-        uses: home-assistant/builder@master
+        # Épinglé par SHA (audit D2) : master est mutable et ce job détient
+        # packages: write. Migration complète hors builder suivie dans #25.
+        uses: home-assistant/builder@bb9bc86ea4c721825986c19b52e4da07be0f0fde
         with:
           args: |
             --${{ matrix.arch }} \

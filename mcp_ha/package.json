@@ -1,6 +1,6 @@
 {
   "name": "mcp-ha",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "type": "module",
   "description": "Add-on Home Assistant exposant un serveur MCP (Model Context Protocol)",
@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.test.json",
     "test": "vitest run",
     "start": "node dist/index.js"
   },
