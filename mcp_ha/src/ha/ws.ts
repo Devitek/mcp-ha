@@ -45,8 +45,14 @@ export class HaWsClient {
   private authInvalidCount = 0;
   /** Epoch ms of the moment the connection was last lost; null while authed. */
   private disconnectedAt: number | null = Date.now();
+  private connectListeners: Array<() => void> = [];
 
   constructor(private cfg: AddonConfig) {}
+
+  /** Registers a callback fired on every successful (re)authentication. */
+  onConnect(cb: () => void): void {
+    this.connectListeners.push(cb);
+  }
 
   get connected(): boolean {
     return this.authed;
@@ -186,6 +192,13 @@ export class HaWsClient {
         for (const w of this.waiters.splice(0)) {
           clearTimeout(w.timer);
           w.resolve();
+        }
+        for (const cb of this.connectListeners) {
+          try {
+            cb();
+          } catch {
+            // a listener failure must not break the auth flow
+          }
         }
         this.startPing();
         break;

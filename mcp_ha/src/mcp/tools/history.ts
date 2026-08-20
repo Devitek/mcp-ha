@@ -16,7 +16,7 @@ function downsample<T>(rows: T[], max: number): { rows: T[]; note?: string } {
   const stride = Math.ceil(rows.length / max);
   const kept = rows.filter((_, i) => i % stride === 0);
   const last = rows[rows.length - 1];
-  if (kept[kept.length - 1] !== last) kept.push(last);
+  if (last !== undefined && kept[kept.length - 1] !== last) kept.push(last);
   return {
     rows: kept,
     note: `${rows.length} raw points, downsampled to ${kept.length} (1 in ${stride}). Narrow the window for more precision.`,
@@ -51,6 +51,9 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
         entity_ids: [entity_id],
         minimal_response: true,
         no_attributes: true,
+        // Explicit (audit C10): the first point is the state already in
+        // effect at window start, documented in the tool reference.
+        include_start_time_state: true,
       });
       // The WebSocket answers in a compressed format: s = state, lu =
       // last_updated in epoch seconds. Normalize while accepting the long

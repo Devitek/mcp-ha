@@ -3,6 +3,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../context.js";
 import { listEnvelope, safe } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
+import { log } from "../../logger.js";
 
 export function registerAutomationTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
@@ -66,8 +67,15 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
       try {
         const config = await ctx.http.coreGet(`/config/automation/config/${encodeURIComponent(cfgId)}`);
         return { ...base, config };
-      } catch {
-        return { ...base, note: "Configuration not readable through the API (YAML automation or insufficient rights)." };
+      } catch (e) {
+        // A 404 is the normal YAML case; anything else is a real failure and
+        // must not be disguised as one (audit B7).
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("HTTP 404")) {
+          return { ...base, note: "No stored configuration (YAML-defined automation)." };
+        }
+        log.warning(`Could not fetch the automation config for ${entity_id}: ${msg}`);
+        return { ...base, note: "Configuration not readable right now (Home Assistant API error); the state above is still accurate." };
       }
     })
   );

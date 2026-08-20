@@ -122,6 +122,25 @@ describe("HaWsClient", () => {
     expect(c.disconnectedForMs()).not.toBeNull();
   });
 
+  it("reconnects with backoff after losing the connection (audit E5)", async () => {
+    let connections = 0;
+    const port = await startServer((sock, msg) => {
+      sock.send(JSON.stringify({ id: msg.id, type: "result", success: true, result: "pong" }));
+    });
+    wss!.on("connection", () => {
+      connections++;
+    });
+    const c = makeClient(port);
+    expect(await c.send("probe")).toBe("pong");
+    // Server-side kill of every socket: the client must come back on its own
+    // (minimum backoff is 1 s) and serve commands again.
+    for (const client of wss!.clients) client.terminate();
+    await new Promise((r) => setTimeout(r, 1_800));
+    expect(await c.send("probe")).toBe("pong");
+    expect(connections).toBe(2);
+    expect(c.connected).toBe(true);
+  }, 10_000);
+
   it("fails fast on auth_invalid instead of letting waiters sit out their timeout", async () => {
     wss = new WebSocketServer({ port: 0 });
     wss.on("connection", (sock) => {

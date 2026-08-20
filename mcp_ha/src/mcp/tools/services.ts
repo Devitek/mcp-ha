@@ -4,6 +4,7 @@ import type { ToolContext } from "../../context.js";
 import { listEnvelope, safe, trunc } from "../helpers.js";
 import { entityWriteAllowed, serviceAllowed } from "../../safety.js";
 import { audit } from "../../logger.js";
+import { parseHaPayload, servicesSchema } from "../../ha/schemas.js";
 
 function fieldSummary(fields: Record<string, any> | undefined) {
   if (!fields) return [];
@@ -32,7 +33,10 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
       annotations: { readOnlyHint: true },
     },
     safe("ha_list_services", async ({ domain, search }) => {
-      const services: Record<string, Record<string, any>> = await ctx.ws.send("get_services");
+      const services = parseHaPayload(servicesSchema, await ctx.ws.send("get_services"), "get_services") as Record<
+        string,
+        Record<string, any>
+      >;
 
       if (domain) {
         const d = services[domain.toLowerCase().trim()];

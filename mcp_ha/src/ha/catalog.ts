@@ -1,37 +1,82 @@
 import type { HaWsClient } from "./ws.js";
-import type { AreaEntry, DeviceEntry, EntityEntry, HaState, IndexedEntity } from "../types.js";
+import type { HaState, IndexedEntity } from "../types.js";
+import { areasSchema, devicesSchema, entityEntriesSchema, haStatesSchema, parseHaPayload } from "./schemas.js";
 
 const REGISTRY_TTL_MS = 60_000;
+/**
+ * Short-lived state cache (audit F1): a conversation fires many tool calls
+ * in bursts, and each get_states can weigh megabytes on large instances.
+ * A few seconds of reuse removes the per-call storm while staying fresh
+ * enough for interactive use.
+ */
+const STATES_TTL_MS = 3_000;
 
 interface RegistryCache {
   at: number;
-  areas: AreaEntry[];
-  devices: DeviceEntry[];
-  entities: EntityEntry[];
+  areas: Array<{ area_id: string; name: string }>;
+  devices: Array<{ id: string; name: string | null; name_by_user: string | null; manufacturer: string | null; model: string | null; area_id: string | null; disabled_by: string | null }>;
+  entities: Array<{ entity_id: string; area_id: string | null; device_id: string | null; disabled_by: string | null; hidden_by: string | null; entity_category: string | null }>;
 }
 
 /**
  * Join of states + registries (areas, devices, entities). Registries rarely
- * change, they are cached for 60 s. States are always fetched on demand.
+ * change (60 s TTL), states are cached a few seconds. Concurrent callers
+ * share the in-flight promise instead of stampeding Home Assistant, and the
+ * whole cache is invalidated when the WebSocket reconnects.
  */
 export class Catalog {
-  private cache: RegistryCache | null = null;
+  private regCache: RegistryCache | null = null;
+  private regInflight: Promise<RegistryCache> | null = null;
+  private statesCache: { at: number; states: HaState[] } | null = null;
+  private statesInflight: Promise<HaState[]> | null = null;
 
   constructor(private ws: HaWsClient) {}
 
-  async registries(): Promise<RegistryCache> {
-    if (this.cache && Date.now() - this.cache.at < REGISTRY_TTL_MS) return this.cache;
-    const [areas, devices, entities] = await Promise.all([
-      this.ws.send("config/area_registry/list"),
-      this.ws.send("config/device_registry/list"),
-      this.ws.send("config/entity_registry/list"),
-    ]);
-    this.cache = { at: Date.now(), areas, devices, entities };
-    return this.cache;
+  /** Drops every cache; wired to the WS reconnection (audit B5/C9). */
+  invalidate(): void {
+    this.regCache = null;
+    this.statesCache = null;
   }
 
-  states(): Promise<HaState[]> {
-    return this.ws.send("get_states");
+  async registries(): Promise<RegistryCache> {
+    if (this.regCache && Date.now() - this.regCache.at < REGISTRY_TTL_MS) return this.regCache;
+    if (this.regInflight) return this.regInflight;
+    this.regInflight = (async () => {
+      try {
+        const [areasRaw, devicesRaw, entitiesRaw] = await Promise.all([
+          this.ws.send("config/area_registry/list"),
+          this.ws.send("config/device_registry/list"),
+          this.ws.send("config/entity_registry/list"),
+        ]);
+        const cache: RegistryCache = {
+          at: Date.now(),
+          areas: parseHaPayload(areasSchema, areasRaw, "area registry"),
+          devices: parseHaPayload(devicesSchema, devicesRaw, "device registry"),
+          entities: parseHaPayload(entityEntriesSchema, entitiesRaw, "entity registry"),
+        };
+        this.regCache = cache;
+        return cache;
+      } finally {
+        this.regInflight = null;
+      }
+    })();
+    return this.regInflight;
+  }
+
+  async states(): Promise<HaState[]> {
+    if (this.statesCache && Date.now() - this.statesCache.at < STATES_TTL_MS) return this.statesCache.states;
+    if (this.statesInflight) return this.statesInflight;
+    this.statesInflight = (async () => {
+      try {
+        const raw = await this.ws.send("get_states");
+        const states = parseHaPayload(haStatesSchema, raw, "get_states") as HaState[];
+        this.statesCache = { at: Date.now(), states };
+        return states;
+      } finally {
+        this.statesInflight = null;
+      }
+    })();
+    return this.statesInflight;
   }
 
   async index(): Promise<IndexedEntity[]> {

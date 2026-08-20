@@ -21,9 +21,10 @@ const states = [
   { entity_id: "sensor.orphan", state: "1", attributes: {}, last_changed: "2026-01-01T00:00:00Z", last_updated: "2026-01-01T00:00:00Z" },
 ];
 
-function fakeWs() {
+function fakeWs(overrides: Record<string, unknown> = {}) {
   return {
     send: vi.fn(async (type: string) => {
+      if (type in overrides) return overrides[type];
       switch (type) {
         case "config/area_registry/list": return areas;
         case "config/device_registry/list": return devices;
@@ -51,14 +52,39 @@ describe("Catalog.index", () => {
     expect(byId.get("sensor.orphan")).toMatchObject({ area: null, hidden: false, name: "sensor.orphan" });
   });
 
-  it("caches the registries within the TTL but not the states", async () => {
+  it("caches states and registries within their TTLs (audit F1)", async () => {
     const ws = fakeWs();
     const catalog = new Catalog(ws as any);
     await catalog.index();
     await catalog.index();
     const calls = ws.send.mock.calls.map((c) => c[0]);
-    // 2 get_states (uncached), 3 registry calls (cached on the second run).
-    expect(calls.filter((t) => t === "get_states")).toHaveLength(2);
+    // Everything served from cache on the second run.
+    expect(calls.filter((t) => t === "get_states")).toHaveLength(1);
     expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(3);
+  });
+
+  it("shares the in-flight promise between concurrent callers (audit B5)", async () => {
+    const ws = fakeWs();
+    const catalog = new Catalog(ws as any);
+    await Promise.all([catalog.index(), catalog.index(), catalog.index()]);
+    const calls = ws.send.mock.calls.map((c) => c[0]);
+    expect(calls.filter((t) => t === "get_states")).toHaveLength(1);
+    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(3);
+  });
+
+  it("refetches everything after invalidate(), e.g. on WS reconnection (audit C9)", async () => {
+    const ws = fakeWs();
+    const catalog = new Catalog(ws as any);
+    await catalog.index();
+    catalog.invalidate();
+    await catalog.index();
+    const calls = ws.send.mock.calls.map((c) => c[0]);
+    expect(calls.filter((t) => t === "get_states")).toHaveLength(2);
+    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(6);
+  });
+
+  it("turns an unexpected HA payload into an actionable error (audit B2)", async () => {
+    const catalog = new Catalog(fakeWs({ get_states: { not: "an array" } }) as any);
+    await expect(catalog.index()).rejects.toThrow(/Unexpected payload from Home Assistant \(get_states\)/);
   });
 });

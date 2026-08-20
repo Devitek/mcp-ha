@@ -28,10 +28,14 @@ export function listEnvelope<T>(all: T[], limit = 50, offset = 0, note?: string)
   };
 }
 
-/** Truncates a string while flagging the cut. */
+/** Truncates a string while flagging the cut, never splitting a surrogate pair. */
 export function trunc(s: unknown, max: number): string {
   const str = typeof s === "string" ? s : JSON.stringify(s) ?? "";
-  return str.length > max ? `${str.slice(0, max)}… (truncated, ${str.length} chars)` : str;
+  if (str.length <= max) return str;
+  let sliced = str.slice(0, max);
+  const lastCode = sliced.charCodeAt(sliced.length - 1);
+  if (lastCode >= 0xd800 && lastCode <= 0xdbff) sliced = sliced.slice(0, -1);
+  return `${sliced}… (truncated, ${str.length} chars)`;
 }
 
 export interface ToolResult {
@@ -41,14 +45,14 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-/** Serializes the result as compact JSON, capped at MAX_RESPONSE_BYTES. */
+/** Serializes the result as compact JSON, capped at MAX_RESPONSE_BYTES (real bytes, audit B14). */
 export function jsonResult(data: unknown): ToolResult {
   let text = JSON.stringify(data);
-  if (text.length > MAX_RESPONSE_BYTES) {
+  if (Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES) {
     text = JSON.stringify({
       truncated: true,
       note: "Response too large, truncated. Refine with filters (domain, area, search, limit, shorter time window).",
-      preview: text.slice(0, MAX_RESPONSE_BYTES),
+      preview: trunc(text, MAX_RESPONSE_BYTES),
     });
   }
   return { content: [{ type: "text", text }] };
@@ -69,6 +73,10 @@ export function safe<A>(name: string, fn: (args: A) => Promise<unknown>): (args:
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       log.warning(`Tool ${name} failed: ${msg}`);
+      // The stack is the only way to locate a TypeError coming from an
+      // unexpected HA payload (audit B6); debug level keeps it out of
+      // normal logs.
+      if (e instanceof Error && e.stack) log.debug(e.stack);
       return errorResult(msg);
     }
   };
@@ -84,7 +92,7 @@ export interface TimeWindow {
  * hours. Rejects invalid or overly wide windows.
  */
 export function timeWindow(
-  p: { start?: string; end?: string; hours?: number },
+  p: { start?: string | undefined; end?: string | undefined; hours?: number | undefined },
   defaultHours: number,
   maxHours: number
 ): TimeWindow {

@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registerAutomationTools } from "./automations.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, entity, fakeCtx, fakeServer } from "./testkit.test.js";
+import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -67,13 +67,24 @@ describe("ha_get_automation", () => {
     expect(coreGet).not.toHaveBeenCalled();
   });
 
-  it("degrades gracefully when the config endpoint fails", async () => {
+  it("treats a 404 as the normal YAML case (audit B7)", async () => {
     const coreGet = vi.fn(async () => {
-      throw new Error("HTTP 404");
+      throw new Error("HTTP 404: not found");
     });
     const { tools } = setup(coreGet);
     const res = await callTool(tools, "ha_get_automation", { entity_id: "automation.morning" });
     expect(res.isError).toBe(false);
-    expect(res.data.note).toContain("not readable");
+    expect(res.data.note).toContain("YAML");
+  });
+
+  it("does not disguise an API failure as a YAML case (audit B7)", async () => {
+    const coreGet = vi.fn(async () => {
+      throw new Error("HTTP 503: supervisor restarting");
+    });
+    const { tools } = setup(coreGet);
+    const res = await callTool(tools, "ha_get_automation", { entity_id: "automation.morning" });
+    expect(res.isError).toBe(false);
+    expect(res.data.note).toContain("not readable right now");
+    expect(res.data.note).not.toContain("YAML");
   });
 });
