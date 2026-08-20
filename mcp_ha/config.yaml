@@ -1,5 +1,5 @@
 name: MCP Home Assistant
-version: "0.1.0"
+version: "0.1.1"
 slug: mcp_ha
 description: >-
   Serveur MCP (Model Context Protocol) pour interroger et piloter Home

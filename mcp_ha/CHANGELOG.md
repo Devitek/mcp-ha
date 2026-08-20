@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+- Ajout de l'icône et du logo de l'add-on.
+- Runtime Node 26 : le binaire vient de l'image officielle node:26-alpine (le paquet apk d'Alpine ne suit pas la dernière LTS), base Home Assistant Alpine 3.24.
+- Dépendances mises à jour : zod 4, vitest 4, TypeScript 7, actions de CI.
+- CI : build de validation de l'image Docker sur chaque changement.
+
 ## 0.1.0
 
 Première version.
