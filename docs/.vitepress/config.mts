@@ -1,5 +1,6 @@
 import { defineConfig } from "vitepress";
 import { withMermaid } from "vitepress-plugin-mermaid";
+import llmstxt from "vitepress-plugin-llms";
 
 // Documentation site, English at the root and French under /fr/.
 // Hosted on GitHub Pages, hence the /mcp-ha/ base.
@@ -9,6 +10,25 @@ export default withMermaid(
     title: "MCP Home Assistant",
     lastUpdated: true,
     head: [["link", { rel: "icon", type: "image/png", href: "/mcp-ha/icon.png" }]],
+
+    vite: {
+      plugins: [
+        // LLM-friendly docs (llms.txt convention): /llms.txt index,
+        // /llms-full.txt with everything inlined, plus a .md twin of every
+        // page. English only: mirroring French would double the tokens for
+        // no benefit to an LLM.
+        llmstxt({
+          // Bare domain: the plugin appends the VitePress base (/mcp-ha/)
+          // itself, a domain with the path would double it.
+          domain: "https://devitek.github.io",
+          ignoreFiles: ["fr/**"],
+          description: "Home Assistant add-on exposing an MCP server (16 tools) so AI assistants can query and control a Home Assistant instance.",
+          details:
+            "Read-only by default; a single guarded write tool (ha_call_service) exists behind the allow_write option. " +
+            "LAN-only design with bearer authentication. The add-on talks to Home Assistant over WebSocket through the Supervisor proxy.",
+        }),
+      ],
+    },
 
     locales: {
       root: {
