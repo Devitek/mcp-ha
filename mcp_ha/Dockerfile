@@ -1,7 +1,7 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.21
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base:3.24
 
 # Étape de build : compilation TypeScript avec les dépendances de dev
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -9,10 +9,14 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
-# Image finale : base Home Assistant (s6 + bashio) et runtime Node seul
+# Image finale : base Home Assistant (s6 + bashio) et runtime Node seul.
+# Le binaire node vient de l'image officielle node:26-alpine plutôt que du
+# paquet apk : Alpine ne suit pas la dernière LTS de Node, la copie garantit
+# la version voulue. Seule dépendance système requise : libstdc++.
 FROM ${BUILD_FROM}
 ENV NODE_ENV=production
-RUN apk add --no-cache nodejs
+RUN apk add --no-cache libstdc++
+COPY --from=build /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
