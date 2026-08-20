@@ -35,6 +35,16 @@ The add-on is **read only by default**. The single write tool, `ha_call_service`
 - Home Assistant OS or Supervised (the add-on needs the Supervisor).
 - An MCP client on your LAN: Claude Code, Claude Desktop, Gemini CLI, or anything speaking MCP over Streamable HTTP.
 
+## Documentation for LLMs
+
+This documentation follows the [llms.txt convention](https://llmstxt.org), so AI assistants and agents can consume it directly:
+
+- [`/llms.txt`](https://devitek.github.io/mcp-ha/llms.txt): a compact index with a summary and described links, ideal for an agent that picks what to read.
+- [`/llms-full.txt`](https://devitek.github.io/mcp-ha/llms-full.txt): the entire documentation in a single markdown file, ideal to paste into a conversation or ingest in one shot.
+- Every page also exists as raw markdown: append `.md` to its URL (e.g. [/reference/tools.md](https://devitek.github.io/mcp-ha/reference/tools.md)).
+
+These files are regenerated on every site build, in English only. The documentation is also indexed on [Context7](https://context7.com), for agents that resolve library docs through the Context7 MCP server.
+
 ## Where next
 
 - [Installation](/guide/installation)

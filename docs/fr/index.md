@@ -35,6 +35,16 @@ L'add-on est en **lecture seule par défaut**. Le seul outil d'écriture, `ha_ca
 - Home Assistant OS ou Supervised (l'add-on a besoin du Supervisor).
 - Un client MCP sur votre réseau local : Claude Code, Claude Desktop, Gemini CLI, ou tout client MCP en Streamable HTTP.
 
+## Documentation pour les LLMs
+
+Cette documentation suit la [convention llms.txt](https://llmstxt.org), pour être consommée directement par les assistants IA et les agents :
+
+- [`/llms.txt`](https://devitek.github.io/mcp-ha/llms.txt) : un index compact avec résumé et liens décrits, idéal pour un agent qui choisit quoi lire.
+- [`/llms-full.txt`](https://devitek.github.io/mcp-ha/llms-full.txt) : toute la documentation en un seul fichier markdown, idéal à coller dans une conversation ou à ingérer d'un bloc.
+- Chaque page existe aussi en markdown brut : ajoutez `.md` à son URL (ex. [/reference/tools.md](https://devitek.github.io/mcp-ha/reference/tools.md)).
+
+Ces fichiers sont régénérés à chaque build du site, en anglais uniquement. La documentation est aussi indexée sur [Context7](https://context7.com), pour les agents qui résolvent les docs via le serveur MCP Context7.
+
 ## Pour aller plus loin
 
 - [Installation](/fr/guide/installation)
