@@ -14,9 +14,9 @@ afterEach(() => vi.restoreAllMocks());
 /** Audit lines are JSON with audit:true, emitted even at log level fatal. */
 function auditLines(): any[] {
   return consoleSpy.mock.calls
-    .map((c) => String(c[0]))
-    .filter((line) => line.includes('"audit":true'))
-    .map((line) => JSON.parse(line));
+    .map((c: unknown[]) => String(c[0]))
+    .filter((line: string) => line.includes('"audit":true'))
+    .map((line: string) => JSON.parse(line));
 }
 
 const SERVICES_FIXTURE = {
