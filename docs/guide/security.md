@@ -1,0 +1,47 @@
+# Security
+
+Giving an LLM access to your home automation deserves a real security posture. This page summarizes the model; the authoritative document is [SECURITY.md](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md) in the repository.
+
+## Design choices
+
+- **Read only by default.** With `allow_write: false` (the default), the write tool is not registered: it does not appear in the client's tool list at all.
+- **LAN only.** Plain HTTP with a static bearer token. Do not expose port 9583 to the internet; for remote access use a VPN (WireGuard, Tailscale...).
+- **The Supervisor token never leaves the add-on.** MCP clients authenticate with their own API token; no tool returns any HA credential.
+
+## Write path
+
+Every `ha_call_service` call goes through this gauntlet:
+
+```mermaid
+flowchart TD
+  A["ha_call_service"] --> B{"allow_write enabled?"}
+  B -- "no" --> R0["Tool not registered:<br>invisible to the client"]
+  B -- "yes" --> C{"service in<br>service_denylist?"}
+  C -- "yes" --> R1["Refused + audit line"]
+  C -- "no" --> D{"targeted entities pass<br>allowlist / denylist?"}
+  D -- "no" --> R1
+  D -- "yes" --> E{"area_id / device_id target<br>while restrictions exist?"}
+  E -- "yes" --> R1
+  E -- "no" --> F{"dry_run?"}
+  F -- "yes" --> P["Preview returned + audit,<br>nothing executed"]
+  F -- "no" --> X["call_service executed + audit"]
+```
+
+The audit lines are JSON, one per attempt, and are emitted regardless of the configured log level. See [Logging](/reference/logging).
+
+## Token lifecycle
+
+- Generated on first start (32 random bytes) when `api_token` is empty.
+- Persisted in `/data/token` (mode 600), written back into the add-on options, printed once per start in the log.
+- Compared in constant time on every request.
+- To rotate: clear the `api_token` option, delete `/data/token` (or reinstall), restart.
+
+## Accepted limitations
+
+- `ha_render_template` evaluates Jinja server-side: read only, but it can read **any** entity state, `filter_reads` does not apply to it.
+- The token being in the options means it is included in add-on backups, and visible to HA admins. So are the logs.
+- No TLS: anyone able to sniff your LAN traffic can read the token. That is the LAN-only tradeoff.
+
+## Reporting
+
+Found a vulnerability? Please use [private security advisories](https://github.com/Devitek/mcp-ha/security/advisories/new) rather than a public issue.

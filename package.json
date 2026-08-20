@@ -1,0 +1,21 @@
+{
+  "name": "mcp-ha-repo",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Repository tooling: VitePress documentation site (the add-on lives in mcp_ha/)",
+  "license": "MIT",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "devDependencies": {
+    "mermaid": "^11.4.0",
+    "vitepress": "^1.6.0",
+    "vitepress-plugin-mermaid": "^2.0.17"
+  }
+}
