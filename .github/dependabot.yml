@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/mcp_ha"
+    schedule:
+      interval: weekly
+    labels:
+      - "sécurité"
+    commit-message:
+      prefix: "chore"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    labels:
+      - "ci"
+    commit-message:
+      prefix: "ci"

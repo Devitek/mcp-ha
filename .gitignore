@@ -1,0 +1,11 @@
+# Dépendances et build
+node_modules/
+dist/
+
+# Environnement local
+.env
+*.log
+.DS_Store
+
+# Outillage IA local, non versionné
+CLAUDE.md
