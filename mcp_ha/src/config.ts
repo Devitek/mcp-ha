@@ -1,12 +1,15 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
+import { z } from "zod";
 import { log, setLogLevel } from "./logger.js";
 import { maskSecret } from "./safety.js";
 
-export const VERSION = "0.1.4";
+export const VERSION = "0.1.5";
 
 const OPTIONS_PATH = "/data/options.json";
 const TOKEN_PATH = "/data/token";
+/** Below this size a user-chosen token is realistically brute-forceable. */
+export const MIN_TOKEN_LENGTH = 16;
 
 export interface AddonConfig {
   port: number;
@@ -25,39 +28,83 @@ export interface AddonConfig {
   devHaToken: string | null;
 }
 
-function strArray(v: unknown): string[] {
-  return Array.isArray(v) ? v.map(String).filter((s) => s.trim().length > 0) : [];
+/**
+ * Runtime validation of /data/options.json. The Supervisor validates against
+ * the config.yaml schema, but dev mode has no Supervisor and a corrupted file
+ * must degrade to defaults instead of crash-looping the add-on.
+ */
+const optionsSchema = z
+  .object({
+    log_level: z.string().default("info"),
+    api_token: z.string().default(""),
+    allow_write: z.boolean().default(false),
+    filter_reads: z.boolean().default(false),
+    entity_allowlist: z.array(z.string()).default([]),
+    entity_denylist: z.array(z.string()).default([]),
+    service_denylist: z.array(z.string()).default([]),
+  })
+  .loose();
+
+type Options = z.infer<typeof optionsSchema>;
+
+function readOptions(): Options {
+  let raw: unknown = {};
+  if (existsSync(OPTIONS_PATH)) {
+    try {
+      raw = JSON.parse(readFileSync(OPTIONS_PATH, "utf8"));
+    } catch (e) {
+      log.error(`Could not read ${OPTIONS_PATH}: ${String(e)}. Falling back to defaults.`);
+    }
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) raw = {};
+  const parsed = optionsSchema.safeParse(raw);
+  if (parsed.success) return parsed.data;
+  log.error(
+    `Invalid values in ${OPTIONS_PATH} (${parsed.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ")}). Falling back to defaults.`
+  );
+  return optionsSchema.parse({});
+}
+
+function parsePort(v: string | undefined): number {
+  const n = Number(v ?? 9583);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) {
+    log.warning(`Invalid MCP_PORT value "${v}", using 9583`);
+    return 9583;
+  }
+  return n;
 }
 
 export function loadConfig(): AddonConfig {
-  let opts: Record<string, unknown> = {};
-  if (existsSync(OPTIONS_PATH)) {
-    try {
-      opts = JSON.parse(readFileSync(OPTIONS_PATH, "utf8"));
-    } catch (e) {
-      log.error(`Could not read ${OPTIONS_PATH}: ${String(e)}`);
-    }
-  }
+  const opts = readOptions();
 
-  const level = setLogLevel(String(opts.log_level ?? process.env.LOG_LEVEL ?? "info"));
+  const level = setLogLevel(String(process.env.LOG_LEVEL ?? opts.log_level));
   log.debug(`Log level set to ${level}`);
 
-  let apiToken = String(opts.api_token ?? process.env.MCP_API_TOKEN ?? "").trim();
+  let apiToken = (opts.api_token || process.env.MCP_API_TOKEN || "").trim();
   let apiTokenGenerated = false;
   if (!apiToken) {
     apiToken = bootstrapToken();
     apiTokenGenerated = true;
+  } else if (apiToken.length < MIN_TOKEN_LENGTH) {
+    // Accepted for now to avoid locking out existing setups, but loudly:
+    // a short token on a LAN endpoint is brute-forceable.
+    log.error(
+      `The configured api_token is only ${apiToken.length} characters long (minimum recommended: ${MIN_TOKEN_LENGTH}). ` +
+        "It is realistically brute-forceable; clear the option to get a strong generated token."
+    );
   }
 
   return {
-    port: Number(process.env.MCP_PORT ?? 9583),
+    port: parsePort(process.env.MCP_PORT),
     apiToken,
     apiTokenGenerated,
-    allowWrite: opts.allow_write === true || process.env.MCP_ALLOW_WRITE === "true",
-    filterReads: opts.filter_reads === true,
-    entityAllowlist: strArray(opts.entity_allowlist),
-    entityDenylist: strArray(opts.entity_denylist),
-    serviceDenylist: strArray(opts.service_denylist),
+    allowWrite: opts.allow_write || process.env.MCP_ALLOW_WRITE === "true",
+    filterReads: opts.filter_reads,
+    entityAllowlist: opts.entity_allowlist.filter((s) => s.trim().length > 0),
+    entityDenylist: opts.entity_denylist.filter((s) => s.trim().length > 0),
+    serviceDenylist: opts.service_denylist.filter((s) => s.trim().length > 0),
     supervisorToken: process.env.SUPERVISOR_TOKEN ?? null,
     devHaUrl: process.env.HA_URL ?? null,
     devHaToken: process.env.HA_TOKEN ?? null,
@@ -89,7 +136,10 @@ function bootstrapToken(): string {
   }
   const t = randomBytes(32).toString("hex");
   try {
-    writeFileSync(TOKEN_PATH, t, { mode: 0o600 });
+    // Atomic write: a kill in the middle of a plain write would leave a
+    // truncated token and lock every client out after the next boot.
+    writeFileSync(`${TOKEN_PATH}.tmp`, t, { mode: 0o600 });
+    renameSync(`${TOKEN_PATH}.tmp`, TOKEN_PATH);
     log.warning(
       `No api_token configured: generated ${maskSecret(t)} and persisted it in ${TOKEN_PATH}. Read the full token in the add-on Configuration tab (api_token option).`
     );
