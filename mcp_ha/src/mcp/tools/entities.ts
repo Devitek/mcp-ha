@@ -5,7 +5,7 @@ import type { IndexedEntity } from "../../types.js";
 import { listEnvelope, safe, trunc } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
 
-/** Projection compacte utilisée par toutes les listes d'entités. */
+/** Compact projection used by every entity list. */
 function summary(e: IndexedEntity) {
   return {
     entity_id: e.entity_id,
@@ -28,7 +28,7 @@ function matchQuery(e: IndexedEntity, query: string): number {
     if (id.includes(t)) score += 5;
     else if (name.includes(t)) score += 4;
     else if (area.includes(t)) score += 2;
-    else return 0; // chaque mot doit matcher quelque part
+    else return 0; // every word must match somewhere
   }
   return score;
 }
@@ -40,14 +40,14 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
     "ha_search_entities",
     {
-      title: "Rechercher des entités",
+      title: "Search entities",
       description:
-        "Recherche floue d'entités Home Assistant par nom, entity_id ou pièce. " +
-        "À utiliser en premier pour trouver le bon entity_id (ex. query: 'lumière cuisine'). " +
-        "Enchaînez avec ha_get_entity pour le détail complet.",
+        "Fuzzy search of Home Assistant entities by name, entity_id or area. " +
+        "Use this first to find the right entity_id (e.g. query: 'kitchen light'). " +
+        "Follow up with ha_get_entity for full details.",
       inputSchema: {
-        query: z.string().min(1).describe("Termes de recherche (nom, id, pièce)"),
-        limit: z.number().int().min(1).max(50).optional().describe("Nombre max de résultats, défaut 20"),
+        query: z.string().min(1).describe("Search terms (name, id, area)"),
+        limit: z.number().int().min(1).max(50).optional().describe("Max results, default 20"),
       },
       annotations: { readOnlyHint: true },
     },
@@ -58,24 +58,29 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
         .filter((x) => x.score > 0)
         .sort((a, b) => b.score - a.score)
         .map((x) => summary(x.e));
-      return listEnvelope(scored, limit ?? 20, 0, scored.length === 0 ? "Aucun résultat, essayez d'autres mots ou ha_list_entities avec un filtre domain." : undefined);
+      return listEnvelope(
+        scored,
+        limit ?? 20,
+        0,
+        scored.length === 0 ? "No result, try other words or ha_list_entities with a domain filter." : undefined
+      );
     })
   );
 
   server.registerTool(
     "ha_list_entities",
     {
-      title: "Lister les entités",
+      title: "List entities",
       description:
-        "Liste paginée et compacte des entités, filtrable par domain (light, sensor, switch, automation...), " +
-        "area (nom de pièce), search et state. Sans aucun filtre, renvoie un histogramme par domaine et par pièce " +
-        "au lieu d'un dump complet : filtrez pour obtenir les entités.",
+        "Paginated compact list of entities, filterable by domain (light, sensor, switch, automation...), " +
+        "area (room name), search and state. With no filter at all it returns a histogram per domain and " +
+        "per area instead of a full dump: filter to get actual entities.",
       inputSchema: {
-        domain: z.string().optional().describe("Domaine exact, ex. light"),
-        area: z.string().optional().describe("Nom (ou id) de pièce, insensible à la casse"),
-        search: z.string().optional().describe("Recherche floue dans id, nom, pièce"),
-        state: z.string().optional().describe("État exact, ex. on"),
-        limit: z.number().int().min(1).max(200).optional().describe("Défaut 50, max 200"),
+        domain: z.string().optional().describe("Exact domain, e.g. light"),
+        area: z.string().optional().describe("Area name (or id), case insensitive"),
+        search: z.string().optional().describe("Fuzzy search in id, name, area"),
+        state: z.string().optional().describe("Exact state, e.g. on"),
+        limit: z.number().int().min(1).max(200).optional().describe("Default 50, max 200"),
         offset: z.number().int().min(0).optional(),
       },
       annotations: { readOnlyHint: true },
@@ -96,7 +101,7 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
           total: all.length,
           by_domain: top(byDomain),
           by_area: top(byArea),
-          note: "Aperçu seulement. Relancez avec un filtre (domain, area, search ou state) pour obtenir les entités.",
+          note: "Overview only. Call again with a filter (domain, area, search or state) to get entities.",
         };
       }
 
@@ -120,22 +125,22 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
     "ha_get_entity",
     {
-      title: "Détail d'une entité",
+      title: "Entity details",
       description:
-        "État complet d'une entité : state, tous les attributs, pièce, appareil, horodatages. " +
-        "Les valeurs d'attributs très longues sont tronquées.",
+        "Full state of one entity: state, all attributes, area, device, timestamps. " +
+        "Very long attribute values are truncated.",
       inputSchema: {
-        entity_id: z.string().describe("Ex. light.cuisine"),
+        entity_id: z.string().describe("E.g. light.kitchen"),
       },
       annotations: { readOnlyHint: true },
     },
     safe("ha_get_entity", async ({ entity_id }) => {
       if (!entityReadVisible(ctx.cfg, entity_id)) {
-        throw new Error(`l'entité ${entity_id} n'est pas accessible (filter_reads)`);
+        throw new Error(`entity ${entity_id} is not accessible (filter_reads)`);
       }
       const all = await ctx.catalog.index();
       const e = all.find((x) => x.entity_id === entity_id);
-      if (!e) throw new Error(`entité inconnue : ${entity_id}. Utilisez ha_search_entities pour trouver le bon id.`);
+      if (!e) throw new Error(`unknown entity: ${entity_id}. Use ha_search_entities to find the right id.`);
       const attributes: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(e.attributes)) {
         const s = JSON.stringify(v) ?? "";
@@ -157,8 +162,8 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
     "ha_list_areas",
     {
-      title: "Lister les pièces",
-      description: "Toutes les pièces (areas) déclarées, avec le nombre d'entités de chacune.",
+      title: "List areas",
+      description: "All declared areas (rooms), with the number of entities in each.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -180,12 +185,12 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
     "ha_list_devices",
     {
-      title: "Lister les appareils",
+      title: "List devices",
       description:
-        "Appareils (devices) du registre : fabricant, modèle, pièce. Filtrable par pièce. " +
-        "Un appareil regroupe plusieurs entités.",
+        "Devices from the registry: manufacturer, model, area. Filterable by area. " +
+        "One device groups several entities.",
       inputSchema: {
-        area: z.string().optional().describe("Nom de pièce, insensible à la casse"),
+        area: z.string().optional().describe("Area name, case insensitive"),
         limit: z.number().int().min(1).max(200).optional(),
         offset: z.number().int().min(0).optional(),
       },
@@ -198,7 +203,7 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
         .filter((d) => !d.disabled_by)
         .map((d) => ({
           device_id: d.id,
-          name: d.name_by_user ?? d.name ?? "(sans nom)",
+          name: d.name_by_user ?? d.name ?? "(unnamed)",
           manufacturer: d.manufacturer,
           model: d.model,
           area: d.area_id ? (areaById.get(d.area_id) ?? null) : null,

@@ -11,9 +11,8 @@ interface RegistryCache {
 }
 
 /**
- * Jointure états + registres (areas, devices, entities). Les registres
- * changent rarement, on les met en cache 60 s. Les états sont toujours
- * relus à la demande.
+ * Join of states + registries (areas, devices, entities). Registries rarely
+ * change, they are cached for 60 s. States are always fetched on demand.
  */
 export class Catalog {
   private cache: RegistryCache | null = null;

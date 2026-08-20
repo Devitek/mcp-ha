@@ -20,14 +20,14 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
   server.registerTool(
     "ha_list_services",
     {
-      title: "Lister les services",
+      title: "List services",
       description:
-        "Catalogue des services appelables. Sans paramètre : la liste des domaines et leur nombre de services. " +
-        "Avec domain : le détail des services du domaine (champs, description). " +
-        "Avec search : recherche transverse.",
+        "Catalog of callable services. Without parameters: the list of domains with their service counts. " +
+        "With domain: the detailed services of that domain (fields, description). " +
+        "With search: cross-domain search.",
       inputSchema: {
-        domain: z.string().optional().describe("Ex. light, script, climate"),
-        search: z.string().optional().describe("Recherche dans les noms et descriptions"),
+        domain: z.string().optional().describe("E.g. light, script, climate"),
+        search: z.string().optional().describe("Search in names and descriptions"),
       },
       annotations: { readOnlyHint: true },
     },
@@ -36,7 +36,7 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
 
       if (domain) {
         const d = services[domain.toLowerCase().trim()];
-        if (!d) throw new Error(`domaine inconnu : ${domain}`);
+        if (!d) throw new Error(`unknown domain: ${domain}`);
         return {
           domain,
           services: Object.entries(d).map(([name, def]) => ({
@@ -65,27 +65,27 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
           domain: dom,
           services: Object.keys(defs).length,
         })),
-        note: "Relancez avec domain: '...' pour le détail d'un domaine, ou search pour une recherche transverse.",
+        note: "Call again with domain: '...' for the details of one domain, or search for a cross-domain lookup.",
       };
     })
   );
 
-  // Outil d'écriture : uniquement enregistré si allow_write est actif.
-  // Invisible sinon, c'est le premier étage de la défense.
+  // Write tool: only registered when allow_write is enabled. Invisible
+  // otherwise, that is the first layer of defense.
   if (!ctx.cfg.allowWrite) return;
 
   server.registerTool(
     "ha_call_service",
     {
-      title: "Appeler un service",
+      title: "Call a service",
       description:
-        "Appelle un service Home Assistant (ex. light.turn_on sur light.cuisine). " +
-        "Vérifiez d'abord le service avec ha_list_services et l'entité avec ha_search_entities. " +
-        "Utilisez dry_run: true pour prévisualiser l'appel sans l'exécuter. " +
-        "Soumis aux listes d'autorisation configurées dans l'add-on.",
+        "Calls a Home Assistant service (e.g. light.turn_on on light.kitchen). " +
+        "Check the service with ha_list_services and the entity with ha_search_entities first. " +
+        "Use dry_run: true to preview the call without executing it. " +
+        "Subject to the allow/deny lists configured in the add-on.",
       inputSchema: {
-        domain: z.string().describe("Domaine du service, ex. light"),
-        service: z.string().describe("Nom du service, ex. turn_on"),
+        domain: z.string().describe("Service domain, e.g. light"),
+        service: z.string().describe("Service name, e.g. turn_on"),
         target: z
           .object({
             entity_id: z.union([z.string(), z.array(z.string())]).optional(),
@@ -93,11 +93,11 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
             area_id: z.union([z.string(), z.array(z.string())]).optional(),
           })
           .optional()
-          .describe("Cible de l'appel, privilégiez entity_id"),
-        // zod 4 : z.record exige désormais le schéma de clé et de valeur.
-        data: z.record(z.string(), z.any()).optional().describe("Données du service, ex. { brightness_pct: 50 }"),
-        dry_run: z.boolean().optional().describe("true : prévisualise sans exécuter"),
-        return_response: z.boolean().optional().describe("true si le service renvoie des données (ex. weather.get_forecasts)"),
+          .describe("Call target, prefer entity_id"),
+        // zod 4: z.record requires both the key and the value schema.
+        data: z.record(z.string(), z.any()).optional().describe("Service data, e.g. { brightness_pct: 50 }"),
+        dry_run: z.boolean().optional().describe("true: preview without executing"),
+        return_response: z.boolean().optional().describe("true when the service returns data (e.g. weather.get_forecasts)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
@@ -106,13 +106,13 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
       const svc = service.toLowerCase().trim();
       const deny = (reason: string) => {
         audit({ tool: "ha_call_service", domain: dom, service: svc, target, allowed: false, reason });
-        throw new Error(`appel refusé : ${reason}`);
+        throw new Error(`call refused: ${reason}`);
       };
 
       const sv = serviceAllowed(ctx.cfg, dom, svc);
-      if (!sv.allowed) deny(sv.reason ?? "service interdit");
+      if (!sv.allowed) deny(sv.reason ?? "service denied");
 
-      // Entités ciblées explicitement (target et data au cas où).
+      // Explicitly targeted entities (target, plus data just in case).
       const ids: string[] = [];
       const collect = (v: unknown) => {
         if (typeof v === "string") ids.push(v);
@@ -123,14 +123,14 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
 
       for (const id of ids) {
         const v = entityWriteAllowed(ctx.cfg, id);
-        if (!v.allowed) deny(v.reason ?? `entité interdite : ${id}`);
+        if (!v.allowed) deny(v.reason ?? `entity denied: ${id}`);
       }
 
-      // Un ciblage par pièce ou par appareil contournerait les listes
-      // d'entités : on l'interdit dès qu'une restriction est configurée.
+      // Targeting by area or device would bypass the entity lists: refuse it
+      // as soon as any entity restriction is configured.
       const hasRestrictions = ctx.cfg.entityAllowlist.length > 0 || ctx.cfg.entityDenylist.length > 0;
       if (hasRestrictions && (target?.area_id || target?.device_id)) {
-        deny("des restrictions d'entités sont configurées, ciblez des entity_id explicites plutôt que area_id ou device_id");
+        deny("entity restrictions are configured, target explicit entity_id values instead of area_id or device_id");
       }
 
       if (dry_run) {
@@ -138,7 +138,7 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
         return {
           dry_run: true,
           would_call: { domain: dom, service: svc, target: target ?? null, data: data ?? null },
-          note: "Aucune action exécutée. Relancez sans dry_run pour exécuter.",
+          note: "Nothing was executed. Call again without dry_run to execute.",
         };
       }
 

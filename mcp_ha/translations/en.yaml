@@ -1,9 +1,16 @@
 configuration:
+  log_level:
+    name: Log level
+    description: >-
+      Verbosity of the add-on log. info is a good default, debug and trace
+      help when diagnosing an issue. Write audit lines are always emitted
+      regardless of this level.
   api_token:
     name: API token
     description: >-
       Token expected in the Authorization header of MCP clients. Leave empty
-      to generate one on first start, it will be printed in the add-on log.
+      to generate one on first start: it is then saved back into this option
+      and shown in the add-on log.
   allow_write:
     name: Allow write
     description: >-

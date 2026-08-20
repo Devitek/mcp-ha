@@ -6,6 +6,7 @@ function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
   return {
     port: 9583,
     apiToken: "t",
+    apiTokenGenerated: false,
     allowWrite: true,
     filterReads: false,
     entityAllowlist: [],
@@ -19,55 +20,55 @@ function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
 }
 
 describe("globToRegex", () => {
-  it("matche un id exact", () => {
+  it("matches an exact id", () => {
     expect(globToRegex("lock.front_door").test("lock.front_door")).toBe(true);
     expect(globToRegex("lock.front_door").test("lock.front_door_2")).toBe(false);
   });
 
-  it("matche un domaine entier avec l'étoile", () => {
-    expect(globToRegex("light.*").test("light.cuisine")).toBe(true);
-    expect(globToRegex("light.*").test("switch.cuisine")).toBe(false);
+  it("matches a whole domain with the star", () => {
+    expect(globToRegex("light.*").test("light.kitchen")).toBe(true);
+    expect(globToRegex("light.*").test("switch.kitchen")).toBe(false);
   });
 
-  it("échappe les caractères spéciaux de regex", () => {
-    // Le point ne doit pas être un joker : light_cuisine ne matche pas light.cuisine
-    expect(globToRegex("light.cuisine").test("lightXcuisine")).toBe(false);
+  it("escapes regex metacharacters", () => {
+    // The dot must not act as a wildcard.
+    expect(globToRegex("light.kitchen").test("lightXkitchen")).toBe(false);
     expect(globToRegex("a+b").test("a+b")).toBe(true);
     expect(globToRegex("a+b").test("aab")).toBe(false);
   });
 
-  it("gère l'étoile en plein milieu", () => {
+  it("handles a star in the middle", () => {
     expect(globToRegex("recorder.purge*").test("recorder.purge_entities")).toBe(true);
-    expect(globToRegex("*.cuisine").test("light.cuisine")).toBe(true);
+    expect(globToRegex("*.kitchen").test("light.kitchen")).toBe(true);
   });
 
-  it("est insensible à la casse", () => {
-    expect(matchesAny("Light.Cuisine", ["light.*"])).toBe(true);
+  it("is case insensitive", () => {
+    expect(matchesAny("Light.Kitchen", ["light.*"])).toBe(true);
   });
 });
 
 describe("entityWriteAllowed", () => {
-  it("autorise tout quand aucune liste n'est configurée", () => {
-    expect(entityWriteAllowed(cfg(), "light.cuisine").allowed).toBe(true);
+  it("allows everything when no list is configured", () => {
+    expect(entityWriteAllowed(cfg(), "light.kitchen").allowed).toBe(true);
   });
 
-  it("une allowlist non vide passe en interdit par défaut", () => {
+  it("a non-empty allowlist switches to deny by default", () => {
     const c = cfg({ entityAllowlist: ["light.*"] });
-    expect(entityWriteAllowed(c, "light.cuisine").allowed).toBe(true);
+    expect(entityWriteAllowed(c, "light.kitchen").allowed).toBe(true);
     expect(entityWriteAllowed(c, "switch.tv").allowed).toBe(false);
   });
 
-  it("la denylist gagne sur l'allowlist", () => {
-    const c = cfg({ entityAllowlist: ["light.*"], entityDenylist: ["light.chambre_bebe"] });
-    expect(entityWriteAllowed(c, "light.chambre_bebe").allowed).toBe(false);
-    expect(entityWriteAllowed(c, "light.salon").allowed).toBe(true);
+  it("the denylist wins over the allowlist", () => {
+    const c = cfg({ entityAllowlist: ["light.*"], entityDenylist: ["light.baby_room"] });
+    expect(entityWriteAllowed(c, "light.baby_room").allowed).toBe(false);
+    expect(entityWriteAllowed(c, "light.living_room").allowed).toBe(true);
   });
 
-  it("refuse avec une raison exploitable", () => {
+  it("refuses with an actionable reason", () => {
     const c = cfg({ entityDenylist: ["lock.*"] });
-    const v = entityWriteAllowed(c, "lock.entree");
+    const v = entityWriteAllowed(c, "lock.entrance");
     expect(v.allowed).toBe(false);
-    expect(v.reason).toContain("lock.entree");
+    expect(v.reason).toContain("lock.entrance");
   });
 });
 
@@ -82,34 +83,34 @@ describe("serviceAllowed", () => {
     ],
   });
 
-  it("bloque les services listés, y compris par glob", () => {
+  it("blocks denylisted services, including via globs", () => {
     expect(serviceAllowed(c, "homeassistant", "stop").allowed).toBe(false);
     expect(serviceAllowed(c, "hassio", "addon_start").allowed).toBe(false);
     expect(serviceAllowed(c, "shell_command", "reboot_nas").allowed).toBe(false);
     expect(serviceAllowed(c, "recorder", "purge_entities").allowed).toBe(false);
   });
 
-  it("laisse passer les services ordinaires", () => {
+  it("lets ordinary services through", () => {
     expect(serviceAllowed(c, "light", "turn_on").allowed).toBe(true);
     expect(serviceAllowed(c, "homeassistant", "turn_off").allowed).toBe(true);
   });
 });
 
 describe("entityReadVisible", () => {
-  it("ne filtre rien par défaut", () => {
+  it("filters nothing by default", () => {
     const c = cfg({ entityDenylist: ["camera.*"] });
-    expect(entityReadVisible(c, "camera.salon")).toBe(true);
+    expect(entityReadVisible(c, "camera.living_room")).toBe(true);
   });
 
-  it("applique la denylist quand filter_reads est actif", () => {
+  it("applies the denylist when filter_reads is enabled", () => {
     const c = cfg({ entityDenylist: ["camera.*"], filterReads: true });
-    expect(entityReadVisible(c, "camera.salon")).toBe(false);
-    expect(entityReadVisible(c, "light.salon")).toBe(true);
+    expect(entityReadVisible(c, "camera.living_room")).toBe(false);
+    expect(entityReadVisible(c, "light.living_room")).toBe(true);
   });
 });
 
 describe("safeEqual", () => {
-  it("compare correctement", () => {
+  it("compares correctly", () => {
     expect(safeEqual("abc", "abc")).toBe(true);
     expect(safeEqual("abc", "abd")).toBe(false);
     expect(safeEqual("abc", "abcd")).toBe(false);

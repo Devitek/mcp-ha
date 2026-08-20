@@ -20,9 +20,10 @@ const PING_INTERVAL_MS = 30_000;
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
- * Client WebSocket Home Assistant : handshake d'auth, corrélation des
- * réponses par id croissant, timeouts, keep-alive et reconnexion avec
- * backoff exponentiel. Les commandes émises avant auth_ok patientent.
+ * Home Assistant WebSocket client: auth handshake, response correlation by
+ * monotonically increasing id, per-command timeouts, keep-alive and
+ * reconnection with exponential backoff. Commands issued before auth_ok wait
+ * in line.
  */
 export class HaWsClient {
   private ws: WebSocket | null = null;
@@ -45,7 +46,7 @@ export class HaWsClient {
     if (this.cfg.devHaUrl) {
       return this.cfg.devHaUrl.replace(/^http/, "ws").replace(/\/+$/, "") + "/api/websocket";
     }
-    throw new Error("Aucune cible Home Assistant : ni SUPERVISOR_TOKEN ni HA_URL");
+    throw new Error("No Home Assistant target: neither SUPERVISOR_TOKEN nor HA_URL is set");
   }
 
   private token(): string {
@@ -61,14 +62,14 @@ export class HaWsClient {
       log.error(String(e instanceof Error ? e.message : e));
       return;
     }
-    log.info(`Connexion WebSocket à ${url}`);
+    log.info(`Connecting to Home Assistant WebSocket at ${url}`);
     const ws = new WebSocket(url);
     this.ws = ws;
     ws.on("message", (raw) => this.onMessage(raw.toString()));
-    ws.on("close", () => this.onClose("connexion fermée"));
+    ws.on("close", () => this.onClose("connection closed"));
     ws.on("error", (err) => {
-      log.warn(`Erreur WebSocket : ${err.message}`);
-      // close suivra et déclenchera la reconnexion
+      log.warning(`WebSocket error: ${err.message}`);
+      // close follows and triggers the reconnection
     });
   }
 
@@ -78,7 +79,7 @@ export class HaWsClient {
     this.ws?.close();
   }
 
-  /** Envoie une commande et attend son result. */
+  /** Sends a command and waits for its result. */
   async send(
     type: string,
     payload: Record<string, unknown> = {},
@@ -93,7 +94,7 @@ export class HaWsClient {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.waiters = this.waiters.filter((w) => w.timer !== timer);
-        reject(new Error("WebSocket HA non connecté (réessayez dans quelques secondes)"));
+        reject(new Error("Home Assistant WebSocket is not connected (retry in a few seconds)"));
       }, timeoutMs);
       this.waiters.push({ resolve: () => resolve(), reject, timer });
     });
@@ -102,13 +103,14 @@ export class HaWsClient {
   private raw(type: string, payload: Record<string, unknown>, timeoutMs: number): Promise<unknown> {
     const ws = this.ws;
     if (!ws || ws.readyState !== WebSocket.OPEN) {
-      return Promise.reject(new Error("WebSocket HA non connecté"));
+      return Promise.reject(new Error("Home Assistant WebSocket is not connected"));
     }
     const id = this.nextId++;
+    log.debug(`WS command ${type} (id ${id})`);
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`la commande ${type} n'a pas répondu en ${timeoutMs} ms`));
+        reject(new Error(`command ${type} did not answer within ${timeoutMs} ms`));
       }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer });
       ws.send(JSON.stringify({ id, type, ...payload }));
@@ -122,6 +124,7 @@ export class HaWsClient {
     } catch {
       return;
     }
+    log.trace(`WS frame received: type=${msg.type ?? "?"} id=${msg.id ?? "-"} (${rawStr.length} bytes)`);
     switch (msg.type) {
       case "auth_required":
         this.ws?.send(JSON.stringify({ type: "auth", access_token: this.token() }));
@@ -129,7 +132,7 @@ export class HaWsClient {
       case "auth_ok":
         this.authed = true;
         this.backoff = RECONNECT_MIN_MS;
-        log.info(`Authentifié auprès de Home Assistant ${msg.ha_version ?? ""}`.trim());
+        log.info(`Authenticated with Home Assistant ${msg.ha_version ?? ""}`.trim());
         for (const w of this.waiters.splice(0)) {
           clearTimeout(w.timer);
           w.resolve();
@@ -137,9 +140,9 @@ export class HaWsClient {
         this.startPing();
         break;
       case "auth_invalid":
-        // Jeton Supervisor refusé : cas anormal, on loggue et la fermeture
-        // qui suit déclenchera des retries espacés.
-        log.error(`Authentification HA refusée : ${msg.message ?? "raison inconnue"}`);
+        // Refused Supervisor token: abnormal. The close that follows will
+        // schedule spaced retries.
+        log.error(`Home Assistant refused the authentication: ${msg.message ?? "unknown reason"}`);
         break;
       default: {
         if (typeof msg.id !== "number") return;
@@ -149,13 +152,16 @@ export class HaWsClient {
           this.pending.delete(msg.id);
           clearTimeout(p.timer);
           if (msg.success) p.resolve(msg.result);
-          else p.reject(new Error(msg.error?.message ?? "erreur Home Assistant"));
+          else {
+            log.debug(`WS command id ${msg.id} failed: ${msg.error?.message ?? "unknown error"}`);
+            p.reject(new Error(msg.error?.message ?? "Home Assistant error"));
+          }
         } else if (msg.type === "pong") {
           this.pending.delete(msg.id);
           clearTimeout(p.timer);
           p.resolve(null);
         }
-        // Les événements (subscribe) arriveront en v0.2, ignorés pour l'instant.
+        // Subscription events will arrive in a later version, ignored for now.
       }
     }
   }
@@ -165,7 +171,7 @@ export class HaWsClient {
     this.pingTimer = setInterval(() => {
       if (!this.authed || !this.ws) return;
       this.raw("ping", {}, 5_000).catch(() => {
-        log.warn("Pas de réponse au ping, fermeture du socket pour forcer la reconnexion");
+        log.warning("No answer to ping, terminating the socket to force a reconnection");
         this.ws?.terminate();
       });
     }, PING_INTERVAL_MS);
@@ -180,11 +186,11 @@ export class HaWsClient {
     this.ws = null;
     for (const [, p] of this.pending) {
       clearTimeout(p.timer);
-      p.reject(new Error("connexion WebSocket HA perdue pendant la commande"));
+      p.reject(new Error("Home Assistant WebSocket connection was lost during the command"));
     }
     this.pending.clear();
     if (this.closing) return;
-    log.warn(`WebSocket HA fermé (${why}), reconnexion dans ${this.backoff} ms`);
+    log.warning(`Home Assistant WebSocket closed (${why}), reconnecting in ${this.backoff} ms`);
     setTimeout(() => this.connect(), this.backoff);
     this.backoff = Math.min(this.backoff * 2, RECONNECT_MAX_MS);
   }

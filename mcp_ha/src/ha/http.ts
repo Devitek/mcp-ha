@@ -1,10 +1,12 @@
+import { log } from "../logger.js";
 import type { AddonConfig } from "../config.js";
 
 /**
- * Les deux restes HTTP du design WebSocket-first :
- * - l'API Supervisor (add-ons), qui n'a pas d'équivalent WebSocket ;
- * - quelques endpoints REST du core (config des automations, template,
- *   error_log) sans équivalent WebSocket simple.
+ * The two HTTP leftovers of the WebSocket-first design:
+ * - the Supervisor API (add-ons, self options), which has no WebSocket
+ *   equivalent;
+ * - a few core REST endpoints (automation config, template, error_log)
+ *   without a simple WebSocket counterpart.
  */
 export class HaHttp {
   constructor(private cfg: AddonConfig) {}
@@ -16,7 +18,7 @@ export class HaHttp {
   private coreBase(): string {
     if (this.cfg.supervisorToken) return "http://supervisor/core/api";
     if (this.cfg.devHaUrl) return this.cfg.devHaUrl.replace(/\/+$/, "") + "/api";
-    throw new Error("Aucune cible Home Assistant : ni SUPERVISOR_TOKEN ni HA_URL");
+    throw new Error("No Home Assistant target: neither SUPERVISOR_TOKEN nor HA_URL is set");
   }
 
   private coreToken(): string {
@@ -24,6 +26,7 @@ export class HaHttp {
   }
 
   private async request(url: string, token: string, init: RequestInit, asText: boolean): Promise<any> {
+    log.debug(`HTTP ${init.method ?? "GET"} ${url}`);
     const res = await fetch(url, {
       ...init,
       headers: {
@@ -34,7 +37,7 @@ export class HaHttp {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      throw new Error(`HTTP ${res.status} : ${body.slice(0, 300) || res.statusText}`);
+      throw new Error(`HTTP ${res.status}: ${body.slice(0, 300) || res.statusText}`);
     }
     return asText ? res.text() : res.json();
   }
@@ -56,15 +59,27 @@ export class HaHttp {
     );
   }
 
-  /** GET sur l'API Supervisor. Répond { result, data }, on renvoie data. */
-  async supervisorGet(path: string): Promise<any> {
+  private requireSupervisor(): string {
     if (!this.cfg.supervisorToken) {
-      throw new Error("API Supervisor indisponible hors environnement add-on (mode dev)");
+      throw new Error("Supervisor API is not available outside the add-on environment (dev mode)");
     }
+    return this.cfg.supervisorToken;
+  }
+
+  /** GET on the Supervisor API. Answers are { result, data }, data is returned. */
+  async supervisorGet(path: string): Promise<any> {
+    const token = this.requireSupervisor();
+    const json = await this.request("http://supervisor" + path, token, { method: "GET" }, false);
+    return json?.data ?? json;
+  }
+
+  /** POST on the Supervisor API (used to write the add-on options back). */
+  async supervisorPost(path: string, body: unknown): Promise<any> {
+    const token = this.requireSupervisor();
     const json = await this.request(
       "http://supervisor" + path,
-      this.cfg.supervisorToken,
-      { method: "GET" },
+      token,
+      { method: "POST", body: JSON.stringify(body) },
       false
     );
     return json?.data ?? json;

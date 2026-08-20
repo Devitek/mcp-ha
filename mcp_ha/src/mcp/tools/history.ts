@@ -7,7 +7,7 @@ import { entityReadVisible } from "../../safety.js";
 const MAX_POINTS = 500;
 const MAX_LOGBOOK = 200;
 
-/** Sous-échantillonne en gardant premier, dernier et un pas régulier. */
+/** Downsamples while keeping the first, the last and a regular stride. */
 function downsample<T>(rows: T[], max: number): { rows: T[]; note?: string } {
   if (rows.length <= max) return { rows };
   const stride = Math.ceil(rows.length / max);
@@ -16,7 +16,7 @@ function downsample<T>(rows: T[], max: number): { rows: T[]; note?: string } {
   if (kept[kept.length - 1] !== last) kept.push(last);
   return {
     rows: kept,
-    note: `${rows.length} points bruts, sous-échantillonnés à ${kept.length} (1 sur ${stride}). Réduisez la fenêtre pour plus de précision.`,
+    note: `${rows.length} raw points, downsampled to ${kept.length} (1 in ${stride}). Narrow the window for more precision.`,
   };
 }
 
@@ -24,22 +24,22 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
   server.registerTool(
     "ha_get_history",
     {
-      title: "Historique d'une entité",
+      title: "Entity history",
       description:
-        "Changements d'état d'une entité sur une fenêtre temporelle (défaut 24 h, max 7 jours). " +
-        "Pour des capteurs numériques sur de longues périodes, préférez ha_get_statistics (agrégats). " +
-        "Fenêtre : hours (glissant) ou start/end en ISO 8601.",
+        "State changes of one entity over a time window (default 24 h, max 7 days). " +
+        "For numeric sensors over long periods prefer ha_get_statistics (aggregates). " +
+        "Window: hours (sliding) or start/end in ISO 8601.",
       inputSchema: {
-        entity_id: z.string().describe("Ex. sensor.temperature_salon"),
-        hours: z.number().min(0.25).max(168).optional().describe("Fenêtre glissante en heures, défaut 24"),
-        start: z.string().optional().describe("Début ISO 8601"),
-        end: z.string().optional().describe("Fin ISO 8601, défaut maintenant"),
+        entity_id: z.string().describe("E.g. sensor.living_room_temperature"),
+        hours: z.number().min(0.25).max(168).optional().describe("Sliding window in hours, default 24"),
+        start: z.string().optional().describe("ISO 8601 start"),
+        end: z.string().optional().describe("ISO 8601 end, default now"),
       },
       annotations: { readOnlyHint: true },
     },
     safe("ha_get_history", async ({ entity_id, hours, start, end }) => {
       if (!entityReadVisible(ctx.cfg, entity_id)) {
-        throw new Error(`l'entité ${entity_id} n'est pas accessible (filter_reads)`);
+        throw new Error(`entity ${entity_id} is not accessible (filter_reads)`);
       }
       const w = timeWindow({ start, end, hours }, 24, 168);
       const res: Record<string, any[]> = await ctx.ws.send("history/history_during_period", {
@@ -49,8 +49,9 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
         minimal_response: true,
         no_attributes: true,
       });
-      // Le WebSocket renvoie un format compressé : s = state, lu = last_updated
-      // en secondes epoch. On normalise, en tolérant aussi le format long.
+      // The WebSocket answers in a compressed format: s = state, lu =
+      // last_updated in epoch seconds. Normalize while accepting the long
+      // format too.
       const raw = res?.[entity_id] ?? [];
       const points = raw.map((r) => ({
         t: toIso(r.lu ?? r.last_updated ?? r.last_changed),
@@ -64,24 +65,24 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
   server.registerTool(
     "ha_get_statistics",
     {
-      title: "Statistiques long terme",
+      title: "Long-term statistics",
       description:
-        "Agrégats du recorder (min, max, moyenne, somme) par période pour des capteurs numériques ou compteurs " +
-        "(énergie, température...). Bien plus compact que ha_get_history sur de longues durées. " +
-        "L'id statistique est en général l'entity_id du capteur.",
+        "Recorder aggregates (min, max, mean, sum) per period for numeric sensors and counters " +
+        "(energy, temperature...). Much more compact than ha_get_history over long ranges. " +
+        "The statistic id is usually the sensor entity_id.",
       inputSchema: {
-        statistic_id: z.union([z.string(), z.array(z.string()).max(10)]).describe("Ex. sensor.conso_maison, ou liste"),
-        period: z.enum(["5minute", "hour", "day", "week", "month"]).optional().describe("Défaut hour"),
-        hours: z.number().min(1).max(8760).optional().describe("Fenêtre glissante en heures, défaut 24"),
-        start: z.string().optional().describe("Début ISO 8601"),
-        end: z.string().optional().describe("Fin ISO 8601"),
+        statistic_id: z.union([z.string(), z.array(z.string()).max(10)]).describe("E.g. sensor.home_energy, or a list"),
+        period: z.enum(["5minute", "hour", "day", "week", "month"]).optional().describe("Default hour"),
+        hours: z.number().min(1).max(8760).optional().describe("Sliding window in hours, default 24"),
+        start: z.string().optional().describe("ISO 8601 start"),
+        end: z.string().optional().describe("ISO 8601 end"),
       },
       annotations: { readOnlyHint: true },
     },
     safe("ha_get_statistics", async ({ statistic_id, period, hours, start, end }) => {
       const ids = Array.isArray(statistic_id) ? statistic_id : [statistic_id];
       for (const id of ids) {
-        if (!entityReadVisible(ctx.cfg, id)) throw new Error(`${id} n'est pas accessible (filter_reads)`);
+        if (!entityReadVisible(ctx.cfg, id)) throw new Error(`${id} is not accessible (filter_reads)`);
       }
       const w = timeWindow({ start, end, hours }, 24, 8760);
       const res: Record<string, any[]> = await ctx.ws.send("recorder/statistics_during_period", {
@@ -109,13 +110,13 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
   server.registerTool(
     "ha_get_logbook",
     {
-      title: "Journal des événements (logbook)",
+      title: "Logbook events",
       description:
-        "Événements lisibles du logbook (qui a fait quoi, quand) sur une fenêtre temporelle " +
-        "(défaut 24 h, max 7 jours), filtrable par entité. Utile pour répondre à « que s'est-il passé ? ».",
+        "Human-readable logbook events (who did what, when) over a time window " +
+        "(default 24 h, max 7 days), filterable by entity. Useful to answer 'what happened?'.",
       inputSchema: {
-        entity_id: z.string().optional().describe("Limiter à une entité"),
-        hours: z.number().min(0.25).max(168).optional().describe("Fenêtre glissante en heures, défaut 24"),
+        entity_id: z.string().optional().describe("Restrict to one entity"),
+        hours: z.number().min(0.25).max(168).optional().describe("Sliding window in hours, default 24"),
         start: z.string().optional(),
         end: z.string().optional(),
       },
@@ -123,7 +124,7 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
     },
     safe("ha_get_logbook", async ({ entity_id, hours, start, end }) => {
       if (entity_id && !entityReadVisible(ctx.cfg, entity_id)) {
-        throw new Error(`l'entité ${entity_id} n'est pas accessible (filter_reads)`);
+        throw new Error(`entity ${entity_id} is not accessible (filter_reads)`);
       }
       const w = timeWindow({ start, end, hours }, 24, 168);
       const payload: Record<string, unknown> = { start_time: w.start, end_time: w.end };
@@ -143,7 +144,7 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
         count: visible.length,
         events,
         ...(visible.length > MAX_LOGBOOK
-          ? { note: `${visible.length} événements, seuls les ${MAX_LOGBOOK} derniers sont renvoyés. Réduisez la fenêtre ou filtrez par entité.` }
+          ? { note: `${visible.length} events, only the last ${MAX_LOGBOOK} are returned. Narrow the window or filter by entity.` }
           : {}),
       };
     })

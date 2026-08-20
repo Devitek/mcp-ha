@@ -1,5 +1,5 @@
-// Formes minimales des objets Home Assistant manipulés par les outils.
-// Les payloads réels contiennent bien plus de champs, on ne type que ce qu'on lit.
+// Minimal shapes of the Home Assistant objects the tools work with. The real
+// payloads carry many more fields, we only type what we read.
 
 export interface HaState {
   entity_id: string;
@@ -33,7 +33,7 @@ export interface EntityEntry {
   entity_category: string | null;
 }
 
-/** Entité enrichie par la jointure états + registres. */
+/** Entity enriched by joining states with the registries. */
 export interface IndexedEntity {
   entity_id: string;
   name: string;

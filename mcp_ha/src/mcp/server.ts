@@ -9,18 +9,18 @@ import { registerAddonTools } from "./tools/addons.js";
 import { registerSystemTools } from "./tools/system.js";
 
 /**
- * Construit un serveur MCP complet. Appelé à chaque requête (mode stateless),
- * l'enregistrement des outils est purement en mémoire et très bon marché.
+ * Builds a complete MCP server. Called for every request (stateless mode),
+ * tool registration is in-memory and very cheap.
  */
 export function buildServer(ctx: ToolContext): McpServer {
   const server = new McpServer(
     { name: "mcp-ha", version: VERSION },
     {
       instructions:
-        "Serveur MCP pour Home Assistant. Découvrez les entités avec ha_search_entities " +
-        "(ou ha_list_entities avec filtres), puis ha_get_entity pour le détail. " +
-        "Les réponses sont du JSON compact, paginé et plafonné : affinez vos filtres plutôt " +
-        "que de demander de gros volumes. Pour l'historique long, préférez ha_get_statistics.",
+        "MCP server for Home Assistant. Discover entities with ha_search_entities " +
+        "(or ha_list_entities with filters), then ha_get_entity for details. " +
+        "Responses are compact, paginated and capped JSON: refine your filters " +
+        "instead of requesting large dumps. For long history windows prefer ha_get_statistics.",
     }
   );
   registerEntityTools(server, ctx);

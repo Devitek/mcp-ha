@@ -1,9 +1,9 @@
 name: MCP Home Assistant
-version: "0.1.1"
+version: "0.1.2"
 slug: mcp_ha
 description: >-
-  Serveur MCP (Model Context Protocol) pour interroger et piloter Home
-  Assistant depuis un assistant IA (Claude, Gemini...)
+  MCP (Model Context Protocol) server to query and control Home Assistant
+  from an AI assistant (Claude, Gemini...)
 url: https://github.com/Devitek/mcp-ha
 arch:
   - aarch64
@@ -12,15 +12,16 @@ init: false
 startup: services
 image: ghcr.io/devitek/mcp-ha-{arch}
 homeassistant_api: true
-# Rôle manager pour lire les infos des add-ons via l'API Supervisor.
-# Voir l'issue #11 : à rétrograder si "default" suffit en lecture.
+# Manager role to read add-on information through the Supervisor API.
+# See issue #11: downgrade if "default" turns out to be enough for reads.
 hassio_api: true
 hassio_role: manager
 ports:
   "9583/tcp": 9583
 ports_description:
-  "9583/tcp": Endpoint MCP (Streamable HTTP) et /health
+  "9583/tcp": MCP endpoint (Streamable HTTP) and /health
 options:
+  log_level: info
   api_token: ""
   allow_write: false
   filter_reads: false
@@ -35,6 +36,7 @@ options:
     - recorder.purge*
     - backup.*
 schema:
+  log_level: list(trace|debug|info|notice|warning|error|fatal)
   api_token: password?
   allow_write: bool
   filter_reads: bool

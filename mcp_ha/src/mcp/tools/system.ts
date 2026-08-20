@@ -7,20 +7,20 @@ export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
     "ha_render_template",
     {
-      title: "Rendre un template Jinja",
+      title: "Render a Jinja template",
       description:
-        "Évalue un template Jinja2 côté Home Assistant et renvoie le rendu. Très puissant pour des lectures " +
-        "calculées : {{ states('sensor.x') }}, {{ states.light | selectattr('state','eq','on') | list | count }}, etc. " +
-        "Lecture seule, mais accède à toutes les entités.",
+        "Evaluates a Jinja2 template on the Home Assistant side and returns the result. Very powerful " +
+        "for computed reads: {{ states('sensor.x') }}, {{ states.light | selectattr('state','eq','on') | list | count }}, etc. " +
+        "Read only, but it can access every entity.",
       inputSchema: {
-        template: z.string().min(1).max(5000).describe("Template Jinja2"),
+        template: z.string().min(1).max(5000).describe("Jinja2 template"),
       },
       annotations: { readOnlyHint: true },
     },
     safe("ha_render_template", async ({ template }) => {
-      // Choix v0.1 : REST plutôt que WebSocket, car la commande WS
-      // render_template est un abonnement (résultat via événements), voir
-      // l'issue #12 du dépôt.
+      // v0.1 choice: REST rather than WebSocket, because the WS
+      // render_template command is a subscription (result comes through
+      // events), see issue #12 in the repository.
       const rendered = await ctx.http.corePostText("/template", { template });
       return { rendered: trunc(rendered, 5000) };
     })
@@ -29,12 +29,12 @@ export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
     "ha_get_system",
     {
-      title: "Infos système",
+      title: "System information",
       description:
-        "section 'config' : version de HA, nom, fuseau, unités, nombre d'intégrations. " +
-        "section 'error_log' : les dernières lignes du journal d'erreurs de Home Assistant.",
+        "section 'config': HA version, name, timezone, units, number of integrations. " +
+        "section 'error_log': the last lines of the Home Assistant error log.",
       inputSchema: {
-        section: z.enum(["config", "error_log"]).describe("Quelle section lire"),
+        section: z.enum(["config", "error_log"]).describe("Which section to read"),
       },
       annotations: { readOnlyHint: true },
     },

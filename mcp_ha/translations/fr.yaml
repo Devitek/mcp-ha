@@ -1,10 +1,16 @@
 configuration:
+  log_level:
+    name: Niveau de log
+    description: >-
+      Verbosité du journal de l'add-on. info est un bon défaut, debug et
+      trace aident au diagnostic. Les lignes d'audit des écritures sont
+      toujours émises quel que soit ce niveau.
   api_token:
     name: Jeton API
     description: >-
-      Jeton attendu dans l'en-tête Authorization des clients MCP. Laissez vide
-      pour générer un jeton au premier démarrage, il sera affiché dans le
-      journal de l'add-on.
+      Jeton attendu dans l'en-tête Authorization des clients MCP. Laissez
+      vide pour en générer un au premier démarrage : il est alors reporté
+      dans cette option et affiché dans le journal de l'add-on.
   allow_write:
     name: Autoriser l'écriture
     description: >-

@@ -9,19 +9,19 @@ export function registerAddonTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool(
     "ha_get_addons",
     {
-      title: "Add-ons installés",
+      title: "Installed add-ons",
       description:
-        "Sans paramètre : liste des add-ons installés (slug, version, état, mise à jour disponible). " +
-        "Avec slug : le détail d'un add-on. Lecture seule, le pilotage viendra plus tard.",
+        "Without parameters: the list of installed add-ons (slug, version, state, update available). " +
+        "With slug: the details of one add-on. Read only, control will come later.",
       inputSchema: {
-        slug: z.string().optional().describe("Slug d'un add-on, ex. core_mosquitto"),
+        slug: z.string().optional().describe("Add-on slug, e.g. core_mosquitto"),
       },
       annotations: { readOnlyHint: true },
     },
     safe("ha_get_addons", async ({ slug }) => {
       if (slug) {
-        // Le slug part dans une URL Supervisor : on le valide strictement.
-        if (!SLUG_RE.test(slug)) throw new Error(`slug invalide : ${slug}`);
+        // The slug ends up in a Supervisor URL: validate it strictly.
+        if (!SLUG_RE.test(slug)) throw new Error(`invalid slug: ${slug}`);
         const info = await ctx.http.supervisorGet(`/addons/${slug}/info`);
         return {
           slug: info.slug,

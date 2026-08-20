@@ -8,10 +8,10 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
   server.registerTool(
     "ha_list_automations",
     {
-      title: "Lister les automations",
+      title: "List automations",
       description:
-        "Toutes les automations : entity_id, nom, état (on = activée), dernier déclenchement. " +
-        "Pour la config détaillée d'une automation, utilisez ha_get_automation.",
+        "All automations: entity_id, name, state (on = enabled), last trigger time. " +
+        "For the detailed configuration of one automation use ha_get_automation.",
       inputSchema: {
         limit: z.number().int().min(1).max(200).optional(),
         offset: z.number().int().min(0).optional(),
@@ -34,22 +34,22 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
   server.registerTool(
     "ha_get_automation",
     {
-      title: "Détail d'une automation",
+      title: "Automation details",
       description:
-        "État d'une automation et, si elle a été créée via l'interface, sa configuration complète " +
-        "(déclencheurs, conditions, actions). Les automations définies en YAML ne renvoient que l'état.",
+        "State of one automation and, when it was created through the UI, its full configuration " +
+        "(triggers, conditions, actions). YAML-defined automations only return their state.",
       inputSchema: {
-        entity_id: z.string().describe("Ex. automation.chauffage_nuit"),
+        entity_id: z.string().describe("E.g. automation.night_heating"),
       },
       annotations: { readOnlyHint: true },
     },
     safe("ha_get_automation", async ({ entity_id }) => {
       if (!entityReadVisible(ctx.cfg, entity_id)) {
-        throw new Error(`l'entité ${entity_id} n'est pas accessible (filter_reads)`);
+        throw new Error(`entity ${entity_id} is not accessible (filter_reads)`);
       }
       const all = await ctx.catalog.index();
       const e = all.find((x) => x.entity_id === entity_id && x.domain === "automation");
-      if (!e) throw new Error(`automation inconnue : ${entity_id}`);
+      if (!e) throw new Error(`unknown automation: ${entity_id}`);
 
       const base = {
         entity_id: e.entity_id,
@@ -61,13 +61,13 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
 
       const cfgId = e.attributes.id;
       if (typeof cfgId !== "string" || !cfgId) {
-        return { ...base, note: "Pas d'id de configuration : automation probablement définie en YAML, config non lisible." };
+        return { ...base, note: "No configuration id: probably a YAML-defined automation, config not readable." };
       }
       try {
         const config = await ctx.http.coreGet(`/config/automation/config/${encodeURIComponent(cfgId)}`);
         return { ...base, config };
       } catch {
-        return { ...base, note: "Configuration non lisible via l'API (automation YAML ou droits insuffisants)." };
+        return { ...base, note: "Configuration not readable through the API (YAML automation or insufficient rights)." };
       }
     })
   );
@@ -75,9 +75,9 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
   server.registerTool(
     "ha_list_scripts",
     {
-      title: "Lister les scripts",
+      title: "List scripts",
       description:
-        "Tous les scripts : entity_id, nom, dernier déclenchement, état (on = en cours d'exécution).",
+        "All scripts: entity_id, name, last trigger time, state (on = currently running).",
       inputSchema: {
         limit: z.number().int().min(1).max(200).optional(),
         offset: z.number().int().min(0).optional(),

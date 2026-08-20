@@ -1,6 +1,6 @@
 import { log } from "../logger.js";
 
-/** Plafond de taille d'une réponse d'outil : le contexte du LLM est précieux. */
+/** Size cap for a tool response: the LLM context window is precious. */
 export const MAX_RESPONSE_BYTES = 15_000;
 
 export interface ListEnvelope<T> {
@@ -12,7 +12,7 @@ export interface ListEnvelope<T> {
   note?: string;
 }
 
-/** Enveloppe standard de toutes les listes : pagination + compteurs. */
+/** Standard envelope for every list: pagination + counters. */
 export function listEnvelope<T>(all: T[], limit = 50, offset = 0, note?: string): ListEnvelope<T> {
   const l = Math.min(Math.max(Math.trunc(limit), 1), 200);
   const o = Math.max(Math.trunc(offset), 0);
@@ -28,26 +28,26 @@ export function listEnvelope<T>(all: T[], limit = 50, offset = 0, note?: string)
   };
 }
 
-/** Tronque une chaîne en signalant la coupe. */
+/** Truncates a string while flagging the cut. */
 export function trunc(s: unknown, max: number): string {
   const str = typeof s === "string" ? s : JSON.stringify(s) ?? "";
-  return str.length > max ? `${str.slice(0, max)}… (tronqué, ${str.length} car.)` : str;
+  return str.length > max ? `${str.slice(0, max)}… (truncated, ${str.length} chars)` : str;
 }
 
 export interface ToolResult {
-  // Signature d'index requise pour être assignable au CallToolResult du SDK.
+  // Index signature required for assignability to the SDK CallToolResult.
   [key: string]: unknown;
   content: Array<{ type: "text"; text: string }>;
   isError?: boolean;
 }
 
-/** Sérialise le résultat en JSON compact, plafonné à MAX_RESPONSE_BYTES. */
+/** Serializes the result as compact JSON, capped at MAX_RESPONSE_BYTES. */
 export function jsonResult(data: unknown): ToolResult {
   let text = JSON.stringify(data);
   if (text.length > MAX_RESPONSE_BYTES) {
     text = JSON.stringify({
       truncated: true,
-      note: "Réponse trop volumineuse, tronquée. Affinez avec des filtres (domain, area, search, limit, fenêtre temporelle plus courte).",
+      note: "Response too large, truncated. Refine with filters (domain, area, search, limit, shorter time window).",
       preview: text.slice(0, MAX_RESPONSE_BYTES),
     });
   }
@@ -55,18 +55,20 @@ export function jsonResult(data: unknown): ToolResult {
 }
 
 export function errorResult(message: string): ToolResult {
-  return { content: [{ type: "text", text: `Erreur : ${message}` }], isError: true };
+  return { content: [{ type: "text", text: `Error: ${message}` }], isError: true };
 }
 
-/** Enrobe un handler d'outil : erreurs propres, jamais de stack au client. */
+/** Wraps a tool handler: clean errors, never a stack trace to the client. */
 export function safe<A>(name: string, fn: (args: A) => Promise<unknown>): (args: A) => Promise<ToolResult> {
   return async (args: A) => {
+    log.debug(`Tool ${name} called`);
+    log.trace(`Tool ${name} arguments: ${trunc(args, 500)}`);
     try {
       const data = await fn(args);
       return jsonResult(data);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      log.warn(`Outil ${name} en erreur : ${msg}`);
+      log.warning(`Tool ${name} failed: ${msg}`);
       return errorResult(msg);
     }
   };
@@ -78,8 +80,8 @@ export interface TimeWindow {
 }
 
 /**
- * Résout une fenêtre temporelle bornée à partir de start/end ISO ou d'un
- * nombre d'heures glissant. Rejette les fenêtres invalides ou trop larges.
+ * Resolves a bounded time window from ISO start/end or a sliding number of
+ * hours. Rejects invalid or overly wide windows.
  */
 export function timeWindow(
   p: { start?: string; end?: string; hours?: number },
@@ -91,20 +93,20 @@ export function timeWindow(
     ? new Date(p.start)
     : new Date(end.getTime() - (p.hours ?? defaultHours) * 3_600_000);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    throw new Error("dates invalides, format ISO 8601 attendu (ex. 2026-08-19T00:00:00Z)");
+    throw new Error("invalid dates, ISO 8601 expected (e.g. 2026-08-19T00:00:00Z)");
   }
   const spanHours = (end.getTime() - start.getTime()) / 3_600_000;
-  if (spanHours <= 0) throw new Error("la fenêtre temporelle est vide (start >= end)");
+  if (spanHours <= 0) throw new Error("the time window is empty (start >= end)");
   if (spanHours > maxHours) {
-    throw new Error(`fenêtre trop large (${Math.round(spanHours)} h, maximum ${maxHours} h)`);
+    throw new Error(`time window too wide (${Math.round(spanHours)} h, maximum ${maxHours} h)`);
   }
   return { start: start.toISOString(), end: end.toISOString() };
 }
 
-/** Timestamp HA (secondes ou millisecondes epoch, ou ISO) vers ISO 8601. */
+/** HA timestamp (epoch seconds or milliseconds, or ISO) to ISO 8601. */
 export function toIso(v: unknown): string | null {
   if (typeof v === "number") {
-    // Heuristique : avant l'an 33658 en secondes, un epoch ms dépasse 1e12.
+    // Heuristic: an epoch in ms exceeds 1e12 until the year 33658.
     const ms = v > 1e12 ? v : v * 1000;
     return new Date(ms).toISOString();
   }

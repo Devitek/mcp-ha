@@ -1,14 +1,15 @@
 #!/usr/bin/with-contenv bashio
-# Entrypoint de l'add-on. La configuration est lue par le serveur Node
-# directement dans /data/options.json, SUPERVISOR_TOKEN est injecté par le
-# Supervisor. On garde bashio pour des logs propres dans l'interface HA.
+# Add-on entrypoint. The Node server reads its configuration directly from
+# /data/options.json, SUPERVISOR_TOKEN is injected by the Supervisor. bashio
+# is only used here for clean startup logs in the HA interface.
 
-bashio::log.info "Démarrage du serveur MCP Home Assistant sur le port 9583..."
+bashio::log.level "$(bashio::config 'log_level')"
+bashio::log.info "Starting the MCP Home Assistant server on port 9583..."
 
 if bashio::config.true 'allow_write'; then
-  bashio::log.warning "allow_write est actif : l'outil ha_call_service est exposé aux clients MCP."
+  bashio::log.warning "allow_write is enabled: ha_call_service is exposed to MCP clients."
 else
-  bashio::log.info "Mode lecture seule (allow_write: false)."
+  bashio::log.info "Read-only mode (allow_write: false)."
 fi
 
 exec node /app/dist/index.js
