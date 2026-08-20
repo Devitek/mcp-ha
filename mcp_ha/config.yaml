@@ -10,7 +10,6 @@ arch:
   - amd64
 init: false
 startup: services
-boot: auto
 image: ghcr.io/devitek/mcp-ha-{arch}
 homeassistant_api: true
 # Rôle manager pour lire les infos des add-ons via l'API Supervisor.
@@ -21,7 +20,6 @@ ports:
   "9583/tcp": 9583
 ports_description:
   "9583/tcp": Endpoint MCP (Streamable HTTP) et /health
-watchdog: http://[HOST]:[PORT:9583]/health
 options:
   api_token: ""
   allow_write: false
