@@ -37,6 +37,16 @@ npm run docs:build
 
 Any diagram in the documentation must be written with Mermaid.
 
+## Definition of done
+
+No task (issue or PR) is finished until every point below holds:
+
+1. **Unit tests**: any new or changed logic is covered by vitest tests, and `npm test` is green. Security-related code (`safety.ts`, authentication, permissions) always ships with tests.
+2. **Documentation**: DOCS.md, the README and the documentation site (English root **and** French mirror under `docs/fr/`) reflect the change in the same commit set. Numbers quoted in the docs (caps, defaults, versions) must match the code.
+3. **llms.txt**: `/llms.txt` and `/llms-full.txt` are regenerated automatically when the site builds, so keeping the site pages accurate is what keeps the LLM-facing docs accurate. Never let them drift from the shipped behaviour.
+4. **CHANGELOG.md** gets a line for any user-visible change.
+5. The related issue is commented and closed with a reference to the commits.
+
 ## Conventions
 
 - **Languages**: documentation, code, logs and error messages are in English. Issues, commits and internal work discussions are in French: they are the maintainer's knowledge base.
