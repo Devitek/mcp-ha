@@ -32,7 +32,7 @@ Les lignes d'audit sont en JSON, une par tentative, et sont émises quel que soi
 ## Cycle de vie du jeton
 
 - Généré au premier démarrage (32 octets aléatoires) quand `api_token` est vide.
-- Persisté dans `/data/token` (mode 600), reporté dans les options de l'add-on, affiché à chaque démarrage dans le journal.
+- Persisté dans `/data/token` (mode 600) et reporté dans les options de l'add-on. Le journal ne le montre jamais en entier : seulement un préfixe masqué à remplissage fixe (`d370f4f8**********`), qui ne révèle ni la valeur ni sa longueur.
 - Comparé en temps constant à chaque requête.
 - Pour le renouveler : videz l'option `api_token`, supprimez `/data/token` (ou réinstallez), redémarrez.
 

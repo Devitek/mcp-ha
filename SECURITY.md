@@ -18,7 +18,7 @@ Giving an LLM access to your home automation is not a trivial decision. This doc
 
 ## Mechanisms in place
 
-1. **Bearer authentication** on the MCP endpoint, constant-time comparison. The token is generated randomly (32 bytes) on first start when not provided, persisted in `/data/token` with mode 600, and written back into the add-on options so it is visible in the configuration panel.
+1. **Bearer authentication** on the MCP endpoint, constant-time comparison. The token is generated randomly (32 bytes) on first start when not provided, persisted in `/data/token` with mode 600, and written back into the add-on options so it is visible in the configuration panel. It never appears in full in the logs: only a masked prefix (e.g. `d370f4f8**********`) with fixed-length padding, so neither the value nor its length leaks.
 2. **Read only by default.** With `allow_write: false`, the `ha_call_service` tool is not registered at all: it does not even appear in the client's tool list.
 3. **Service denylist** shipped with serious defaults: `homeassistant.stop`, `homeassistant.restart`, `hassio.*`, `shell_command.*`, `python_script.*`, `recorder.purge*`, `backup.*`.
 4. **Entity glob lists** for writes: `entity_allowlist` (when non-empty, everything else is refused) and `entity_denylist` (always wins). Targeting by `area_id` or `device_id` is refused as soon as an entity restriction is configured, because it would bypass the lists.
@@ -30,7 +30,7 @@ Giving an LLM access to your home automation is not a trivial decision. This doc
 ## Known and accepted limitations
 
 - `ha_render_template` evaluates Jinja on the HA side: read only, but a template can read the state of any entity. `filter_reads` does not apply to it.
-- The generated token is printed in the add-on log on startup and stored in the add-on options, which means it also ends up in add-on backups. The log and the options are only visible to HA admins.
+- The generated token is stored in the add-on options, which means it also ends up in add-on backups. The options are only visible to HA admins; the log never contains it in full.
 - The add-on requests `hassio_role: manager` to read add-ons. This may be more than necessary; reducing it is tracked in issue [#11](https://github.com/Devitek/mcp-ha/issues/11).
 
 ## Reporting a vulnerability

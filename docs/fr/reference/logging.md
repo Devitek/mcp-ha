@@ -35,6 +35,10 @@ Les tentatives d'écriture via `ha_call_service` produisent chacune une ligne JS
 
 Les tentatives refusées portent `"allowed": false` et une `reason`. Aucun secret n'apparaît dans les lignes d'audit.
 
+## Secrets
+
+Aucun secret n'est jamais journalisé en entier, à aucun niveau. Le jeton API n'apparaît que sous forme de préfixe masqué à remplissage fixe (`d370f4f8**********`) ; la valeur complète vit dans l'onglet Configuration de l'add-on. Un test unitaire garde cet invariant.
+
 ## Diagnostiquer
 
 - Problèmes de connexion : `debug` montre chaque commande WS et chaque reconnexion avec son délai de backoff.

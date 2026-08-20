@@ -9,8 +9,8 @@ configuration:
     name: API token
     description: >-
       Token expected in the Authorization header of MCP clients. Leave empty
-      to generate one on first start: it is then saved back into this option
-      and shown in the add-on log.
+      to generate one on first start: it is then saved back into this option.
+      The log only ever shows a masked prefix of it.
   allow_write:
     name: Allow write
     description: >-

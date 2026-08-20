@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { log, setLogLevel } from "./logger.js";
+import { maskSecret } from "./safety.js";
 
-export const VERSION = "0.1.3";
+export const VERSION = "0.1.4";
 
 const OPTIONS_PATH = "/data/options.json";
 const TOKEN_PATH = "/data/token";
@@ -67,14 +68,19 @@ export function loadConfig(): AddonConfig {
  * No token configured: generate a random one (32 bytes) and persist it in
  * /data so it survives restarts and updates. A fresh install starts with an
  * empty /data, so every installation gets its own token.
+ *
+ * The token is a secret: it never reaches the logs in full, only a masked
+ * prefix does. The full value is available in the add-on Configuration tab
+ * (the startup write-back saves it into the api_token option).
  */
 function bootstrapToken(): string {
   try {
     if (existsSync(TOKEN_PATH)) {
       const t = readFileSync(TOKEN_PATH, "utf8").trim();
       if (t) {
-        log.info(`API token loaded from ${TOKEN_PATH} (delete this file to force a new one).`);
-        log.warning(`API token for your MCP clients: ${t}`);
+        log.info(
+          `API token ${maskSecret(t)} loaded from ${TOKEN_PATH}. The full token is in the add-on Configuration tab (api_token option); delete ${TOKEN_PATH} to force a new one.`
+        );
         return t;
       }
     }
@@ -84,10 +90,13 @@ function bootstrapToken(): string {
   const t = randomBytes(32).toString("hex");
   try {
     writeFileSync(TOKEN_PATH, t, { mode: 0o600 });
-    log.warning(`No api_token configured: a random token was generated and persisted in ${TOKEN_PATH}.`);
+    log.warning(
+      `No api_token configured: generated ${maskSecret(t)} and persisted it in ${TOKEN_PATH}. Read the full token in the add-on Configuration tab (api_token option).`
+    );
   } catch {
-    log.warning("No api_token configured and /data is not writable: using an ephemeral token (dev mode).");
+    log.warning(
+      `No api_token configured and /data is not writable: using an ephemeral token ${maskSecret(t)}. Set MCP_API_TOKEN explicitly to use a known value (dev mode).`
+    );
   }
-  log.warning(`API token for your MCP clients: ${t}`);
   return t;
 }

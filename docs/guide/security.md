@@ -32,7 +32,7 @@ The audit lines are JSON, one per attempt, and are emitted regardless of the con
 ## Token lifecycle
 
 - Generated on first start (32 random bytes) when `api_token` is empty.
-- Persisted in `/data/token` (mode 600), written back into the add-on options, printed once per start in the log.
+- Persisted in `/data/token` (mode 600) and written back into the add-on options. The log never shows it in full: only a masked prefix with fixed-length padding (`d370f4f8**********`), so neither the value nor its length leaks.
 - Compared in constant time on every request.
 - To rotate: clear the `api_token` option, delete `/data/token` (or reinstall), restart.
 

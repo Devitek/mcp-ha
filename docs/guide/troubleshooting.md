@@ -2,7 +2,7 @@
 
 ## Lost API token
 
-It is visible in the add-on **Configuration** tab (`api_token` option) and kept in `/data/token`. Restarting the add-on prints it again in the **Log** tab. To force a new one: clear the option, delete `/data/token`, restart.
+It is visible in the add-on **Configuration** tab (`api_token` option) and kept in `/data/token`. The log never shows it in full, only a masked prefix. If the option looks empty, restart the add-on: the write-back is retried at every start. To force a new token: clear the option, delete `/data/token`, restart.
 
 ## 401 Unauthorized
 
@@ -34,7 +34,7 @@ Adjust the `log_level` option: `debug` adds WebSocket commands, HTTP calls and t
 `http://HA_IP:9583/health` answers without authentication:
 
 ```json
-{ "status": "ok", "version": "0.1.3", "websocket": true }
+{ "status": "ok", "version": "0.1.4", "websocket": true }
 ```
 
 `websocket: false` means the add-on runs but is not (yet) connected to Home Assistant.

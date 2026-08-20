@@ -9,7 +9,7 @@ Full documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/
 ## Getting started
 
 1. Install the add-on and start it.
-2. Open the add-on **Configuration** tab: an API token was generated and saved there on first start (also printed in the **Log** tab). Copy it.
+2. Open the add-on **Configuration** tab: an API token was generated and saved there on first start (the log only ever shows a masked prefix of it). Copy it.
 3. Configure your MCP client (see below) with `http://HA_IP:9583/mcp` and that token.
 4. Ask your assistant something like: "which lights are on?"
 
@@ -18,7 +18,7 @@ Full documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/
 | Option | Default | Description |
 |--------|---------|-------------|
 | `log_level` | `info` | Log verbosity: trace, debug, info, notice, warning, error, fatal. Write audit lines are always emitted. |
-| `api_token` | empty | Token expected from MCP clients (`Authorization: Bearer ...`). Leave empty to have one generated on first start, saved back into this option and printed in the log. |
+| `api_token` | empty | Token expected from MCP clients (`Authorization: Bearer ...`). Leave empty to have one generated on first start and saved back into this option. The log only shows a masked prefix. |
 | `allow_write` | `false` | Exposes the `ha_call_service` tool. Without it, no write tool is even visible to the client. |
 | `filter_reads` | `false` | Also applies `entity_denylist` to reads: hidden entities disappear from listings and from `ha_get_entity`. |
 | `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes (e.g. `light.*`). When non-empty, everything else is refused. |
@@ -76,7 +76,7 @@ The full threat model is in the repository's [SECURITY.md](https://github.com/De
 
 ## Troubleshooting
 
-- **Lost token**: it is visible in the add-on Configuration tab (option `api_token`) and kept in `/data/token`. To force a new one, clear the option and delete the file, then restart.
+- **Lost token**: it is visible in the add-on Configuration tab (option `api_token`) and kept in `/data/token`; the log never shows it in full. If the option looks empty, restart the add-on: the write-back is retried at every start. To force a new token, clear the option and delete the file, then restart.
 - **401 Unauthorized**: check the `Authorization: Bearer ...` header on the client side, without stray spaces.
 - **Tools answer "WebSocket is not connected"**: check the log, the add-on reconnects continuously. A Home Assistant restart causes a short outage, reconnection is automatic.
 - **`ha_get_addons` fails**: the Supervisor API is only reachable when running as a real add-on (not in dev mode).

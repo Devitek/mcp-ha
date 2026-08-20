@@ -24,11 +24,8 @@ https://github.com/Devitek/mcp-ha
 
 ## Récupérer votre jeton API
 
-Au premier démarrage, l'add-on génère un jeton API aléatoire (32 octets) et :
+Au premier démarrage, l'add-on génère un jeton API aléatoire (32 octets) et l'enregistre dans l'onglet **Configuration** de l'add-on, dans l'option `api_token`. Cet onglet est le seul endroit où la valeur complète est visible : l'onglet **Journal** n'affiche jamais qu'un préfixe masqué du type `d370f4f8**********`, car un secret n'a rien à faire dans des logs.
 
-- l'enregistre dans l'onglet **Configuration** de l'add-on, dans l'option `api_token` ;
-- l'affiche dans l'onglet **Journal**.
-
-Chaque installation a son propre jeton : réinstaller l'add-on efface ses données et en produit un neuf. Vous pouvez aussi définir votre propre valeur dans `api_token` à tout moment ; redémarrez l'add-on pour l'appliquer.
+Chaque installation a son propre jeton : réinstaller l'add-on efface ses données et en produit un neuf. Vous pouvez aussi définir votre propre valeur dans `api_token` à tout moment ; redémarrez l'add-on pour l'appliquer. Si l'option semble vide, redémarrez l'add-on : l'enregistrement du jeton y est retenté à chaque démarrage.
 
 Étape suivante : [connecter un client](/fr/guide/clients).

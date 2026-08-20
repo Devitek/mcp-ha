@@ -39,7 +39,7 @@ Requirements: Home Assistant OS or Supervised (the add-on needs the Supervisor).
    Or manually: Settings, Add-ons, Add-on store, three-dot menu, Repositories, then paste `https://github.com/Devitek/mcp-ha`.
 
 2. Install "MCP Home Assistant" and start it.
-3. Open the add-on Configuration tab: an API token was generated and saved there on first start (it is also printed in the add-on log).
+3. Open the add-on Configuration tab: an API token was generated and saved there on first start (the log only ever shows a masked prefix).
 
 ## Connecting a client
 
@@ -64,6 +64,7 @@ The full threat model is in [SECURITY.md](SECURITY.md).
 ## Documentation
 
 - [Documentation site](https://devitek.github.io/mcp-ha/): installation, configuration, clients, tool reference, architecture (English and French)
+- LLM-friendly docs following the llms.txt convention: [llms.txt](https://devitek.github.io/mcp-ha/llms.txt) (index) and [llms-full.txt](https://devitek.github.io/mcp-ha/llms-full.txt) (everything in one file), also indexed on [Context7](https://context7.com)
 - [Add-on documentation](mcp_ha/DOCS.md): the page shown in the HA interface
 - [Contributing guide](CONTRIBUTING.md): dev setup, conventions, releases
 - [Repository issues](https://github.com/Devitek/mcp-ha/issues?q=is%3Aissue): the project knowledge base, every design decision and pitfall is tracked there with the `décision` and `écueil` labels (in French)

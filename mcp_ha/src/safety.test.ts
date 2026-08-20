@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AddonConfig } from "./config.js";
-import { entityReadVisible, entityWriteAllowed, globToRegex, matchesAny, safeEqual, serviceAllowed } from "./safety.js";
+import { entityReadVisible, entityWriteAllowed, globToRegex, maskSecret, matchesAny, safeEqual, serviceAllowed } from "./safety.js";
 
 function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
   return {
@@ -115,5 +115,25 @@ describe("safeEqual", () => {
     expect(safeEqual("abc", "abd")).toBe(false);
     expect(safeEqual("abc", "abcd")).toBe(false);
     expect(safeEqual("", "")).toBe(true);
+  });
+});
+
+describe("maskSecret", () => {
+  it("shows only a short prefix followed by fixed padding", () => {
+    const secret = "d370f4f8aabbccddeeff00112233445566778899aabbccddeeff001122334455";
+    expect(maskSecret(secret)).toBe("d370f4f8**********");
+  });
+
+  it("never contains the full secret and hides the real length", () => {
+    const secret = "a".repeat(64);
+    const masked = maskSecret(secret);
+    expect(masked).not.toContain(secret);
+    expect(masked.length).toBe(18); // 8 visible + 10 fixed asterisks
+    expect(maskSecret("b".repeat(40)).length).toBe(18);
+  });
+
+  it("fully masks short secrets and passes empty ones through", () => {
+    expect(maskSecret("shorty")).toBe("**********");
+    expect(maskSecret("")).toBe("");
   });
 });

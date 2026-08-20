@@ -2,7 +2,7 @@
 
 ## Jeton API perdu
 
-Il est visible dans l'onglet **Configuration** de l'add-on (option `api_token`) et conservé dans `/data/token`. Un redémarrage de l'add-on le réaffiche dans l'onglet **Journal**. Pour en forcer un nouveau : videz l'option, supprimez `/data/token`, redémarrez.
+Il est visible dans l'onglet **Configuration** de l'add-on (option `api_token`) et conservé dans `/data/token`. Le journal ne le montre jamais en entier, seulement un préfixe masqué. Si l'option semble vide, redémarrez l'add-on : le report y est retenté à chaque démarrage. Pour forcer un nouveau jeton : videz l'option, supprimez `/data/token`, redémarrez.
 
 ## 401 Unauthorized
 
@@ -34,7 +34,7 @@ Ajustez l'option `log_level` : `debug` ajoute les commandes WebSocket, les appel
 `http://IP_DE_HA:9583/health` répond sans authentification :
 
 ```json
-{ "status": "ok", "version": "0.1.3", "websocket": true }
+{ "status": "ok", "version": "0.1.4", "websocket": true }
 ```
 
 `websocket: false` signifie que l'add-on tourne mais n'est pas (encore) connecté à Home Assistant.

@@ -10,7 +10,7 @@ configuration:
     description: >-
       Jeton attendu dans l'en-tête Authorization des clients MCP. Laissez
       vide pour en générer un au premier démarrage : il est alors reporté
-      dans cette option et affiché dans le journal de l'add-on.
+      dans cette option. Le journal n'affiche jamais qu'un préfixe masqué.
   allow_write:
     name: Autoriser l'écriture
     description: >-

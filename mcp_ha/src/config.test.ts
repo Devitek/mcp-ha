@@ -89,6 +89,19 @@ describe("loadConfig", () => {
     expect(writeMock).not.toHaveBeenCalled();
   });
 
+  it("never logs the full API token, only a masked prefix", () => {
+    // The security regression test for issue #39: whatever the path
+    // (generation here), the raw token must not reach the logs.
+    setLogLevel("info");
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const cfg = loadConfig();
+    const logged = spy.mock.calls.map((c) => String(c[0]));
+    expect(cfg.apiToken).toMatch(/^[0-9a-f]{64}$/);
+    expect(logged.some((l) => l.includes(cfg.apiToken))).toBe(false);
+    expect(logged.some((l) => l.includes(`${cfg.apiToken.slice(0, 8)}**********`))).toBe(true);
+    spy.mockRestore();
+  });
+
   it("honours environment overrides", () => {
     process.env.MCP_API_TOKEN = "x";
     process.env.MCP_PORT = "1234";

@@ -63,3 +63,14 @@ export function safeEqual(a: string, b: string): boolean {
   const hb = createHash("sha256").update(b).digest();
   return timingSafeEqual(ha, hb);
 }
+
+/**
+ * Displayable form of a secret: a short prefix followed by a fixed number of
+ * asterisks (e.g. d370f4f8**********). Secrets must never reach the logs in
+ * full, and the padding is fixed so the real length is not revealed either.
+ */
+export function maskSecret(secret: string, visible = 8): string {
+  if (!secret) return "";
+  if (secret.length <= visible) return "*".repeat(10);
+  return secret.slice(0, visible) + "*".repeat(10);
+}

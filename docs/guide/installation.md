@@ -24,11 +24,8 @@ https://github.com/Devitek/mcp-ha
 
 ## Get your API token
 
-On first start, the add-on generates a random API token (32 bytes) and:
+On first start, the add-on generates a random API token (32 bytes) and saves it into the **Configuration** tab of the add-on, in the `api_token` option. That tab is the only place showing the full value: the **Log** tab only ever shows a masked prefix such as `d370f4f8**********`, because a secret does not belong in logs.
 
-- saves it into the **Configuration** tab of the add-on, in the `api_token` option;
-- prints it in the **Log** tab.
-
-Every installation gets its own token: reinstalling the add-on wipes its data and produces a fresh one. You can also set your own value in `api_token` at any time; restart the add-on to apply it.
+Every installation gets its own token: reinstalling the add-on wipes its data and produces a fresh one. You can also set your own value in `api_token` at any time; restart the add-on to apply it. If the option ever looks empty, restart the add-on: saving the token there is retried at every start.
 
 Next step: [connect a client](/guide/clients).

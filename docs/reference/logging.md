@@ -35,6 +35,10 @@ Write attempts through `ha_call_service` produce one JSON line each, **regardles
 
 Refused attempts carry `"allowed": false` and a `reason`. Secrets never appear in audit lines.
 
+## Secrets
+
+No secret is ever logged in full, at any level. The API token only appears as a masked prefix with fixed-length padding (`d370f4f8**********`); the full value lives in the add-on Configuration tab. A unit test guards this invariant.
+
 ## Diagnosing
 
 - Connection issues: `debug` shows every WS command and reconnection with its backoff delay.
