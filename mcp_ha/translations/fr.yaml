@@ -1,0 +1,34 @@
+configuration:
+  api_token:
+    name: Jeton API
+    description: >-
+      Jeton attendu dans l'en-tête Authorization des clients MCP. Laissez vide
+      pour générer un jeton au premier démarrage, il sera affiché dans le
+      journal de l'add-on.
+  allow_write:
+    name: Autoriser l'écriture
+    description: >-
+      Expose l'outil ha_call_service qui permet à l'assistant d'appeler des
+      services Home Assistant. Désactivé, l'add-on est en lecture seule.
+  filter_reads:
+    name: Filtrer aussi les lectures
+    description: >-
+      Applique la liste noire d'entités aux lectures. Les entités masquées
+      disparaissent des listes et du détail.
+  entity_allowlist:
+    name: Liste blanche d'entités (écriture)
+    description: >-
+      Motifs glob (ex. light.*). Si la liste n'est pas vide, seules ces
+      entités peuvent être ciblées par une écriture.
+  entity_denylist:
+    name: Liste noire d'entités (écriture)
+    description: >-
+      Motifs glob (ex. lock.*). Ces entités ne peuvent jamais être ciblées
+      par une écriture, la liste noire gagne sur la liste blanche.
+  service_denylist:
+    name: Liste noire de services
+    description: >-
+      Services interdits quel que soit le contexte (ex. hassio.*,
+      shell_command.*). Réfléchissez avant d'en retirer.
+network:
+  9583/tcp: Port du serveur MCP (et endpoint /health)

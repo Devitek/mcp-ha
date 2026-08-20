@@ -1,0 +1,33 @@
+configuration:
+  api_token:
+    name: API token
+    description: >-
+      Token expected in the Authorization header of MCP clients. Leave empty
+      to generate one on first start, it will be printed in the add-on log.
+  allow_write:
+    name: Allow write
+    description: >-
+      Exposes the ha_call_service tool so the assistant can call Home
+      Assistant services. When disabled the add-on is read only.
+  filter_reads:
+    name: Filter reads too
+    description: >-
+      Applies the entity denylist to reads as well. Denied entities disappear
+      from listings and from entity details.
+  entity_allowlist:
+    name: Entity allowlist (writes)
+    description: >-
+      Glob patterns (e.g. light.*). When not empty, only these entities can
+      be targeted by a write.
+  entity_denylist:
+    name: Entity denylist (writes)
+    description: >-
+      Glob patterns (e.g. lock.*). These entities can never be targeted by a
+      write, the denylist always wins.
+  service_denylist:
+    name: Service denylist
+    description: >-
+      Services that are always refused (e.g. hassio.*, shell_command.*).
+      Think twice before removing entries.
+network:
+  9583/tcp: MCP server port (and /health endpoint)
