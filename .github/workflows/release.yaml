@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  verify:
+    name: Cohérence des versions
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Le tag doit correspondre à config.yaml
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          if ! grep -q "^version: \"${tag}\"$" mcp_ha/config.yaml; then
+            echo "::error::Le tag v${tag} ne correspond pas à la version de mcp_ha/config.yaml"
+            exit 1
+          fi
+          if ! grep -q "\"version\": \"${tag}\"" mcp_ha/package.json; then
+            echo "::error::Le tag v${tag} ne correspond pas à la version de mcp_ha/package.json"
+            exit 1
+          fi
+
+  build:
+    name: Build des images (${{ matrix.arch }})
+    needs: verify
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [aarch64, amd64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: QEMU pour la compilation croisée
+        uses: docker/setup-qemu-action@v3
+
+      - name: Login sur ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build et push de l'image
+        uses: home-assistant/builder@master
+        with:
+          args: |
+            --${{ matrix.arch }} \
+            --target /data/mcp_ha \
+            --image mcp-ha-{arch} \
+            --docker-hub ghcr.io/devitek
+
+  release:
+    name: GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Création de la release avec notes générées
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes

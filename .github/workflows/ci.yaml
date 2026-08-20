@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-addon:
+    name: Lint du manifest add-on
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint de la configuration de l'add-on
+        uses: frenck/action-addon-linter@v2
+        with:
+          path: "./mcp_ha"
+
+  build-test:
+    name: Build, tests et audit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp_ha
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mcp_ha/package-lock.json
+
+      - name: Installation des dépendances
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      - name: Tests unitaires
+        run: npm test
+
+      - name: Audit de sécurité des dépendances
+        run: npm audit --audit-level=high
