@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Le tag doit correspondre à config.yaml
         run: |
@@ -38,7 +38,7 @@ jobs:
         arch: [aarch64, amd64]
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: QEMU pour la compilation croisée
         uses: docker/setup-qemu-action@v3
@@ -65,7 +65,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Création de la release avec notes générées
         env:
