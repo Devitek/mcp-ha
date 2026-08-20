@@ -1,17 +1,24 @@
 # Changelog
 
+## 0.1.2
+
+- Documentation, logs, error messages and tool descriptions switched to English. Issues and commits stay in French (project knowledge base).
+- New `log_level` option (trace, debug, info, notice, warning, error, fatal) applied to both the Node server and bashio. Write audit lines are emitted at any level.
+- The API token generated on first start is now written back into the add-on options: it is visible and editable in the Configuration tab instead of hiding in the log.
+- Documentation site (English and French) on GitHub Pages: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/), diagrams in Mermaid.
+
 ## 0.1.1
 
-- Ajout de l'icône et du logo de l'add-on.
-- Runtime Node 26 : le binaire vient de l'image officielle node:26-alpine (le paquet apk d'Alpine ne suit pas la dernière LTS), base Home Assistant Alpine 3.24.
-- Dépendances mises à jour : zod 4, vitest 4, TypeScript 7, actions de CI.
-- CI : build de validation de l'image Docker sur chaque changement.
+- Add-on icon and logo.
+- Node 26 runtime: the binary comes from the official node:26-alpine image (the Alpine apk package does not track the latest LTS), Home Assistant Alpine 3.24 base.
+- Dependency updates: zod 4, vitest 4, TypeScript 7, CI actions.
+- CI: Docker image validation build on every change.
 
 ## 0.1.0
 
-Première version.
+First version.
 
-- Serveur MCP en Streamable HTTP (port 9583) avec authentification par jeton bearer, généré automatiquement au premier démarrage.
-- 15 outils de lecture : recherche et listes d'entités, pièces, appareils, services, automations (avec config), scripts, historique, statistiques long terme, logbook, add-ons, rendu de template, infos système.
-- Un outil d'écriture, `ha_call_service`, désactivé par défaut (`allow_write: false`) et encadré : listes glob d'entités, denylist de services, dry_run, journal d'audit.
-- Connexion à Home Assistant en WebSocket avec reconnexion automatique.
+- MCP server over Streamable HTTP (port 9583) with bearer token authentication, token generated on first start.
+- 15 read tools: entity search and listings, areas, devices, services, automations (with config), scripts, history, long-term statistics, logbook, add-ons, template rendering, system info.
+- One write tool, `ha_call_service`, disabled by default (`allow_write: false`) and guarded: entity glob lists, service denylist, dry_run, audit trail.
+- Home Assistant connection over WebSocket with automatic reconnection.

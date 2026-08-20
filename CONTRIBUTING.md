@@ -1,49 +1,59 @@
-# Contribuer
+# Contributing
 
-Merci de votre intérêt ! Ce projet est petit mais tenu avec soin. Voici ce qu'il faut savoir.
+Thanks for your interest! This project is small but carefully maintained. Here is what you need to know.
 
-## Développement local
+## Local development
 
-Le serveur peut tourner hors add-on, contre n'importe quelle instance HA, avec un [jeton longue durée](https://my.home-assistant.io/redirect/profile_security/) :
+The server can run outside the add-on, against any HA instance, with a [long-lived access token](https://my.home-assistant.io/redirect/profile_security/):
 
 ```bash
 cd mcp_ha
 npm install
 npm run build
-HA_URL=http://homeassistant.local:8123 HA_TOKEN=votre_jeton_longue_duree \
-MCP_API_TOKEN=un-jeton-de-dev npm start
+HA_URL=http://homeassistant.local:8123 HA_TOKEN=your_long_lived_token \
+MCP_API_TOKEN=a-dev-token npm start
 ```
 
-Le serveur écoute sur `http://localhost:9583/mcp`. Limites du mode dev : l'outil `ha_get_addons` répond une erreur claire (pas d'API Supervisor hors add-on).
+The server listens on `http://localhost:9583/mcp`. Dev-mode limits: `ha_get_addons` returns a clear error (no Supervisor API outside the add-on). Useful environment variables: `LOG_LEVEL` (trace to fatal), `MCP_PORT`, `MCP_ALLOW_WRITE=true`.
 
-Tests et vérifications :
+Checks:
 
 ```bash
-npm run build   # tsc strict
+npm run build   # strict tsc
 npm test        # vitest
 ```
 
-Pour builder l'image comme le Supervisor le ferait : commentez la ligne `image:` de `config.yaml` et ajoutez le dossier du repo comme dépôt local d'add-ons, ou utilisez `docker build` dans `mcp_ha/`.
+To build the image the way the Supervisor would: comment out the `image:` line of `config.yaml` and add the repo folder as a local add-on repository, or use `docker build` in `mcp_ha/`.
+
+## Documentation site
+
+The site (English and French) lives in `docs/` and is built with VitePress:
+
+```bash
+npm install        # at the repository root
+npm run docs:dev   # local preview
+npm run docs:build
+```
+
+Any diagram in the documentation must be written with Mermaid.
 
 ## Conventions
 
-- **Commits** : [conventional commits](https://www.conventionalcommits.org/fr/), description en français. Types usuels : `feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `test`.
-- **Langue** : tout est en français (code excepté) : issues, commits, docs, messages d'erreur destinés à l'utilisateur.
-- **Style rédactionnel** : ton naturel et direct. Pas de tirets cadratins dans les textes, préférez la virgule, les deux-points ou les parenthèses.
-- **Issues comme base de connaissances** : chaque décision de conception se trace dans une issue labellisée `décision` (fermée quand actée), chaque problème non trivial rencontré dans une issue `écueil` avec sa cause et sa solution. Des modèles d'issues sont fournis. C'est une habitude du projet, pas une option.
-- **Sécurité d'abord** : tout changement touchant `safety.ts`, l'authentification ou les permissions de l'add-on doit venir avec ses tests et une mise à jour de SECURITY.md si le comportement change.
-- **Documentation** : si le comportement visible change, DOCS.md et le README changent dans la même PR, et CHANGELOG.md prend une ligne.
+- **Languages**: documentation, code, logs and error messages are in English. Issues, commits and internal work discussions are in French: they are the maintainer's knowledge base.
+- **Commits**: [conventional commits](https://www.conventionalcommits.org/), description in French. Usual types: `feat`, `fix`, `docs`, `ci`, `chore`, `refactor`, `test`.
+- **Writing style**: natural and direct. No em dashes; prefer commas, colons or parentheses.
+- **Issues as a knowledge base**: every design decision is captured in an issue labeled `décision` (closed once settled), every non-trivial pitfall in an issue labeled `écueil` with its cause and fix. Issue templates are provided. This is a project habit, not an option.
+- **Security first**: any change touching `safety.ts`, authentication or the add-on permissions must come with tests and a SECURITY.md update when the behaviour changes.
+- **Documentation**: when visible behaviour changes, DOCS.md, the README and the site change in the same PR, and CHANGELOG.md gets a line.
 
-## Publier une release
+## Publishing a release
 
-1. Monter la version dans `mcp_ha/config.yaml` et `mcp_ha/package.json` (elles doivent être identiques, la CI le vérifie).
-2. Compléter `mcp_ha/CHANGELOG.md`.
-3. Commit puis tag :
+1. Bump the version in `mcp_ha/config.yaml`, `mcp_ha/package.json` and `mcp_ha/src/config.ts` (they must match, the CI checks the first two).
+2. Update `mcp_ha/CHANGELOG.md`.
+3. Commit then tag:
 
    ```bash
    git tag v0.2.0 && git push origin main --tags
    ```
 
-4. Le workflow `release.yaml` construit les images aarch64 et amd64, les pousse sur ghcr et crée la GitHub Release avec notes générées.
-
-Rappel première fois : les paquets ghcr doivent être rendus publics à la main (voir issue [#13](https://github.com/Devitek/mcp-ha/issues/13)), sinon le Supervisor ne peut pas tirer les images.
+4. The `release.yaml` workflow builds the aarch64 and amd64 images, pushes them to ghcr and creates the GitHub Release with generated notes.

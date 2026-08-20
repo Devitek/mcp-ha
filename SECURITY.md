@@ -1,38 +1,38 @@
-# Sécurité
+# Security
 
-Donner à un LLM un accès à sa domotique n'est pas anodin. Ce document décrit ce que l'add-on protège, comment, et ce qu'il ne protège volontairement pas.
+Giving an LLM access to your home automation is not a trivial decision. This document describes what the add-on protects, how, and what it deliberately does not protect.
 
-## Modèle de menace
+## Threat model
 
-**Ce qu'on protège :**
+**What we protect against:**
 
-- L'instance Home Assistant contre des actions non voulues déclenchées par un client MCP (hallucination du modèle, prompt injection dans un contenu que le LLM lit, client compromis).
-- Le jeton Supervisor : il ne quitte jamais l'add-on, les clients MCP n'y ont pas accès et aucun outil ne le renvoie.
-- Le contexte de l'utilisateur : pas de fuite d'information vers des clients non authentifiés.
+- Unwanted actions on the Home Assistant instance triggered through an MCP client (model hallucination, prompt injection in content the LLM reads, compromised client).
+- Leakage of the Supervisor token: it never leaves the add-on, MCP clients have no access to it and no tool returns it.
+- Information disclosure to unauthenticated clients.
 
-**Ce qu'on ne protège pas (hors périmètre v0.1) :**
+**What we do not protect against (out of scope):**
 
-- L'exposition sur internet. L'add-on parle HTTP en clair avec un jeton statique : c'est un design LAN. Si vous voulez un accès distant, passez par un VPN (WireGuard, Tailscale...), pas par une redirection de port.
-- Un attaquant déjà présent sur votre LAN qui intercepte le trafic (pas de TLS).
-- Un utilisateur légitime du client MCP qui demande des actions autorisées mais regrettables. Les listes d'autorisation limitent le rayon d'action, pas l'intention.
+- Internet exposure. The add-on speaks plain HTTP with a static token: it is a LAN design. For remote access, use a VPN (WireGuard, Tailscale...), not a port forward.
+- An attacker already on your LAN sniffing traffic (no TLS).
+- A legitimate MCP user requesting allowed but regrettable actions. Allowlists bound the blast radius, not the intent.
 
-## Mécanismes en place
+## Mechanisms in place
 
-1. **Authentification bearer** sur l'endpoint MCP, comparaison en temps constant. Le jeton est généré aléatoirement (32 octets) au premier démarrage si non fourni, persisté dans `/data/token` en mode 600.
-2. **Lecture seule par défaut.** `allow_write: false` fait que l'outil `ha_call_service` n'est pas enregistré du tout : il n'apparaît même pas dans la liste des outils du client.
-3. **Denylist de services** livrée avec des défauts sérieux : `homeassistant.stop`, `homeassistant.restart`, `hassio.*`, `shell_command.*`, `python_script.*`, `recorder.purge*`, `backup.*`.
-4. **Listes glob d'entités** pour l'écriture : `entity_allowlist` (si non vide, tout le reste est refusé) et `entity_denylist` (gagne toujours). Le ciblage par `area_id` ou `device_id` est refusé dès qu'une restriction d'entités est configurée, car il permettrait de la contourner.
-5. **Audit** : chaque tentative d'écriture, acceptée ou refusée, est journalisée en JSON dans les logs de l'add-on avec sa raison.
-6. **dry_run** pour prévisualiser un appel de service sans l'exécuter.
-7. **filter_reads** (optionnel) pour masquer aussi en lecture les entités de la denylist (caméras, trackers...).
-8. **Garde-fous d'API** : corps de requête plafonné, slug d'add-on validé par regex avant insertion dans une URL, messages d'erreur sans stack trace.
+1. **Bearer authentication** on the MCP endpoint, constant-time comparison. The token is generated randomly (32 bytes) on first start when not provided, persisted in `/data/token` with mode 600, and written back into the add-on options so it is visible in the configuration panel.
+2. **Read only by default.** With `allow_write: false`, the `ha_call_service` tool is not registered at all: it does not even appear in the client's tool list.
+3. **Service denylist** shipped with serious defaults: `homeassistant.stop`, `homeassistant.restart`, `hassio.*`, `shell_command.*`, `python_script.*`, `recorder.purge*`, `backup.*`.
+4. **Entity glob lists** for writes: `entity_allowlist` (when non-empty, everything else is refused) and `entity_denylist` (always wins). Targeting by `area_id` or `device_id` is refused as soon as an entity restriction is configured, because it would bypass the lists.
+5. **Audit trail**: every write attempt, allowed or refused, is logged as a JSON line in the add-on log with its reason. Audit lines are emitted regardless of the configured log level.
+6. **dry_run** to preview a service call without executing it.
+7. **filter_reads** (optional) to hide denylisted entities from reads as well (cameras, trackers...).
+8. **API guard rails**: capped request body, add-on slug validated by regex before being used in a URL, error messages without stack traces.
 
-## Limites connues et assumées
+## Known and accepted limitations
 
-- `ha_render_template` évalue du Jinja côté HA : c'est en lecture seule, mais un template peut lire l'état de n'importe quelle entité. `filter_reads` ne s'y applique pas. Si c'est un problème pour vous, il faudra attendre une option dédiée (ou ne pas exposer l'add-on à ce client).
-- Le jeton généré est affiché dans le journal de l'add-on au démarrage : c'est le seul canal disponible pour vous le transmettre. Le journal n'est visible que des admins HA.
-- L'add-on demande `hassio_role: manager` pour lire les add-ons. C'est peut-être plus que nécessaire, la réduction est suivie dans l'issue [#11](https://github.com/Devitek/mcp-ha/issues/11).
+- `ha_render_template` evaluates Jinja on the HA side: read only, but a template can read the state of any entity. `filter_reads` does not apply to it.
+- The generated token is printed in the add-on log on startup and stored in the add-on options, which means it also ends up in add-on backups. The log and the options are only visible to HA admins.
+- The add-on requests `hassio_role: manager` to read add-ons. This may be more than necessary; reducing it is tracked in issue [#11](https://github.com/Devitek/mcp-ha/issues/11).
 
-## Signaler une vulnérabilité
+## Reporting a vulnerability
 
-Utilisez les [advisories de sécurité GitHub](https://github.com/Devitek/mcp-ha/security/advisories/new) (signalement privé) plutôt qu'une issue publique. Décrivez le scénario d'attaque et, si possible, une reproduction. Réponse sous quelques jours au mieux : c'est un projet personnel, pas une équipe d'astreinte.
+Use [GitHub security advisories](https://github.com/Devitek/mcp-ha/security/advisories/new) (private reporting) rather than a public issue. Describe the attack scenario and, if possible, a reproduction. Expect an answer within a few days at best: this is a personal project, not an on-call team.

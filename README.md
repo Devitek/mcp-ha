@@ -1,71 +1,73 @@
-# mcp-ha : un serveur MCP pour Home Assistant, en add-on
+# mcp-ha: an MCP server for Home Assistant, as an add-on
 
 [![CI](https://github.com/Devitek/mcp-ha/actions/workflows/ci.yaml/badge.svg)](https://github.com/Devitek/mcp-ha/actions/workflows/ci.yaml)
 [![Release](https://img.shields.io/github/v/release/Devitek/mcp-ha?sort=semver)](https://github.com/Devitek/mcp-ha/releases)
-[![Licence MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Cet add-on Home Assistant expose un serveur [MCP](https://modelcontextprotocol.io) (Model Context Protocol). Concrètement : vous connectez Claude, Gemini ou tout autre client MCP à votre instance, et vous discutez avec votre maison.
+This Home Assistant add-on exposes an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server. In practice: you connect Claude, Gemini or any other MCP client to your instance, and you talk to your home.
 
-> « Quelles lumières sont restées allumées ? », « Pourquoi l'automation du chauffage ne s'est pas déclenchée cette nuit ? », « Trace-moi la conso électrique de la semaine. »
+> "Which lights were left on?", "Why didn't the heating automation trigger last night?", "Plot my energy usage for the week."
 
-## Ce que ça couvre
+**Documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/)** (English and French)
 
-| Domaine | Outils |
-|---------|--------|
-| Entités, pièces, appareils | recherche floue, listes paginées, détail complet |
-| Services | catalogue par domaine, recherche, appel encadré (opt-in) |
-| Automations | liste, état, dernier déclenchement, configuration complète |
-| Scripts | liste, état d'exécution |
-| Historique | changements d'état, statistiques long terme, logbook |
-| Add-ons | liste et détail (lecture) |
-| Système | rendu de template Jinja, config HA, journal d'erreurs |
+## What it covers
 
-16 outils au total, pensés pour économiser le contexte du LLM : réponses compactes, paginées et plafonnées, avec des messages qui guident l'assistant vers des requêtes plus précises.
+| Domain | Tools |
+|--------|-------|
+| Entities, areas, devices | fuzzy search, paginated lists, full details |
+| Services | catalog per domain, search, guarded call (opt-in) |
+| Automations | list, state, last trigger, full configuration |
+| Scripts | list, running state |
+| History | state changes, long-term statistics, logbook |
+| Add-ons | list and details (read) |
+| System | Jinja template rendering, HA config, error log |
 
-## Pourquoi pas l'intégration MCP officielle de HA ?
+16 tools in total, designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
 
-Elle existe et fonctionne, mais elle passe par l'API Assist : uniquement les entités exposées à Assist, pas d'historique, pas de registres, pas d'add-ons, pas de config d'automations. Cet add-on donne un accès direct et granulaire. Les deux cohabitent sans problème.
+## Why not the official HA MCP integration?
+
+It exists and works, but it goes through the Assist API: only entities exposed to Assist, no history, no registries, no add-ons, no automation configs. This add-on gives direct, granular access. Both can coexist.
 
 ## Installation
 
-Prérequis : Home Assistant OS ou Supervised (l'add-on a besoin du Supervisor).
+Requirements: Home Assistant OS or Supervised (the add-on needs the Supervisor).
 
-1. Ajoutez ce dépôt à vos dépôts d'add-ons :
+1. Add this repository to your add-on repositories:
 
-   [![Ajouter le dépôt](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FDevitek%2Fmcp-ha)
+   [![Add repository](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FDevitek%2Fmcp-ha)
 
-   Ou manuellement : Paramètres, Modules complémentaires, Boutique, menu trois points, Dépôts, puis collez `https://github.com/Devitek/mcp-ha`.
+   Or manually: Settings, Add-ons, Add-on store, three-dot menu, Repositories, then paste `https://github.com/Devitek/mcp-ha`.
 
-2. Installez « MCP Home Assistant », démarrez-le.
-3. Ouvrez le journal de l'add-on : un jeton d'API y est affiché au premier démarrage. Copiez-le.
+2. Install "MCP Home Assistant" and start it.
+3. Open the add-on Configuration tab: an API token was generated and saved there on first start (it is also printed in the add-on log).
 
-## Connexion d'un client
+## Connecting a client
 
-**Claude Code** :
+**Claude Code**:
 
 ```bash
 claude mcp add --transport http home-assistant \
-  http://IP_DE_HA:9583/mcp \
-  --header "Authorization: Bearer VOTRE_JETON"
+  http://HA_IP:9583/mcp \
+  --header "Authorization: Bearer YOUR_TOKEN"
 ```
 
-**Claude Desktop** et **Gemini CLI** : voir la [documentation de l'add-on](mcp_ha/DOCS.md), les trois configurations y sont détaillées.
+**Claude Desktop** and **Gemini CLI**: see the [clients guide](https://devitek.github.io/mcp-ha/guide/clients) on the documentation site.
 
-## Sécurité, en deux mots
+## Security, in short
 
-- **Lecture seule par défaut.** L'outil d'appel de service n'existe pour le client que si vous activez `allow_write`.
-- **Défense en profondeur** quand l'écriture est active : liste noire de services dangereux (arrêt de HA, shell_command...), listes glob d'entités autorisées/interdites, mode `dry_run`, audit JSON de chaque tentative dans le journal.
-- **LAN uniquement.** Pas de TLS ni d'OAuth en v0.1 : n'exposez pas le port 9583 sur internet.
+- **Read only by default.** The service-call tool does not even exist for the client unless you enable `allow_write`.
+- **Defense in depth** when writes are enabled: denylist of dangerous services (HA shutdown, shell_command...), glob allow/deny lists for entities, `dry_run` mode, JSON audit trail of every attempt in the log.
+- **LAN only.** No TLS, no OAuth: do not expose port 9583 to the internet.
 
-Le modèle de menace complet est dans [SECURITY.md](SECURITY.md).
+The full threat model is in [SECURITY.md](SECURITY.md).
 
 ## Documentation
 
-- [Documentation utilisateur de l'add-on](mcp_ha/DOCS.md) : options, clients, dépannage
-- [Conception détaillée](docs/DESIGN.md) : architecture, choix techniques, roadmap
-- [Guide de contribution](CONTRIBUTING.md) : setup de dev, conventions, releases
-- [Les issues du dépôt](https://github.com/Devitek/mcp-ha/issues?q=is%3Aissue) servent de base de connaissances : chaque décision de conception et chaque écueil rencontré y est tracé avec les labels `décision` et `écueil`
+- [Documentation site](https://devitek.github.io/mcp-ha/): installation, configuration, clients, tool reference, architecture (English and French)
+- [Add-on documentation](mcp_ha/DOCS.md): the page shown in the HA interface
+- [Contributing guide](CONTRIBUTING.md): dev setup, conventions, releases
+- [Repository issues](https://github.com/Devitek/mcp-ha/issues?q=is%3Aissue): the project knowledge base, every design decision and pitfall is tracked there with the `décision` and `écueil` labels (in French)
 
-## Licence
+## License
 
 [MIT](LICENSE)

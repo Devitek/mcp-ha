@@ -1,80 +1,84 @@
 # MCP Home Assistant
 
-Cet add-on expose un serveur [MCP](https://modelcontextprotocol.io) (Model Context Protocol) qui permet à un assistant IA (Claude Code, Claude Desktop, Gemini CLI...) d'interroger votre instance Home Assistant : entités, pièces, appareils, services, automations, scripts, historique, statistiques et add-ons.
+This add-on exposes an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server that lets an AI assistant (Claude Code, Claude Desktop, Gemini CLI...) query your Home Assistant instance: entities, areas, devices, services, automations, scripts, history, statistics and add-ons.
 
-Par défaut l'add-on est en **lecture seule**. L'écriture (appel de services) doit être activée explicitement et reste encadrée par des listes d'autorisation.
+By default the add-on is **read only**. Writes (service calls) must be enabled explicitly and remain guarded by allow/deny lists.
 
-## Premiers pas
+Full documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/) (English and French).
 
-1. Installez l'add-on et démarrez-le.
-2. Ouvrez le **Journal** de l'add-on : au premier démarrage, un jeton d'API est généré et affiché. Copiez-le.
-3. Configurez votre client MCP (voir plus bas) avec l'adresse `http://IP_DE_HA:9583/mcp` et ce jeton.
-4. Demandez par exemple à votre assistant : « quelles sont les lumières allumées ? »
+## Getting started
+
+1. Install the add-on and start it.
+2. Open the add-on **Configuration** tab: an API token was generated and saved there on first start (also printed in the **Log** tab). Copy it.
+3. Configure your MCP client (see below) with `http://HA_IP:9583/mcp` and that token.
+4. Ask your assistant something like: "which lights are on?"
 
 ## Options
 
-| Option | Défaut | Description |
-|--------|--------|-------------|
-| `api_token` | vide | Jeton attendu des clients MCP (en-tête `Authorization: Bearer ...`). Laissez vide pour qu'un jeton soit généré au premier démarrage et affiché dans le journal. |
-| `allow_write` | `false` | Expose l'outil `ha_call_service`. Sans cette option, aucun outil d'écriture n'est même visible du client. |
-| `filter_reads` | `false` | Applique aussi `entity_denylist` aux lectures : les entités masquées disparaissent des listes et de `ha_get_entity`. |
-| `entity_allowlist` | `[]` | Motifs glob d'entités autorisées à l'écriture (ex. `light.*`). Si la liste n'est pas vide, tout ce qui n'y figure pas est refusé. |
-| `entity_denylist` | `[]` | Motifs glob d'entités interdites à l'écriture (ex. `lock.*`). La denylist gagne toujours sur l'allowlist. |
-| `service_denylist` | voir config | Services interdits quel que soit le contexte. Les défauts bloquent l'arrêt de HA, les shell_command, la purge du recorder, etc. Réfléchissez avant d'en retirer. |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `log_level` | `info` | Log verbosity: trace, debug, info, notice, warning, error, fatal. Write audit lines are always emitted. |
+| `api_token` | empty | Token expected from MCP clients (`Authorization: Bearer ...`). Leave empty to have one generated on first start, saved back into this option and printed in the log. |
+| `allow_write` | `false` | Exposes the `ha_call_service` tool. Without it, no write tool is even visible to the client. |
+| `filter_reads` | `false` | Also applies `entity_denylist` to reads: hidden entities disappear from listings and from `ha_get_entity`. |
+| `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes (e.g. `light.*`). When non-empty, everything else is refused. |
+| `entity_denylist` | `[]` | Glob patterns of entities forbidden for writes (e.g. `lock.*`). The denylist always wins. |
+| `service_denylist` | see config | Services refused in any context. The defaults block HA shutdown, shell_command, recorder purge, etc. Think twice before removing entries. |
 
-## Connexion des clients
+## Connecting clients
 
-Remplacez `IP_DE_HA` et `VOTRE_JETON`.
+Replace `HA_IP` and `YOUR_TOKEN`.
 
-**Claude Code (CLI)** :
+**Claude Code (CLI)**:
 
 ```bash
 claude mcp add --transport http home-assistant \
-  http://IP_DE_HA:9583/mcp \
-  --header "Authorization: Bearer VOTRE_JETON"
+  http://HA_IP:9583/mcp \
+  --header "Authorization: Bearer YOUR_TOKEN"
 ```
 
-**Claude Desktop** (`claude_desktop_config.json`) :
+**Claude Desktop** (`claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "home-assistant": {
       "command": "npx",
-      "args": ["-y", "mcp-remote", "http://IP_DE_HA:9583/mcp",
-               "--header", "Authorization: Bearer VOTRE_JETON"]
+      "args": ["-y", "mcp-remote", "http://HA_IP:9583/mcp",
+               "--header", "Authorization: Bearer YOUR_TOKEN"]
     }
   }
 }
 ```
 
-**Gemini CLI** (`~/.gemini/settings.json`) :
+**Gemini CLI** (`~/.gemini/settings.json`):
 
 ```json
 {
   "mcpServers": {
     "home-assistant": {
-      "httpUrl": "http://IP_DE_HA:9583/mcp",
-      "headers": { "Authorization": "Bearer VOTRE_JETON" }
+      "httpUrl": "http://HA_IP:9583/mcp",
+      "headers": { "Authorization": "Bearer YOUR_TOKEN" }
     }
   }
 }
 ```
 
-## Sécurité
+## Security
 
-- L'add-on est pensé pour un usage **LAN uniquement**. N'exposez pas le port 9583 sur internet : il n'y a ni TLS ni OAuth en v0.1.
-- Le jeton d'API est un secret : ne le collez pas dans un ticket ou un partage d'écran.
-- `allow_write` est désactivé par défaut. Activez-le seulement si vous voulez que l'assistant puisse agir, et pensez aux listes `entity_allowlist` et `entity_denylist`.
-- Chaque tentative d'écriture (acceptée ou refusée) est tracée en JSON dans le journal de l'add-on.
-- Limite connue : `ha_render_template` évalue des templates Jinja côté HA et peut lire l'état de n'importe quelle entité, `filter_reads` ne s'y applique pas.
+- The add-on is designed for **LAN use only**. Do not expose port 9583 to the internet: there is no TLS and no OAuth.
+- The API token is a secret: do not paste it in a ticket or a screen share.
+- `allow_write` is disabled by default. Enable it only if you want the assistant to act, and consider `entity_allowlist` / `entity_denylist`.
+- Every write attempt (allowed or refused) is logged as JSON in the add-on log, at any log level.
+- Known limitation: `ha_render_template` evaluates Jinja templates on the HA side and can read any entity state, `filter_reads` does not apply to it.
 
-Le détail du modèle de menace est dans le fichier [SECURITY.md](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md) du dépôt.
+The full threat model is in the repository's [SECURITY.md](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md).
 
-## Dépannage
+## Troubleshooting
 
-- **Jeton perdu** : le jeton généré est conservé dans `/data/token`. Redémarrez l'add-on, il est réaffiché dans le journal. Pour en forcer un nouveau, renseignez `api_token` dans les options, ou supprimez le fichier `/data/token` puis redémarrez.
-- **401 Unauthorized** : vérifiez l'en-tête `Authorization: Bearer ...` côté client, sans espace parasite.
-- **Les outils répondent « WebSocket HA non connecté »** : consultez le journal, l'add-on retente la connexion en continu. Un redémarrage de Home Assistant provoque une coupure brève, la reconnexion est automatique.
-- **`ha_get_addons` échoue** : l'API Supervisor n'est accessible que si l'add-on tourne bien en tant qu'add-on (pas en mode dev hors HA).
-- **Santé** : `http://IP_DE_HA:9583/health` répond sans authentification avec l'état de la connexion WebSocket.
+- **Lost token**: it is visible in the add-on Configuration tab (option `api_token`) and kept in `/data/token`. To force a new one, clear the option and delete the file, then restart.
+- **401 Unauthorized**: check the `Authorization: Bearer ...` header on the client side, without stray spaces.
+- **Tools answer "WebSocket is not connected"**: check the log, the add-on reconnects continuously. A Home Assistant restart causes a short outage, reconnection is automatic.
+- **`ha_get_addons` fails**: the Supervisor API is only reachable when running as a real add-on (not in dev mode).
+- **Noisy or too quiet logs**: adjust the `log_level` option (debug and trace add WebSocket and HTTP details).
+- **Health**: `http://HA_IP:9583/health` answers without authentication with the WebSocket connection state.
