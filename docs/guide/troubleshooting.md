@@ -34,7 +34,7 @@ Adjust the `log_level` option: `debug` adds WebSocket commands, HTTP calls and t
 `http://HA_IP:9583/health` answers without authentication:
 
 ```json
-{ "status": "ok", "version": "0.1.2", "websocket": true }
+{ "status": "ok", "version": "0.1.3", "websocket": true }
 ```
 
 `websocket: false` means the add-on runs but is not (yet) connected to Home Assistant.
