@@ -55,9 +55,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build et push de l'image
-        # Épinglé par SHA (audit D2) : master est mutable et ce job détient
-        # packages: write. Migration complète hors builder suivie dans #25.
-        uses: home-assistant/builder@bb9bc86ea4c721825986c19b52e4da07be0f0fde
+        # Épinglé par tag de release (audit D2) : master est mutable et ce job
+        # détient packages: write. Le pin par SHA est impossible avec cette
+        # action, elle utilise sa ref git comme tag de sa propre image Docker
+        # (amd64-builder:<ref>), qui n'existe que pour les tags publiés.
+        # Migration complète hors builder suivie dans #25.
+        uses: home-assistant/builder@2026.06.0
         with:
           args: |
             --${{ matrix.arch }} \
