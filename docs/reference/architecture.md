@@ -70,7 +70,7 @@ Tool responses are designed for LLM consumption:
 - projection by default: lists return minimal fields, details live in `ha_get_entity`;
 - standard envelope with `total`, `has_more`, `next_offset`;
 - unfiltered `ha_list_entities` returns a histogram, not a dump;
-- bounded time windows, downsampling beyond 500 history points;
+- bounded time windows, downsampling beyond 250 history points;
 - global cap around 15 KB per response, with a note explaining how to refine.
 
 ## Token bootstrap

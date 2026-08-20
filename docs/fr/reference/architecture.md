@@ -70,7 +70,7 @@ Les réponses des outils sont pensées pour la consommation par un LLM :
 - projection par défaut : les listes renvoient des champs minimaux, le détail vit dans `ha_get_entity` ;
 - enveloppe standard avec `total`, `has_more`, `next_offset` ;
 - `ha_list_entities` sans filtre renvoie un histogramme, pas un dump ;
-- fenêtres temporelles bornées, sous-échantillonnage au-delà de 500 points d'historique ;
+- fenêtres temporelles bornées, sous-échantillonnage au-delà de 250 points d'historique ;
 - plafond global d'environ 15 Ko par réponse, avec une note expliquant comment affiner.
 
 ## Bootstrap du jeton

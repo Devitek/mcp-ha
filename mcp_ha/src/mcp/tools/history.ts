@@ -4,8 +4,11 @@ import type { ToolContext } from "../../context.js";
 import { safe, timeWindow, toIso } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
 
-const MAX_POINTS = 500;
-const MAX_LOGBOOK = 200;
+// Sized so that a maxed-out response still fits under helpers.ts
+// MAX_RESPONSE_BYTES: at 500/200 the JSON blew past the global cap and
+// always arrived truncated (caught by the unit tests).
+const MAX_POINTS = 250;
+const MAX_LOGBOOK = 100;
 
 /** Downsamples while keeping the first, the last and a regular stride. */
 function downsample<T>(rows: T[], max: number): { rows: T[]; note?: string } {

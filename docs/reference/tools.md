@@ -81,7 +81,7 @@ entity_id, name, running, last_triggered. Params: `limit`, `offset`.
 
 ### ha_get_history
 
-State changes of one entity. Window: `hours` (default 24, max 168) or `start`/`end` ISO 8601. More than 500 points are downsampled with a note.
+State changes of one entity. Window: `hours` (default 24, max 168) or `start`/`end` ISO 8601. More than 250 points are downsampled with a note.
 
 ### ha_get_statistics
 
@@ -89,7 +89,7 @@ Recorder aggregates (mean, min, max, sum) for numeric sensors. `statistic_id` (s
 
 ### ha_get_logbook
 
-Human-readable events, filterable by `entity_id`, window up to 7 days, capped at 200 events.
+Human-readable events, filterable by `entity_id`, window up to 7 days, capped at 100 events.
 
 ## Add-ons and system
 
