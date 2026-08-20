@@ -18,4 +18,10 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
+
+# Santé du conteneur : le linter add-on impose HEALTHCHECK plutôt que
+# l'option watchdog de config.yaml, désormais obsolète.
+HEALTHCHECK --interval=60s --timeout=10s --start-period=20s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:9583/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
 CMD [ "/run.sh" ]
