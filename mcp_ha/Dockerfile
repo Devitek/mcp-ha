@@ -19,7 +19,9 @@ RUN npm run build && npm prune --omit=dev
 # wanted version. Only system dependency required: libstdc++.
 FROM ${BUILD_FROM}
 ENV NODE_ENV=production
-RUN apk add --no-cache libstdc++
+# Dedicated unprivileged user (audit D8): run.sh drops to it after fixing
+# /data ownership, so an RCE in a dependency does not mean container root.
+RUN apk add --no-cache libstdc++ && adduser -S -D -H mcpha
 COPY --from=build /usr/local/bin/node /usr/local/bin/node
 # Fails the BUILD (not the runtime) if the copied binary is incompatible with
 # the base image musl (audit F5).
@@ -32,8 +34,10 @@ RUN chmod a+x /run.sh
 
 # Container health: the add-on linter mandates HEALTHCHECK over the obsolete
 # watchdog option of config.yaml. /health answers 503 once the Home
-# Assistant connection has been down for several minutes.
+# Assistant connection has been down for several minutes. curl ships with
+# the HA base image and is far cheaper than spawning node every probe
+# (audit F10); the port follows MCP_PORT (audit A9).
 HEALTHCHECK --interval=60s --timeout=10s --start-period=20s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:9583/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD curl -sf "http://127.0.0.1:${MCP_PORT:-9583}/health" || exit 1
 
 CMD [ "/run.sh" ]

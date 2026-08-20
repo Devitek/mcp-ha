@@ -21,4 +21,7 @@ else
   bashio::log.info "Read-only mode (allow_write: false)."
 fi
 
-exec node /app/dist/index.js
+# Drop privileges (audit D8): the server does not need root. /data is
+# root-owned by the Supervisor mount, hand it to the service user first.
+chown -R mcpha /data 2>/dev/null || true
+exec s6-setuidgid mcpha node /app/dist/index.js

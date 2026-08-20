@@ -5,6 +5,15 @@ on:
     branches: [main]
   pull_request:
 
+# Jeton au plus juste (audit D9) : rien dans cette CI n'écrit.
+permissions:
+  contents: read
+
+# Les pushes rapprochés annulent les runs devenus obsolètes (audit E12).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint-addon:
     name: Lint du manifest add-on
@@ -44,14 +53,14 @@ jobs:
       - name: Typecheck (tests inclus)
         run: npm run typecheck
 
-      - name: Tests unitaires
-        run: npm test
+      - name: Tests unitaires (avec couverture, audit E9)
+        run: npm test -- --coverage
 
       - name: Audit de sécurité des dépendances
         run: npm audit --audit-level=high
 
   build-image:
-    name: Build de validation de l'image Docker (amd64)
+    name: Build de validation de l'image Docker (amd64) + scan
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -60,4 +69,31 @@ jobs:
       - name: Build de l'image (sans push)
         run: |
           BUILD_FROM=$(grep 'amd64:' mcp_ha/build.yaml | awk '{print $2}')
-          docker build --build-arg BUILD_FROM="$BUILD_FROM" mcp_ha/
+          docker build --build-arg BUILD_FROM="$BUILD_FROM" -t mcpha-scan mcp_ha/
+
+      - name: Scan de vulnérabilités de l'image (audit E10/D10)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: mcpha-scan
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+  # La cross-compilation aarch64 n'était validée qu'au tag (audit E8) : elle
+  # tourne désormais à chaque push main. Pas sur les PRs, QEMU est trop lent.
+  build-image-aarch64:
+    name: Build de validation de l'image Docker (aarch64)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Build de l'image (sans push)
+        run: |
+          BUILD_FROM=$(grep 'aarch64:' mcp_ha/build.yaml | awk '{print $2}')
+          docker build --platform linux/arm64 --build-arg BUILD_FROM="$BUILD_FROM" mcp_ha/

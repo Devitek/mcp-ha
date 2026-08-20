@@ -1,5 +1,5 @@
 name: MCP Home Assistant
-version: "0.1.5"
+version: "0.1.6"
 slug: mcp_ha
 description: >-
   MCP (Model Context Protocol) server to query and control Home Assistant
@@ -9,7 +9,9 @@ arch:
   - aarch64
   - amd64
 init: false
-startup: services
+# application: started after Home Assistant Core, which this add-on talks to
+# from the first second (audit A4).
+startup: application
 image: ghcr.io/devitek/mcp-ha-{arch}
 homeassistant_api: true
 # Least privilege (audit A1): the self endpoints used for the token

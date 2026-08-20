@@ -1,3 +1,4 @@
-name: Add-ons Devitek pour Home Assistant
+name: Devitek Home Assistant add-ons
 url: https://github.com/Devitek/mcp-ha
-maintainer: Devitek
+# GitHub profile instead of a personal email address, by choice.
+maintainer: Devitek (https://github.com/Devitek)

@@ -8,6 +8,14 @@ on:
       - "package.json"
       - "package-lock.json"
       - ".github/workflows/docs.yaml"
+  # Une PR docs cassée doit échouer avant le merge, pas après (audit E7) :
+  # le build tourne sur PR, le déploiement reste réservé aux pushes main.
+  pull_request:
+    paths:
+      - "docs/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/docs.yaml"
   workflow_dispatch:
 
 permissions:
@@ -41,15 +49,18 @@ jobs:
         run: npm run docs:build
 
       - name: Configuration de Pages
+        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@v6
 
       - name: Upload de l'artefact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
         with:
           path: docs/.vitepress/dist
 
   deploy:
     name: Déploiement sur GitHub Pages
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:
