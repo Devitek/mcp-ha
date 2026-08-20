@@ -94,7 +94,8 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
           })
           .optional()
           .describe("Cible de l'appel, privilégiez entity_id"),
-        data: z.record(z.any()).optional().describe("Données du service, ex. { brightness_pct: 50 }"),
+        // zod 4 : z.record exige désormais le schéma de clé et de valeur.
+        data: z.record(z.string(), z.any()).optional().describe("Données du service, ex. { brightness_pct: 50 }"),
         dry_run: z.boolean().optional().describe("true : prévisualise sans exécuter"),
         return_response: z.boolean().optional().describe("true si le service renvoie des données (ex. weather.get_forecasts)"),
       },
