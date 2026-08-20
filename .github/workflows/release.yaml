@@ -58,9 +58,11 @@ jobs:
         # Épinglé par tag de release (audit D2) : master est mutable et ce job
         # détient packages: write. Le pin par SHA est impossible avec cette
         # action, elle utilise sa ref git comme tag de sa propre image Docker
-        # (amd64-builder:<ref>), qui n'existe que pour les tags publiés.
-        # Migration complète hors builder suivie dans #25.
-        uses: home-assistant/builder@2026.06.0
+        # (amd64-builder:<ref>). 2026.03.2 est le DERNIER tag dont l'image est
+        # publiée sur ghcr (le projet déprécié n'en publie plus depuis) : ne
+        # pas monter ce pin sans vérifier l'existence de l'image. Migration
+        # complète hors builder suivie dans #25, devenue urgente.
+        uses: home-assistant/builder@2026.03.2
         with:
           args: |
             --${{ matrix.arch }} \
