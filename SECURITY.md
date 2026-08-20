@@ -26,6 +26,9 @@ Giving an LLM access to your home automation is not a trivial decision. This doc
 6. **dry_run** to preview a service call without executing it.
 7. **filter_reads** (optional) to hide denylisted entities from reads as well (cameras, trackers...).
 8. **API guard rails**: capped request body, add-on slug validated by regex before being used in a URL, error messages without stack traces.
+9. **Brute-force friction**: after 5 failed authentications an IP gets progressively blocked (up to 60 s, HTTP 429 with Retry-After), and a user-set token shorter than 16 characters triggers a loud startup warning.
+10. **Template gating**: `ha_render_template` can read any entity state server-side, so it is not registered at all when `filter_reads` is enabled; the denylist cannot be bypassed through Jinja.
+11. **Container hardening**: the Node server runs as a dedicated unprivileged user (privileges dropped after `/data` ownership is fixed), and a custom AppArmor profile confines the process.
 
 ## Past advisories
 
@@ -33,7 +36,7 @@ Giving an LLM access to your home automation is not a trivial decision. This doc
 
 ## Known and accepted limitations
 
-- `ha_render_template` evaluates Jinja on the HA side: read only, but a template can read the state of any entity. `filter_reads` does not apply to it.
+- `ha_render_template` evaluates Jinja on the HA side and can read the state of any entity. Without `filter_reads` the tool is available (nothing is hidden anyway); with `filter_reads` it is disabled entirely.
 - The generated token is stored in the add-on options, which means it also ends up in add-on backups. The options are only visible to HA admins; the log never contains it in full.
 - The add-on runs with `hassio_role: default`, the least privileged role. If `ha_get_addons` answers a 403 on your installation, please report it so the required role can be reassessed.
 

@@ -40,9 +40,14 @@ Les lignes d'audit sont en JSON, une par tentative, et sont émises quel que soi
 Les versions 0.1.0 à 0.1.3 de l'add-on affichaient le jeton en entier dans le journal. Si vous avez partagé des logs produits par ces versions (issue, forum, capture), renouvelez votre jeton maintenant.
 :::
 
+## Autres garde-fous
+
+- Après 5 échecs d'authentification, une IP est bloquée progressivement (jusqu'à 60 s, HTTP 429 avec `Retry-After`) ; un jeton saisi à la main de moins de 16 caractères déclenche un avertissement bruyant au démarrage.
+- Le serveur Node tourne sous un utilisateur dédié non privilégié dans le conteneur, confiné par un profil AppArmor.
+
 ## Limites assumées
 
-- `ha_render_template` évalue du Jinja côté serveur : lecture seule, mais il peut lire l'état de **n'importe quelle** entité, `filter_reads` ne s'y applique pas.
+- `ha_render_template` évalue du Jinja côté serveur et peut lire l'état de **n'importe quelle** entité : il est donc entièrement désactivé quand `filter_reads` est actif.
 - Le jeton présent dans les options se retrouve dans les sauvegardes de l'add-on, et visible des admins HA. Les journaux aussi.
 - Pas de TLS : quiconque peut sniffer votre LAN peut lire le jeton. C'est le compromis du choix LAN uniquement.
 

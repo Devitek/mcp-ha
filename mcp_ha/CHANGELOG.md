@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.6 - 2026-08-21
+
+Second and final batch of the external audit (every finding of AUDIT.md is now either shipped or tracked with an explicit blocker).
+
+- Security: progressive per-IP blocking after repeated failed authentications (HTTP 429 with Retry-After); `ha_render_template` is disabled when `filter_reads` is on (a template could read any entity and bypass the denylist); the Node server now runs as a dedicated unprivileged user; custom AppArmor profile shipped; workflow permissions reduced to per-job minimums.
+- Robustness: Home Assistant payloads (states, registries, services) are validated at runtime, an API change now yields an explicit "unexpected payload" error instead of a random TypeError; a 404 on automation config is no longer conflated with an API failure; tool errors keep their stack in debug logs.
+- Performance: short-lived state cache (3 s) removes the full `get_states` per tool call, registries share in-flight fetches, and every cache is invalidated on reconnection.
+- History: the first point now explicitly carries the state in effect at window start; response caps are measured in real bytes.
+- Add-on: `startup: application` (waits for HA Core), container healthcheck via curl and honouring MCP_PORT.
+- CI: aarch64 cross-build validated on every push, trivy image scan blocking on HIGH/CRITICAL, coverage measured with thresholds, WebSocket reconnection covered by tests. ESLint stays tracked (#70): typescript-eslint does not support TypeScript 7 yet.
+
 ## 0.1.5 - 2026-08-21
 
 First batch of the external audit (see AUDIT.md and the `audit` label on the issue tracker).

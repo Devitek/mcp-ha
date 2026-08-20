@@ -81,7 +81,7 @@ entity_id, name, running, last_triggered. Params: `limit`, `offset`.
 
 ### ha_get_history
 
-State changes of one entity. Window: `hours` (min 0.25, default 24, max 168) or `start`/`end` ISO 8601. More than 250 points are downsampled with a note.
+State changes of one entity. Window: `hours` (min 0.25, default 24, max 168) or `start`/`end` ISO 8601. The first point is the state already in effect at window start; more than 250 points are downsampled with a note.
 
 ### ha_get_statistics
 
@@ -99,7 +99,7 @@ Without `slug`: list of installed add-ons. With `slug`: details of one. Read onl
 
 ### ha_render_template
 
-Evaluates a Jinja2 template server-side and returns the rendering. Read only, very powerful for computed queries:
+Evaluates a Jinja2 template server-side and returns the rendering. Read only, very powerful for computed queries. Not registered when `filter_reads` is enabled (a template can read any entity):
 
 ```
 {{ states.light | selectattr('state','eq','on') | list | count }}

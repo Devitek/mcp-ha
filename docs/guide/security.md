@@ -40,9 +40,14 @@ The audit lines are JSON, one per attempt, and are emitted regardless of the con
 Add-on versions 0.1.0 to 0.1.3 printed the token in full in the add-on log. If you ever shared logs produced by those versions (issue, forum, screenshot), rotate your token now.
 :::
 
+## Other guard rails
+
+- After 5 failed authentications, an IP is progressively blocked (up to 60 s, HTTP 429 with `Retry-After`); a user-set token shorter than 16 characters triggers a loud startup warning.
+- The Node server runs as a dedicated unprivileged user inside the container, confined by a custom AppArmor profile.
+
 ## Accepted limitations
 
-- `ha_render_template` evaluates Jinja server-side: read only, but it can read **any** entity state, `filter_reads` does not apply to it.
+- `ha_render_template` evaluates Jinja server-side and can read **any** entity state: it is therefore disabled entirely when `filter_reads` is enabled.
 - The token being in the options means it is included in add-on backups, and visible to HA admins. So are the logs.
 - No TLS: anyone able to sniff your LAN traffic can read the token. That is the LAN-only tradeoff.
 
