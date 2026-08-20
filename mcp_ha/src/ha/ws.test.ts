@@ -119,5 +119,26 @@ describe("HaWsClient", () => {
     const c = makeClient(port);
     await expect(c.send("doomed")).rejects.toThrow(/connection was lost/);
     expect(c.connected).toBe(false);
+    expect(c.disconnectedForMs()).not.toBeNull();
+  });
+
+  it("fails fast on auth_invalid instead of letting waiters sit out their timeout", async () => {
+    wss = new WebSocketServer({ port: 0 });
+    wss.on("connection", (sock) => {
+      sock.send(JSON.stringify({ type: "auth_required" }));
+      sock.on("message", () => {
+        sock.send(JSON.stringify({ type: "auth_invalid", message: "bad token" }));
+        sock.close();
+      });
+    });
+    await once(wss, "listening");
+    const address = wss.address();
+    if (typeof address === "string" || address === null) throw new Error("no port");
+    const c = makeClient(address.port);
+    const started = Date.now();
+    await expect(c.send("anything")).rejects.toThrow(/connection was lost/);
+    // Rejected by the close handler, not by the 10 s ready() timeout.
+    expect(Date.now() - started).toBeLessThan(5_000);
+    expect(c.connected).toBe(false);
   });
 });

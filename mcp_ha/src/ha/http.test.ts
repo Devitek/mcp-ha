@@ -20,14 +20,19 @@ function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
   };
 }
 
-function mockFetch(status: number, body: unknown, asText = false) {
-  const fn = vi.fn(async () => ({
+function response(status: number, body: unknown, asText = false) {
+  return {
     ok: status >= 200 && status < 300,
     status,
     statusText: `HTTP ${status}`,
+    headers: new Headers(),
     json: async () => body,
     text: async () => (asText ? String(body) : JSON.stringify(body)),
-  }));
+  };
+}
+
+function mockFetch(status: number, body: unknown, asText = false) {
+  const fn = vi.fn(async () => response(status, body, asText));
   vi.stubGlobal("fetch", fn);
   return fn;
 }
@@ -54,10 +59,50 @@ describe("HaHttp core", () => {
     expect(init.headers.Authorization).toBe("Bearer dev-token");
   });
 
-  it("throws a readable error on non-2xx answers", async () => {
-    mockFetch(404, { message: "not found" });
+  it("throws a readable error on non-2xx answers without retrying a 404", async () => {
+    const fetchMock = mockFetch(404, { message: "not found" });
     const http = new HaHttp(cfg({ devHaUrl: "http://ha", devHaToken: "d" }));
     await expect(http.coreGet("/nope")).rejects.toThrow(/HTTP 404/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("carries a timeout signal on every request (audit C1)", async () => {
+    const fetchMock = mockFetch(200, {});
+    const http = new HaHttp(cfg({ devHaUrl: "http://ha", devHaToken: "d" }));
+    await http.coreGet("/states");
+    const [, init] = fetchMock.mock.calls[0] as any;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("retries a GET once on 503 then succeeds (audit C1)", async () => {
+    let calls = 0;
+    const fn = vi.fn(async () => {
+      calls++;
+      return calls === 1 ? response(503, { error: "starting" }) : response(200, { ok: true });
+    });
+    vi.stubGlobal("fetch", fn);
+    const http = new HaHttp(cfg({ devHaUrl: "http://ha", devHaToken: "d" }));
+    const out = await http.coreGet("/states");
+    expect(out).toEqual({ ok: true });
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("never retries a POST (audit C1: no double effects)", async () => {
+    const fetchMock = mockFetch(503, { error: "starting" });
+    const http = new HaHttp(cfg({ devHaUrl: "http://ha", devHaToken: "d" }));
+    await expect(http.corePostText("/template", { template: "x" })).rejects.toThrow(/HTTP 503/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("turns timeouts into a readable error (audit C1)", async () => {
+    const abort = Object.assign(new Error("aborted"), { name: "TimeoutError" });
+    const fn = vi.fn(async () => {
+      throw abort;
+    });
+    vi.stubGlobal("fetch", fn);
+    const http = new HaHttp(cfg({ devHaUrl: "http://ha", devHaToken: "d" }));
+    await expect(http.coreGet("/states")).rejects.toThrow(/did not answer within/);
+    expect(fn).toHaveBeenCalledTimes(2); // GET timeout is retried once
   });
 
   it("posts JSON and returns raw text with corePostText", async () => {
