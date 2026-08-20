@@ -8,6 +8,11 @@ updates:
       - "sécurité"
     commit-message:
       prefix: "chore"
+    ignore:
+      # Les types Node suivent la version du runtime (Docker et CI), pas la
+      # dernière major disponible. À monter en même temps que Node lui-même.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: "/"
