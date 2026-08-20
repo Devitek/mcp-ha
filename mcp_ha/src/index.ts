@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfig, VERSION, type AddonConfig } from "./config.js";
 import { getLogLevel, log } from "./logger.js";
+import { AuthRateLimiter } from "./ratelimit.js";
 import { safeEqual } from "./safety.js";
 import { HaWsClient } from "./ha/ws.js";
 import { HaHttp } from "./ha/http.js";
@@ -58,6 +59,7 @@ function rpcError(res: ServerResponse, status: number, code: number, message: st
  */
 export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const { cfg, ws } = ctx;
+  const limiter = new AuthRateLimiter();
   return async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
 
@@ -86,28 +88,40 @@ export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: Ser
       return;
     }
 
+    const ip = req.socket.remoteAddress ?? "unknown";
+    const retryIn = limiter.retryInMs(ip);
+    if (retryIn > 0) {
+      rpcError(res, 429, -32002, "too many failed authentications, slow down", {
+        "Retry-After": String(Math.ceil(retryIn / 1000)),
+      });
+      return;
+    }
+
     const auth = req.headers.authorization ?? "";
-    const match = auth.match(/^Bearer\s+(.+)$/i);
-    if (!match || !safeEqual(match[1].trim(), cfg.apiToken)) {
-      log.notice(`Unauthorized MCP request from ${req.socket.remoteAddress ?? "unknown"}`);
+    const presented = auth.match(/^Bearer\s+(.+)$/i)?.[1];
+    if (!presented || !safeEqual(presented.trim(), cfg.apiToken)) {
+      const blocked = limiter.fail(ip);
+      log.notice(`Unauthorized MCP request from ${ip}${blocked > 0 ? ` (blocked ${blocked} ms)` : ""}`);
       rpcError(res, 401, -32001, "unauthorized", { "WWW-Authenticate": "Bearer" });
       return;
     }
+    limiter.succeed(ip);
 
     try {
       const body = await readJsonBody(req);
       log.debug(`MCP request from ${req.socket.remoteAddress ?? "unknown"}`);
-      // Stateless mode: one server and one transport per request, no session.
+      // Stateless mode: one server and one transport per request, no session
+      // (sessionIdGenerator left undefined). The SDK types are not
+      // exactOptionalPropertyTypes-clean, hence the connect cast.
       const server = buildServer(ctx);
       const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
         enableJsonResponse: true,
       });
       res.on("close", () => {
         transport.close();
         server.close();
       });
-      await server.connect(transport);
+      await server.connect(transport as Parameters<typeof server.connect>[0]);
       await transport.handleRequest(req, res, body);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -188,9 +202,12 @@ async function main(): Promise<void> {
   const cfg = loadConfig();
 
   const ws = new HaWsClient(cfg);
+  const catalog = new Catalog(ws);
+  // Stale caches must not survive an HA restart (audit B5/C9).
+  ws.onConnect(() => catalog.invalidate());
   ws.connect();
   const http = new HaHttp(cfg);
-  const ctx: ToolContext = { cfg, ws, http, catalog: new Catalog(ws) };
+  const ctx: ToolContext = { cfg, ws, http, catalog };
   void persistGeneratedToken(cfg, http);
 
   const httpServer = createServer(createHandler(ctx));

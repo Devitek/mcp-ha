@@ -4,9 +4,13 @@ import type { ToolContext } from "../../context.js";
 import { safe, trunc } from "../helpers.js";
 
 export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
-  server.registerTool(
-    "ha_render_template",
-    {
+  // A Jinja template can read ANY entity state server-side, which would
+  // bypass filter_reads entirely (audit D5): with read filtering enabled the
+  // tool is simply not registered, same pattern as allow_write.
+  if (!ctx.cfg.filterReads)
+    server.registerTool(
+      "ha_render_template",
+      {
       title: "Render a Jinja template",
       description:
         "Evaluates a Jinja2 template on the Home Assistant side and returns the result. Very powerful " +
@@ -24,7 +28,7 @@ export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
       const rendered = await ctx.http.corePostText("/template", { template });
       return { rendered: trunc(rendered, 5000) };
     })
-  );
+    );
 
   server.registerTool(
     "ha_get_system",

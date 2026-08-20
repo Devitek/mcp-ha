@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registerSystemTools } from "./system.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, fakeCtx, fakeServer } from "./testkit.test.js";
+import { callTool, fakeCtx, fakeServer } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -13,6 +13,13 @@ describe("ha_render_template", () => {
     const res = await callTool(tools, "ha_render_template", { template: "{{ states('a.b') }}" });
     expect(corePostText).toHaveBeenCalledWith("/template", { template: "{{ states('a.b') }}" });
     expect(res.data.rendered).toContain("truncated");
+  });
+
+  it("is not registered at all when filter_reads is active (audit D5)", () => {
+    const { server, tools } = fakeServer();
+    registerSystemTools(server, fakeCtx({ cfg: { filterReads: true, entityDenylist: ["camera.*"] } }));
+    expect(tools.has("ha_render_template")).toBe(false);
+    expect(tools.has("ha_get_system")).toBe(true);
   });
 });
 

@@ -75,7 +75,7 @@ describe("HTTP boundary (audit E1)", () => {
     const base = await startServer(fakeCtx({ ws: { connected: false, disconnectedForMs: () => 10 * 60_000 } }));
     const r = await fetch(`${base}/health`);
     expect(r.status).toBe(503);
-    expect((await r.json()).status).toBe("degraded");
+    expect(((await r.json()) as any).status).toBe("degraded");
   });
 
   it("stays healthy through a short WS outage", async () => {
@@ -108,7 +108,7 @@ describe("HTTP boundary (audit E1)", () => {
     const base = await startServer(fakeCtx());
     const bad = await fetch(`${base}/mcp`, { method: "POST", headers: { ...ACCEPT, ...AUTH }, body: "{nope" });
     expect(bad.status).toBe(400);
-    expect((await bad.json()).error.code).toBe(-32700);
+    expect(((await bad.json()) as any).error.code).toBe(-32700);
 
     const huge = await fetch(`${base}/mcp`, {
       method: "POST",
@@ -133,7 +133,7 @@ describe("HTTP boundary (audit E1)", () => {
       headers: { ...ACCEPT, ...AUTH },
       body: rpc("tools/list", undefined, 2),
     });
-    const tools = (await list.json()).result.tools.map((t: any) => t.name);
+    const tools = ((await list.json()) as any).result.tools.map((t: any) => t.name);
     expect(tools).toHaveLength(15);
     expect(tools).not.toContain("ha_call_service");
   });
