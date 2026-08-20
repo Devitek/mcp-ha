@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerServiceTools } from "./services.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, fakeCtx, fakeServer } from "./testkit.test.js";
+import { callTool, fakeCtx, fakeServer } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 

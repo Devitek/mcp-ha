@@ -1,6 +1,6 @@
 {
   "name": "mcp-ha",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "description": "Add-on Home Assistant exposant un serveur MCP (Model Context Protocol)",
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@types/node": "^26.0.0",
     "@types/ws": "^8.5.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }

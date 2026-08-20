@@ -28,7 +28,7 @@ describe("setLogLevel", () => {
     log.warning("visible");
     log.error("also visible");
     expect(spy).toHaveBeenCalledTimes(2);
-    expect(spy.mock.calls[0][0]).toContain("WARNING visible");
+    expect(String(spy.mock.calls[0]?.[0])).toContain("WARNING visible");
   });
 
   it("lets everything through at trace level", () => {

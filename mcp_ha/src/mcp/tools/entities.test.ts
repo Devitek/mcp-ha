@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { registerEntityTools } from "./entities.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, entity, fakeCtx, fakeServer } from "./testkit.test.js";
+import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 

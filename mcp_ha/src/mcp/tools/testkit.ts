@@ -1,9 +1,10 @@
 // Shared helpers for the tool tests: a fake MCP server capturing tool
 // registrations, a fake context, and a caller that parses ToolResult JSON.
-// The .test.ts suffix keeps this file out of the compiled build; the single
-// smoke test below stops vitest from complaining about an empty suite.
-import { expect, it, vi } from "vitest";
+// Excluded from the production build via tsconfig.json (it imports vitest),
+// fully typechecked by tsconfig.test.json.
+import { vi } from "vitest";
 import type { AddonConfig } from "../../config.js";
+import type { ToolContext } from "../../context.js";
 
 export interface RegisteredTool {
   cfg: any;
@@ -50,7 +51,7 @@ export function testCfg(partial: Partial<AddonConfig> = {}): AddonConfig {
   };
 }
 
-export function fakeCtx(partial: any = {}) {
+export function fakeCtx(partial: any = {}): ToolContext {
   return {
     cfg: testCfg(partial.cfg ?? {}),
     ws: { send: vi.fn(async () => ({})), connected: true, ...(partial.ws ?? {}) },
@@ -67,16 +68,17 @@ export function fakeCtx(partial: any = {}) {
       index: vi.fn(async () => []),
       registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [] })),
       states: vi.fn(async () => []),
+      invalidate: vi.fn(),
       ...(partial.catalog ?? {}),
     },
-  } as any;
+  } as unknown as ToolContext;
 }
 
 export function entity(id: string, over: Record<string, unknown> = {}) {
   return {
     entity_id: id,
     name: id,
-    domain: id.split(".")[0],
+    domain: id.split(".")[0] ?? "",
     state: "on",
     area: null,
     device_id: null,
@@ -87,9 +89,3 @@ export function entity(id: string, over: Record<string, unknown> = {}) {
     ...over,
   };
 }
-
-it("testkit builds a coherent fake context", async () => {
-  const ctx = fakeCtx({ cfg: { allowWrite: true } });
-  expect(ctx.cfg.allowWrite).toBe(true);
-  expect(await ctx.catalog.index()).toEqual([]);
-});
