@@ -21,7 +21,7 @@ La même valeur est appliquée à bashio (le wrapper `run.sh`), les lignes côt�
 Une ligne par événement sur stderr, visible dans l'onglet **Journal** de l'add-on :
 
 ```
-[2026-08-20T15:30:12.345Z] INFO mcp-ha 0.1.2 listening on port 9583 (MCP endpoint /mcp, health /health)
+[2026-08-20T15:30:12.345Z] INFO mcp-ha x.y.z listening on port 9583 (MCP endpoint /mcp, health /health)
 [2026-08-20T15:30:12.401Z] DEBUG WS command get_states (id 12)
 ```
 

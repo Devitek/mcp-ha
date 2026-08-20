@@ -41,7 +41,7 @@ Cette documentation suit la [convention llms.txt](https://llmstxt.org), pour êt
 
 - [`/llms.txt`](https://devitek.github.io/mcp-ha/llms.txt) : un index compact avec résumé et liens décrits, idéal pour un agent qui choisit quoi lire.
 - [`/llms-full.txt`](https://devitek.github.io/mcp-ha/llms-full.txt) : toute la documentation en un seul fichier markdown, idéal à coller dans une conversation ou à ingérer d'un bloc.
-- Chaque page existe aussi en markdown brut : ajoutez `.md` à son URL (ex. [/reference/tools.md](https://devitek.github.io/mcp-ha/reference/tools.md)).
+- Chaque page anglaise existe aussi en markdown brut : ajoutez `.md` à son URL (ex. [/reference/tools.md](https://devitek.github.io/mcp-ha/reference/tools.md)). Le miroir français n'a pas de jumeaux `.md`.
 
 Ces fichiers sont régénérés à chaque build du site, en anglais uniquement. La documentation est aussi indexée sur [Context7](https://context7.com), pour les agents qui résolvent les docs via le serveur MCP Context7.
 

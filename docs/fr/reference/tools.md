@@ -81,7 +81,7 @@ entity_id, nom, running, last_triggered. Paramètres : `limit`, `offset`.
 
 ### ha_get_history
 
-Changements d'état d'une entité. Fenêtre : `hours` (défaut 24, max 168) ou `start`/`end` en ISO 8601. Au-delà de 250 points, sous-échantillonnage avec une note.
+Changements d'état d'une entité. Fenêtre : `hours` (min 0.25, défaut 24, max 168) ou `start`/`end` en ISO 8601. Au-delà de 250 points, sous-échantillonnage avec une note.
 
 ### ha_get_statistics
 
@@ -89,7 +89,7 @@ Agrégats du recorder (moyenne, min, max, somme) pour les capteurs numériques. 
 
 ### ha_get_logbook
 
-Événements lisibles, filtrables par `entity_id`, fenêtre jusqu'à 7 jours, plafonné à 100 événements.
+Événements lisibles, filtrables par `entity_id`, fenêtre de 0.25 h à 7 jours, plafonné à 100 événements.
 
 ## Add-ons et système
 

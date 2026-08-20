@@ -34,10 +34,10 @@ Ajustez l'option `log_level` : `debug` ajoute les commandes WebSocket, les appel
 `http://IP_DE_HA:9583/health` répond sans authentification :
 
 ```json
-{ "status": "ok", "version": "0.1.4", "websocket": true }
+{ "status": "ok", "websocket": true }
 ```
 
-`websocket: false` signifie que l'add-on tourne mais n'est pas (encore) connecté à Home Assistant.
+`websocket: false` signifie que l'add-on tourne mais n'est pas (encore) connecté à Home Assistant. Après plus de 5 minutes de connexion perdue, l'endpoint répond 503 avec `"status": "degraded"`, ce qui permet au healthcheck du conteneur de redémarrer l'add-on.
 
 ## Autre chose ?
 

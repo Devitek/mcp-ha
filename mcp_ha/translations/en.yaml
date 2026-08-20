@@ -20,7 +20,7 @@ configuration:
     name: Filter reads too
     description: >-
       Applies the entity denylist to reads as well. Denied entities disappear
-      from listings and from entity details.
+      from listings, entity details, history, statistics and the logbook.
   entity_allowlist:
     name: Entity allowlist (writes)
     description: >-

@@ -84,9 +84,9 @@ sequenceDiagram
   A->>A: generate 32 random bytes, write /data/token (0600)
   A->>S: GET /addons/self/info (current options)
   A->>S: POST /addons/self/options (merge api_token)
-  Note over A,S: best effort: a failure only logs a warning
-  A->>A: print the token in the add-on log
-  U->>A: reads the token in the Configuration tab (or the log)
+  Note over A,S: retried a few times, the Supervisor may still be booting
+  A->>A: print a masked prefix in the add-on log
+  U->>A: reads the full token in the Configuration tab
 ```
 
 ## Registry cache

@@ -84,9 +84,9 @@ sequenceDiagram
   A->>A: génère 32 octets aléatoires, écrit /data/token (0600)
   A->>S: GET /addons/self/info (options courantes)
   A->>S: POST /addons/self/options (fusion avec api_token)
-  Note over A,S: au mieux : un échec ne produit qu'un avertissement
-  A->>A: affiche le jeton dans le journal de l'add-on
-  U->>A: lit le jeton dans l'onglet Configuration (ou le journal)
+  Note over A,S: retenté plusieurs fois, le Supervisor peut encore démarrer
+  A->>A: affiche un préfixe masqué dans le journal
+  U->>A: lit le jeton complet dans l'onglet Configuration
 ```
 
 ## Cache des registres

@@ -20,7 +20,8 @@ configuration:
     name: Filtrer aussi les lectures
     description: >-
       Applique la liste noire d'entités aux lectures. Les entités masquées
-      disparaissent des listes et du détail.
+      disparaissent des listes, du détail, de l'historique, des statistiques
+      et du logbook.
   entity_allowlist:
     name: Liste blanche d'entités (écriture)
     description: >-

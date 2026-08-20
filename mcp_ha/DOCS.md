@@ -20,7 +20,7 @@ Full documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/
 | `log_level` | `info` | Log verbosity: trace, debug, info, notice, warning, error, fatal. Write audit lines are always emitted. |
 | `api_token` | empty | Token expected from MCP clients (`Authorization: Bearer ...`). Leave empty to have one generated on first start and saved back into this option. The log only shows a masked prefix. |
 | `allow_write` | `false` | Exposes the `ha_call_service` tool. Without it, no write tool is even visible to the client. |
-| `filter_reads` | `false` | Also applies `entity_denylist` to reads: hidden entities disappear from listings and from `ha_get_entity`. |
+| `filter_reads` | `false` | Also applies `entity_denylist` to reads: hidden entities disappear from listings, entity details, history, statistics and the logbook. |
 | `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes (e.g. `light.*`). When non-empty, everything else is refused. |
 | `entity_denylist` | `[]` | Glob patterns of entities forbidden for writes (e.g. `lock.*`). The denylist always wins. |
 | `service_denylist` | see config | Services refused in any context. The defaults block HA shutdown, shell_command, recorder purge, etc. Think twice before removing entries. |
@@ -71,6 +71,16 @@ claude mcp add --transport http home-assistant \
 - `allow_write` is disabled by default. Enable it only if you want the assistant to act, and consider `entity_allowlist` / `entity_denylist`.
 - Every write attempt (allowed or refused) is logged as JSON in the add-on log, at any log level.
 - Known limitation: `ha_render_template` evaluates Jinja templates on the HA side and can read any entity state, `filter_reads` does not apply to it.
+
+### Rotating the API token
+
+The token lives in three places: the `api_token` option, `/data/token`, and any add-on backup taken since it was generated. To rotate it:
+
+1. Clear the `api_token` option in the Configuration tab and save.
+2. Restart the add-on: a fresh token is generated, saved into the option and persisted in `/data/token`.
+3. Update your MCP clients with the new value.
+
+Rotate immediately if you ever shared add-on logs produced by a version older than 0.1.4: those versions printed the token in full in the log.
 
 The full threat model is in the repository's [SECURITY.md](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md).
 

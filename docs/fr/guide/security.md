@@ -34,7 +34,11 @@ Les lignes d'audit sont en JSON, une par tentative, et sont émises quel que soi
 - Généré au premier démarrage (32 octets aléatoires) quand `api_token` est vide.
 - Persisté dans `/data/token` (mode 600) et reporté dans les options de l'add-on. Le journal ne le montre jamais en entier : seulement un préfixe masqué à remplissage fixe (`d370f4f8**********`), qui ne révèle ni la valeur ni sa longueur.
 - Comparé en temps constant à chaque requête.
-- Pour le renouveler : videz l'option `api_token`, supprimez `/data/token` (ou réinstallez), redémarrez.
+- Pour le renouveler : videz l'option `api_token`, supprimez `/data/token` (ou réinstallez), redémarrez, puis mettez à jour vos clients.
+
+::: warning Versions antérieures à 0.1.4
+Les versions 0.1.0 à 0.1.3 de l'add-on affichaient le jeton en entier dans le journal. Si vous avez partagé des logs produits par ces versions (issue, forum, capture), renouvelez votre jeton maintenant.
+:::
 
 ## Limites assumées
 

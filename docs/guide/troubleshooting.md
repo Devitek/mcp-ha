@@ -34,10 +34,10 @@ Adjust the `log_level` option: `debug` adds WebSocket commands, HTTP calls and t
 `http://HA_IP:9583/health` answers without authentication:
 
 ```json
-{ "status": "ok", "version": "0.1.4", "websocket": true }
+{ "status": "ok", "websocket": true }
 ```
 
-`websocket: false` means the add-on runs but is not (yet) connected to Home Assistant.
+`websocket: false` means the add-on runs but is not (yet) connected to Home Assistant. After more than 5 minutes of lost connection the endpoint answers 503 with `"status": "degraded"`, which lets the container healthcheck restart the add-on.
 
 ## Something else?
 

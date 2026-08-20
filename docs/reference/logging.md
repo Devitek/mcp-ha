@@ -21,7 +21,7 @@ The same value is applied to bashio (the `run.sh` wrapper), so Supervisor-side l
 One line per event on stderr, visible in the add-on **Log** tab:
 
 ```
-[2026-08-20T15:30:12.345Z] INFO mcp-ha 0.1.2 listening on port 9583 (MCP endpoint /mcp, health /health)
+[2026-08-20T15:30:12.345Z] INFO mcp-ha x.y.z listening on port 9583 (MCP endpoint /mcp, health /health)
 [2026-08-20T15:30:12.401Z] DEBUG WS command get_states (id 12)
 ```
 

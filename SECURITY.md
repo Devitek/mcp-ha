@@ -27,11 +27,15 @@ Giving an LLM access to your home automation is not a trivial decision. This doc
 7. **filter_reads** (optional) to hide denylisted entities from reads as well (cameras, trackers...).
 8. **API guard rails**: capped request body, add-on slug validated by regex before being used in a URL, error messages without stack traces.
 
+## Past advisories
+
+- **Versions 0.1.0 to 0.1.3 printed the API token in full in the add-on log** at every start, and the documentation of the time invited users to read it there. Fixed in 0.1.4 (masked prefix only). If you ever shared logs produced by an affected version, rotate your token (see DOCS.md, "Rotating the API token").
+
 ## Known and accepted limitations
 
 - `ha_render_template` evaluates Jinja on the HA side: read only, but a template can read the state of any entity. `filter_reads` does not apply to it.
 - The generated token is stored in the add-on options, which means it also ends up in add-on backups. The options are only visible to HA admins; the log never contains it in full.
-- The add-on requests `hassio_role: manager` to read add-ons. This may be more than necessary; reducing it is tracked in issue [#11](https://github.com/Devitek/mcp-ha/issues/11).
+- The add-on runs with `hassio_role: default`, the least privileged role. If `ha_get_addons` answers a 403 on your installation, please report it so the required role can be reassessed.
 
 ## Reporting a vulnerability
 

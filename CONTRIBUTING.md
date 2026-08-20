@@ -58,7 +58,7 @@ No task (issue or PR) is finished until every point below holds:
 
 ## Publishing a release
 
-1. Bump the version in `mcp_ha/config.yaml`, `mcp_ha/package.json` and `mcp_ha/src/config.ts` (they must match, the CI checks the first two).
+1. Bump the version in `mcp_ha/config.yaml`, `mcp_ha/package.json` and `mcp_ha/src/config.ts` (they must match, the release workflow checks all three at tag time).
 2. Update `mcp_ha/CHANGELOG.md`.
 3. Commit then tag:
 
