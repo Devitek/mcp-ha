@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { log, setLogLevel } from "./logger.js";
 
-export const VERSION = "0.1.2";
+export const VERSION = "0.1.3";
 
 const OPTIONS_PATH = "/data/options.json";
 const TOKEN_PATH = "/data/token";
