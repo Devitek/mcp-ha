@@ -1,5 +1,5 @@
 name: MCP Home Assistant
-version: "0.1.4"
+version: "0.1.5"
 slug: mcp_ha
 description: >-
   MCP (Model Context Protocol) server to query and control Home Assistant
@@ -12,10 +12,11 @@ init: false
 startup: services
 image: ghcr.io/devitek/mcp-ha-{arch}
 homeassistant_api: true
-# Manager role to read add-on information through the Supervisor API.
-# See issue #11: downgrade if "default" turns out to be enough for reads.
+# Least privilege (audit A1): the self endpoints used for the token
+# write-back accept any role, and ha_get_addons degrades with a clear
+# message if "default" turns out to be insufficient for listing.
 hassio_api: true
-hassio_role: manager
+hassio_role: default
 ports:
   "9583/tcp": 9583
 ports_description:

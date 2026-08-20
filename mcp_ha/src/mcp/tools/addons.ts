@@ -19,10 +19,20 @@ export function registerAddonTools(server: McpServer, ctx: ToolContext): void {
       annotations: { readOnlyHint: true },
     },
     safe("ha_get_addons", async ({ slug }) => {
+      const explain403 = (e: unknown): never => {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("HTTP 403")) {
+          throw new Error(
+            "the Supervisor refused the add-on listing (403): this add-on runs with the minimal role. " +
+              "Please report it on https://github.com/Devitek/mcp-ha/issues so the required role can be adjusted."
+          );
+        }
+        throw e;
+      };
       if (slug) {
         // The slug ends up in a Supervisor URL: validate it strictly.
         if (!SLUG_RE.test(slug)) throw new Error(`invalid slug: ${slug}`);
-        const info = await ctx.http.supervisorGet(`/addons/${slug}/info`);
+        const info = await ctx.http.supervisorGet(`/addons/${slug}/info`).catch(explain403);
         return {
           slug: info.slug,
           name: info.name,
@@ -35,7 +45,7 @@ export function registerAddonTools(server: McpServer, ctx: ToolContext): void {
           webui: info.webui ?? null,
         };
       }
-      const data = await ctx.http.supervisorGet("/addons");
+      const data = await ctx.http.supervisorGet("/addons").catch(explain403);
       const addons: any[] = data?.addons ?? [];
       return {
         items: addons.map((a) => ({
