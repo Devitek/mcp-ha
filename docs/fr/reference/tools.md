@@ -10,7 +10,7 @@
 
 ### ha_search_entities
 
-Recherche floue par nom, entity_id ou pièce. Le point d'entrée naturel.
+Recherche floue par nom, entity_id, alias Assist, pièce, étage ou label. Le point d'entrée naturel. Les alias pèsent comme le nom ; pièce, étage et labels pèsent moins.
 
 | Paramètre | Type | Notes |
 |-----------|------|-------|
@@ -19,7 +19,7 @@ Recherche floue par nom, entity_id ou pièce. Le point d'entrée naturel.
 
 ### ha_list_entities
 
-Liste paginée. **Appelé sans aucun filtre, il renvoie un histogramme** (comptes par domaine et par pièce) au lieu d'un dump.
+Liste paginée, filtrable par `domain`, `area`, `floor`, `label`, `search` et `state`. **Appelé sans aucun filtre, il renvoie un histogramme** (comptes par domaine et par pièce) au lieu d'un dump.
 
 | Paramètre | Type | Notes |
 |-----------|------|-------|
@@ -31,7 +31,7 @@ Liste paginée. **Appelé sans aucun filtre, il renvoie un histogramme** (compte
 
 ### ha_get_entity
 
-État complet et attributs d'une entité (les valeurs d'attributs très longues sont tronquées).
+État complet et attributs d'une entité (les valeurs d'attributs très longues sont tronquées), plus son étage, ses alias Assist et ses labels quand elle en a.
 
 | Paramètre | Type |
 |-----------|------|
@@ -39,7 +39,7 @@ Liste paginée. **Appelé sans aucun filtre, il renvoie un histogramme** (compte
 
 ### ha_list_areas
 
-Toutes les pièces avec leur nombre d'entités. Sans paramètre.
+Toutes les pièces avec leur étage et leur nombre d'entités. Sans paramètre.
 
 ### ha_list_devices
 
@@ -114,7 +114,7 @@ entity_id, nom, running, last_triggered. Paramètres : `limit`, `offset`.
 
 ### ha_get_history
 
-Changements d'état d'une entité. Fenêtre : `hours` (min 0.25, défaut 24, max 168) ou `start`/`end` en ISO 8601. Le premier point est l'état déjà en vigueur au début de la fenêtre ; au-delà de 250 points, sous-échantillonnage avec une note.
+Changements d'état d'une entité, ou de 5 au maximum en un appel pour les comparer (`entity_id` accepte une chaîne ou une liste ; une liste renvoie un objet `series` par entité). Fenêtre : `hours` (min 0.25, défaut 24, max 168) ou `start`/`end` en ISO 8601. Le premier point est l'état déjà en vigueur au début de la fenêtre ; le budget de 250 points se partage entre les entités demandées, sous-échantillonnage avec une note au-delà.
 
 ### ha_get_statistics
 

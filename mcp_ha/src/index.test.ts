@@ -37,7 +37,7 @@ function fakeCtx(partial: any = {}) {
       ...(partial.ws ?? {}),
     },
     http: { supervisorAvailable: true, ...(partial.http ?? {}) },
-    catalog: { index: vi.fn(async () => []), registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [] })), states: vi.fn(), ...(partial.catalog ?? {}) },
+    catalog: { index: vi.fn(async () => []), registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [], floors: [], labels: [] })), states: vi.fn(), ...(partial.catalog ?? {}) },
   } as any;
 }
 
@@ -199,7 +199,7 @@ describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
       },
       catalog: {
         index: vi.fn(async () => []),
-        registries: vi.fn(async () => ({ at: 0, areas: [{ area_id: "a1", name: "Kitchen" }], devices: [], entities: [] })),
+        registries: vi.fn(async () => ({ at: 0, areas: [{ area_id: "a1", name: "Kitchen" }], devices: [], entities: [], floors: [], labels: [] })),
       },
     });
     const base = await startServer(ctx);
@@ -240,7 +240,7 @@ describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
       fakeCtx({
         catalog: {
           index: vi.fn(async () => []),
-          registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [] })),
+          registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [], floors: [], labels: [] })),
         },
       })
     );

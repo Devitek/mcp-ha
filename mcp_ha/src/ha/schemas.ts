@@ -22,10 +22,33 @@ export const areaSchema = z
   .object({
     area_id: z.string(),
     name: z.string(),
+    floor_id: z.string().nullable().default(null),
   })
   .loose();
 
 export const areasSchema = z.array(areaSchema);
+
+// Floor and label registries (#89). Both appeared in HA 2024.x, so the
+// catalog treats them as optional: an older core answering unknown_command
+// must not take down the whole join.
+export const floorSchema = z
+  .object({
+    floor_id: z.string(),
+    name: z.string(),
+    level: z.number().nullable().default(null),
+  })
+  .loose();
+
+export const floorsSchema = z.array(floorSchema);
+
+export const labelSchema = z
+  .object({
+    label_id: z.string(),
+    name: z.string(),
+  })
+  .loose();
+
+export const labelsSchema = z.array(labelSchema);
 
 export const deviceSchema = z
   .object({
@@ -49,6 +72,9 @@ export const entityEntrySchema = z
     disabled_by: z.string().nullable().default(null),
     hidden_by: z.string().nullable().default(null),
     entity_category: z.string().nullable().default(null),
+    // Assist aliases and label ids (#89); absent on older cores.
+    aliases: z.array(z.string()).default([]),
+    labels: z.array(z.string()).default([]),
   })
   .loose();
 

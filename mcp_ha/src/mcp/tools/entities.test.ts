@@ -104,6 +104,49 @@ describe("filter_reads", () => {
   });
 });
 
+describe("aliases, labels and floors (#89)", () => {
+  const rich = [
+    entity("light.plafonnier", {
+      name: "Plafonnier",
+      area: "Salon",
+      floor: "Ground floor",
+      aliases: ["big light", "lustre"],
+      labels: ["holiday-off"],
+    }),
+    entity("light.desk", { name: "Desk lamp", area: "Office", floor: "Upstairs" }),
+  ];
+  const setup = () => {
+    const { server, tools } = fakeServer();
+    registerEntityTools(server, fakeCtx({ catalog: { index: async () => rich } }));
+    return tools;
+  };
+
+  it("finds an entity through its Assist alias", async () => {
+    const res = await callTool(setup(), "ha_search_entities", { query: "big light" });
+    expect(res.data.items[0].entity_id).toBe("light.plafonnier");
+  });
+
+  it("matches labels and floors in search with a lower weight than the name", async () => {
+    const res = await callTool(setup(), "ha_search_entities", { query: "holiday" });
+    expect(res.data.items.map((i: any) => i.entity_id)).toEqual(["light.plafonnier"]);
+  });
+
+  it("filters lists by label and by floor", async () => {
+    const byLabel = await callTool(setup(), "ha_list_entities", { label: "Holiday-OFF" });
+    expect(byLabel.data.items.map((i: any) => i.entity_id)).toEqual(["light.plafonnier"]);
+    const byFloor = await callTool(setup(), "ha_list_entities", { floor: "upstairs" });
+    expect(byFloor.data.items.map((i: any) => i.entity_id)).toEqual(["light.desk"]);
+  });
+
+  it("exposes aliases, labels and floor in the entity details, omitting empty ones", async () => {
+    const res = await callTool(setup(), "ha_get_entity", { entity_id: "light.plafonnier" });
+    expect(res.data).toMatchObject({ aliases: ["big light", "lustre"], labels: ["holiday-off"], floor: "Ground floor" });
+    const bare = await callTool(setup(), "ha_get_entity", { entity_id: "light.desk" });
+    expect(bare.data.aliases).toBeUndefined();
+    expect(bare.data.labels).toBeUndefined();
+  });
+});
+
 describe("ha_list_areas and ha_list_devices", () => {
   it("counts entities per area", async () => {
     const { server, tools } = fakeServer();
@@ -113,17 +156,19 @@ describe("ha_list_areas and ha_list_devices", () => {
         registries: async () => ({
           at: 0,
           areas: [
-            { area_id: "a1", name: "Kitchen" },
-            { area_id: "a2", name: "Empty room" },
+            { area_id: "a1", name: "Kitchen", floor_id: "f1" },
+            { area_id: "a2", name: "Empty room", floor_id: null },
           ],
           devices: [],
           entities: [],
+          floors: [{ floor_id: "f1", name: "Ground floor", level: 0 }],
+          labels: [],
         }),
       },
     });
     registerEntityTools(server, ctx);
     const res = await callTool(tools, "ha_list_areas", {});
-    expect(res.data.items).toContainEqual({ area_id: "a1", name: "Kitchen", entities: 2 });
+    expect(res.data.items).toContainEqual({ area_id: "a1", name: "Kitchen", floor: "Ground floor", entities: 2 });
     expect(res.data.items).toContainEqual({ area_id: "a2", name: "Empty room", entities: 0 });
   });
 
@@ -134,13 +179,15 @@ describe("ha_list_areas and ha_list_devices", () => {
         index: async () => [],
         registries: async () => ({
           at: 0,
-          areas: [{ area_id: "a1", name: "Kitchen" }],
+          areas: [{ area_id: "a1", name: "Kitchen", floor_id: null }],
           devices: [
             { id: "d1", name: "Bulb", name_by_user: "My bulb", manufacturer: "Philips", model: "LCA", area_id: "a1", disabled_by: null },
             { id: "d2", name: "Old", name_by_user: null, manufacturer: null, model: null, area_id: "a1", disabled_by: "user" },
             { id: "d3", name: "Elsewhere", name_by_user: null, manufacturer: null, model: null, area_id: null, disabled_by: null },
           ],
           entities: [],
+          floors: [],
+          labels: [],
         }),
       },
     });

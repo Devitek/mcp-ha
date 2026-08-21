@@ -58,9 +58,9 @@ describe("Catalog.index", () => {
     await catalog.index();
     await catalog.index();
     const calls = ws.send.mock.calls.map((c) => c[0]);
-    // Everything served from cache on the second run.
+    // Everything served from cache on the second run (5 registries since #89).
     expect(calls.filter((t) => t === "get_states")).toHaveLength(1);
-    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(3);
+    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(5);
   });
 
   it("shares the in-flight promise between concurrent callers (audit B5)", async () => {
@@ -69,7 +69,7 @@ describe("Catalog.index", () => {
     await Promise.all([catalog.index(), catalog.index(), catalog.index()]);
     const calls = ws.send.mock.calls.map((c) => c[0]);
     expect(calls.filter((t) => t === "get_states")).toHaveLength(1);
-    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(3);
+    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(5);
   });
 
   it("refetches everything after invalidate(), e.g. on WS reconnection (audit C9)", async () => {
@@ -80,12 +80,49 @@ describe("Catalog.index", () => {
     await catalog.index();
     const calls = ws.send.mock.calls.map((c) => c[0]);
     expect(calls.filter((t) => t === "get_states")).toHaveLength(2);
-    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(6);
+    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(10);
   });
 
   it("turns an unexpected HA payload into an actionable error (audit B2)", async () => {
     const catalog = new Catalog(fakeWs({ get_states: { not: "an array" } }) as any);
     await expect(catalog.index()).rejects.toThrow(/Unexpected payload from Home Assistant \(get_states\)/);
+  });
+
+  it("joins floors, aliases and labels when the registries answer (#89)", async () => {
+    const catalog = new Catalog(
+      fakeWs({
+        "config/area_registry/list": [{ area_id: "ar_kitchen", name: "Kitchen", floor_id: "fl_ground" }],
+        "config/entity_registry/list": [
+          {
+            entity_id: "light.direct",
+            area_id: "ar_kitchen",
+            device_id: null,
+            disabled_by: null,
+            hidden_by: null,
+            entity_category: null,
+            aliases: ["big light"],
+            labels: ["lb_1", "lb_ghost"],
+          },
+        ],
+        "config/floor_registry/list": [{ floor_id: "fl_ground", name: "Ground floor", level: 0 }],
+        "config/label_registry/list": [{ label_id: "lb_1", name: "holiday-off" }],
+      }) as any
+    );
+    const e = (await catalog.index()).find((x) => x.entity_id === "light.direct");
+    expect(e).toMatchObject({
+      floor: "Ground floor",
+      aliases: ["big light"],
+      // Known ids are resolved to names, unknown ones stay as ids.
+      labels: ["holiday-off", "lb_ghost"],
+    });
+  });
+
+  it("degrades to empty floors and labels on an older core (#89)", async () => {
+    // fakeWs throws on the floor/label commands by default: this is exactly
+    // the old-core behaviour, and the join must survive it.
+    const catalog = new Catalog(fakeWs() as any);
+    const e = (await catalog.index()).find((x) => x.entity_id === "light.direct");
+    expect(e).toMatchObject({ area: "Kitchen", floor: null, aliases: [], labels: [] });
   });
 });
 

@@ -70,7 +70,7 @@ export function fakeCtx(partial: any = {}): ToolContext {
     },
     catalog: {
       index: vi.fn(async () => []),
-      registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [] })),
+      registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [], floors: [], labels: [] })),
       states: vi.fn(async () => []),
       invalidate: vi.fn(),
       ...(partial.catalog ?? {}),
@@ -88,10 +88,13 @@ export function entity(id: string, over: Record<string, unknown> = {}) {
     domain: id.split(".")[0] ?? "",
     state: "on",
     area: null,
+    floor: null,
     device_id: null,
     last_changed: "2026-01-01T00:00:00Z",
     hidden: false,
     category: null,
+    aliases: [],
+    labels: [],
     attributes: {},
     ...over,
   };

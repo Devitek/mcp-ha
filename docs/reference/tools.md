@@ -10,7 +10,7 @@
 
 ### ha_search_entities
 
-Fuzzy search by name, entity_id or area. The natural entry point.
+Fuzzy search by name, entity_id, Assist alias, area, floor or label. The natural entry point. Aliases weigh like the name; area, floor and labels weigh less.
 
 | Param | Type | Notes |
 |-------|------|-------|
@@ -19,7 +19,7 @@ Fuzzy search by name, entity_id or area. The natural entry point.
 
 ### ha_list_entities
 
-Paginated list. **Called without any filter, it returns a histogram** (counts per domain and per area) instead of a dump.
+Paginated list, filterable by `domain`, `area`, `floor`, `label`, `search` and `state`. **Called without any filter, it returns a histogram** (counts per domain and per area) instead of a dump.
 
 | Param | Type | Notes |
 |-------|------|-------|
@@ -31,7 +31,7 @@ Paginated list. **Called without any filter, it returns a histogram** (counts pe
 
 ### ha_get_entity
 
-Full state and attributes of one entity (long attribute values truncated).
+Full state and attributes of one entity (long attribute values truncated), plus its floor, Assist aliases and labels when it has any.
 
 | Param | Type |
 |-------|------|
@@ -39,7 +39,7 @@ Full state and attributes of one entity (long attribute values truncated).
 
 ### ha_list_areas
 
-All areas with their entity counts. No parameters.
+All areas with their floor and entity counts. No parameters.
 
 ### ha_list_devices
 
@@ -114,7 +114,7 @@ entity_id, name, running, last_triggered. Params: `limit`, `offset`.
 
 ### ha_get_history
 
-State changes of one entity. Window: `hours` (min 0.25, default 24, max 168) or `start`/`end` ISO 8601. The first point is the state already in effect at window start; more than 250 points are downsampled with a note.
+State changes of one entity, or of up to 5 at once to compare them (`entity_id` accepts a string or a list; a list returns a `series` object keyed by entity). Window: `hours` (min 0.25, default 24, max 168) or `start`/`end` ISO 8601. The first point is the state already in effect at window start; the 250-point budget is shared between the requested entities and downsampled with a note beyond it.
 
 ### ha_get_statistics
 

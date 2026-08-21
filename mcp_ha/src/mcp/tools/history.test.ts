@@ -44,6 +44,41 @@ describe("ha_get_history", () => {
     expect(res.data.truncated).toBeUndefined();
   });
 
+  it("fetches several entities in one call and shares the point budget (#88)", async () => {
+    const mk = (n: number, base: number) => Array.from({ length: n }, (_, i) => ({ s: String(i), lu: base + i }));
+    const { tools, ws } = setup(async () => ({
+      "sensor.a": mk(300, 1755648000),
+      "sensor.b": mk(10, 1755648000),
+    }));
+    const res = await callTool(tools, "ha_get_history", { entity_id: ["sensor.a", "sensor.b", "sensor.a"] });
+    expect(ws.send).toHaveBeenCalledWith(
+      "history/history_during_period",
+      expect.objectContaining({ entity_ids: ["sensor.a", "sensor.b"] }) // deduplicated
+    );
+    expect(res.data.series["sensor.a"].count).toBe(300);
+    // Budget of 250 shared between 2 entities: at most 125 (+ last point) each.
+    expect(res.data.series["sensor.a"].points.length).toBeLessThanOrEqual(126);
+    expect(res.data.series["sensor.a"].note).toContain("downsampled");
+    expect(res.data.series["sensor.b"].points).toHaveLength(10);
+    // The single-entity shape is not used for list calls.
+    expect(res.data.points).toBeUndefined();
+  });
+
+  it("caps the list at 5 entities in the input schema (#88)", () => {
+    const { tools } = setup(async () => ({}));
+    const schema = tools.get("ha_get_history")!.cfg.inputSchema.entity_id;
+    expect(schema.safeParse(["a.b", "c.d", "e.f", "g.h", "i.j"]).success).toBe(true);
+    expect(schema.safeParse(["a.b", "c.d", "e.f", "g.h", "i.j", "k.l"]).success).toBe(false);
+  });
+
+  it("refuses the whole call when one listed entity is filtered (#88)", async () => {
+    const { tools, ws } = setup(async () => ({}), { filterReads: true, entityDenylist: ["camera.*"] });
+    const res = await callTool(tools, "ha_get_history", { entity_id: ["sensor.ok", "camera.front"] });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("camera.front");
+    expect(ws.send).not.toHaveBeenCalled();
+  });
+
   it("rejects windows wider than 7 days", async () => {
     const { tools, ws } = setup(async () => ({}));
     const res = await callTool(tools, "ha_get_history", { entity_id: "sensor.temp", hours: 200 });
