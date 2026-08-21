@@ -32,6 +32,61 @@ export function registerPrompts(server: McpServer): void {
     })
   );
 
+  // Proposal prompts (#94, tier 2): the assistant DRAFTS a complete YAML
+  // that the user pastes into the HA editor. Zero new permission, the write
+  // stays in human hands.
+  server.registerPrompt(
+    "propose-automation",
+    {
+      title: "Propose an automation",
+      description: "Drafts a complete, paste-ready automation YAML for a stated goal, without writing anything.",
+      argsSchema: { goal: z.string().describe("What the automation should do, in plain words") },
+    },
+    ({ goal }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text:
+              `Draft a Home Assistant automation for this goal: "${goal}". Proceed step by step:\n` +
+              "1. Find the real entities involved with ha_search_entities / ha_list_entities, and check their current state and attributes (ha_get_entity) so triggers use values that actually exist.\n" +
+              "2. If a similar automation exists (ha_list_automations, ha_get_automation), reuse its conventions.\n" +
+              "3. Write the complete YAML: alias, description, mode, triggers, conditions (only if truly needed) and actions, using the verified entity_ids. Prefer simple, readable constructs.\n" +
+              "4. Present the YAML in one block, explain in two sentences what it does and when it fires, and remind me to paste it in Settings > Automations & scenes > Create automation > Edit in YAML.\n" +
+              "Do NOT create or modify anything in Home Assistant yourself.",
+          },
+        },
+      ],
+    })
+  );
+
+  server.registerPrompt(
+    "propose-script",
+    {
+      title: "Propose a script",
+      description: "Drafts a complete, paste-ready script YAML for a stated goal, without writing anything.",
+      argsSchema: { goal: z.string().describe("What the script should do, in plain words") },
+    },
+    ({ goal }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text:
+              `Draft a Home Assistant script for this goal: "${goal}". Proceed step by step:\n` +
+              "1. Find the real entities involved with ha_search_entities / ha_list_entities and verify their domains and attributes (ha_get_entity).\n" +
+              "2. If similar scripts exist (ha_list_scripts), reuse their conventions.\n" +
+              "3. Write the complete YAML: alias, description, mode and the sequence, using the verified entity_ids and correct service data.\n" +
+              "4. Present the YAML in one block, explain in two sentences what it does, and remind me to paste it in Settings > Automations & scenes > Scripts > Create script > Edit in YAML.\n" +
+              "Do NOT create or modify anything in Home Assistant yourself.",
+          },
+        },
+      ],
+    })
+  );
+
   server.registerPrompt(
     "energy-report",
     {

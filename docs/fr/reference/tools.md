@@ -1,6 +1,6 @@
 # Référence des outils
 
-22 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+24 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -96,6 +96,20 @@ Active ou désactive une automation.
 | `enabled` | boolean, requis | `true` pour activer |
 | `dry_run` / `confirm_token` | | comme `ha_call_service` |
 
+### ha_create_helper <Badge type="danger" text="écriture" />
+
+Crée un helper : un pur conteneur d'état sans comportement (`input_boolean`, `input_number`, `input_select`, `input_text`, `input_datetime`, `counter`, `timer`). Audité ; pas d'étape de confirmation, créer un helper ne fait rien agir dans la maison.
+
+| Paramètre | Type | Notes |
+|-----------|------|-------|
+| `helper_type` | string, requis | un des sept types ci-dessus |
+| `name` | string, requis | nom d'affichage |
+| `options` | object | réglages propres au type (ex. `min`/`max` pour `input_number`, liste `options` pour `input_select`), transmis à HA tels quels |
+
+### ha_delete_helper <Badge type="danger" text="écriture" />
+
+Supprime un helper géré par l'interface, par entity_id. L'id de collection est résolu via le registre d'entités, les helpers renommés sont donc gérés ; les helpers définis en YAML sont refusés avec un message clair. Soumis aux listes d'entités, audité.
+
 ## Automations et scripts
 
 ### ha_list_automations
@@ -176,3 +190,5 @@ Depuis la v0.3, chaque réponse d'outil porte aussi `structuredContent` (le mêm
 |-----|-----------|----------------|
 | `diagnose-automation` | `automation` (entity_id) | enquête pas à pas sur une automation qui n'a pas tourné |
 | `energy-report` | `hours` (optionnel) | bilan de consommation bâti sur les statistiques long terme |
+| `propose-automation` | `goal` | rédige un YAML d'automation prêt à coller depuis des entités vérifiées, n'écrit rien |
+| `propose-script` | `goal` | rédige un YAML de script prêt à coller depuis des entités vérifiées, n'écrit rien |

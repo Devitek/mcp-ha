@@ -1,6 +1,6 @@
 # Tool reference
 
-22 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+24 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -96,6 +96,20 @@ Enables or disables an automation.
 | `enabled` | boolean, required | `true` to enable |
 | `dry_run` / `confirm_token` | | as in `ha_call_service` |
 
+### ha_create_helper <Badge type="danger" text="write" />
+
+Creates a helper: a pure state container with no behaviour (`input_boolean`, `input_number`, `input_select`, `input_text`, `input_datetime`, `counter`, `timer`). Audited; no confirmation step, creating a helper cannot make the house act.
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `helper_type` | string, required | one of the seven types above |
+| `name` | string, required | display name |
+| `options` | object | type-specific settings (e.g. `min`/`max` for `input_number`, `options` list for `input_select`), passed to HA as-is |
+
+### ha_delete_helper <Badge type="danger" text="write" />
+
+Deletes a UI-managed helper by entity_id. The collection id is resolved through the entity registry, so renamed helpers are handled; YAML-defined helpers are refused with a clear message. Subject to the entity allow/deny lists, audited.
+
 ## Automations and scripts
 
 ### ha_list_automations
@@ -176,3 +190,5 @@ Since v0.3 every tool response also carries `structuredContent` (the same JSON a
 |------|-----------|--------------|
 | `diagnose-automation` | `automation` (entity_id) | step-by-step investigation of why an automation did not run |
 | `energy-report` | `hours` (optional) | consumption summary built on long-term statistics |
+| `propose-automation` | `goal` | drafts a paste-ready automation YAML from verified entities, writes nothing |
+| `propose-script` | `goal` | drafts a paste-ready script YAML from verified entities, writes nothing |

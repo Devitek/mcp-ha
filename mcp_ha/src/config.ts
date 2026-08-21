@@ -4,7 +4,7 @@ import { z } from "zod";
 import { log, setLogLevel } from "./logger.js";
 import { maskSecret } from "./safety.js";
 
-export const VERSION = "0.8.1";
+export const VERSION = "0.9.0";
 
 const OPTIONS_PATH = "/data/options.json";
 const TOKEN_PATH = "/data/token";
