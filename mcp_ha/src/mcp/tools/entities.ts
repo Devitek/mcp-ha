@@ -22,12 +22,17 @@ function matchQuery(e: IndexedEntity, query: string): number {
   const id = e.entity_id.toLowerCase();
   const name = e.name.toLowerCase();
   const area = (e.area ?? "").toLowerCase();
+  // Aliases are deliberate alternative names (Assist), so they weigh like
+  // the name; labels and floor weigh like the area (#89).
+  const aliases = e.aliases.map((a) => a.toLowerCase());
+  const labels = e.labels.map((l) => l.toLowerCase());
+  const floor = (e.floor ?? "").toLowerCase();
   if (id === q) return 100;
   let score = 0;
   for (const t of tokens) {
     if (id.includes(t)) score += 5;
-    else if (name.includes(t)) score += 4;
-    else if (area.includes(t)) score += 2;
+    else if (name.includes(t) || aliases.some((a) => a.includes(t))) score += 4;
+    else if (area.includes(t) || floor.includes(t) || labels.some((l) => l.includes(t))) score += 2;
     else return 0; // every word must match somewhere
   }
   return score;
@@ -42,11 +47,11 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
     {
       title: "Search entities",
       description:
-        "Fuzzy search of Home Assistant entities by name, entity_id or area. " +
+        "Fuzzy search of Home Assistant entities by name, entity_id, alias (Assist), area, floor or label. " +
         "Use this first to find the right entity_id (e.g. query: 'kitchen light'). " +
         "Follow up with ha_get_entity for full details.",
       inputSchema: {
-        query: z.string().min(1).describe("Search terms (name, id, area)"),
+        query: z.string().min(1).describe("Search terms (name, id, alias, area, floor, label)"),
         limit: z.number().int().min(1).max(50).optional().describe("Max results, default 20"),
       },
       annotations: { readOnlyHint: true },
@@ -73,22 +78,24 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
       title: "List entities",
       description:
         "Paginated compact list of entities, filterable by domain (light, sensor, switch, automation...), " +
-        "area (room name), search and state. With no filter at all it returns a histogram per domain and " +
-        "per area instead of a full dump: filter to get actual entities.",
+        "area (room name), floor, label, search and state. With no filter at all it returns a histogram " +
+        "per domain and per area instead of a full dump: filter to get actual entities.",
       inputSchema: {
         domain: z.string().optional().describe("Exact domain, e.g. light"),
         area: z.string().optional().describe("Area name (or id), case insensitive"),
-        search: z.string().optional().describe("Fuzzy search in id, name, area"),
+        floor: z.string().optional().describe("Floor name, case insensitive (#89)"),
+        label: z.string().optional().describe("Label name, case insensitive (#89)"),
+        search: z.string().optional().describe("Fuzzy search in id, name, alias, area, floor, label"),
         state: z.string().optional().describe("Exact state, e.g. on"),
         limit: z.number().int().min(1).max(200).optional().describe("Default 50, max 200"),
         offset: z.number().int().min(0).optional(),
       },
       annotations: { readOnlyHint: true },
     },
-    safe("ha_list_entities", async ({ domain, area, search, state, limit, offset }) => {
+    safe("ha_list_entities", async ({ domain, area, floor, label, search, state, limit, offset }) => {
       let all = await visible();
 
-      if (!domain && !area && !search && !state) {
+      if (!domain && !area && !floor && !label && !search && !state) {
         const byDomain = new Map<string, number>();
         const byArea = new Map<string, number>();
         for (const e of all) {
@@ -110,6 +117,14 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
       if (area) {
         const a = area.toLowerCase().trim();
         all = all.filter((e) => (e.area ?? "").toLowerCase() === a);
+      }
+      if (floor) {
+        const f = floor.toLowerCase().trim();
+        all = all.filter((e) => (e.floor ?? "").toLowerCase() === f);
+      }
+      if (label) {
+        const l = label.toLowerCase().trim();
+        all = all.filter((e) => e.labels.some((x) => x.toLowerCase() === l));
       }
       if (search) {
         all = all
@@ -151,6 +166,9 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
         name: e.name,
         state: e.state,
         area: e.area,
+        ...(e.floor ? { floor: e.floor } : {}),
+        ...(e.aliases.length > 0 ? { aliases: e.aliases } : {}),
+        ...(e.labels.length > 0 ? { labels: e.labels } : {}),
         category: e.category,
         hidden: e.hidden,
         last_changed: e.last_changed,
@@ -163,7 +181,7 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
     "ha_list_areas",
     {
       title: "List areas",
-      description: "All declared areas (rooms), with the number of entities in each.",
+      description: "All declared areas (rooms), with their floor and the number of entities in each.",
       inputSchema: {},
       annotations: { readOnlyHint: true },
     },
@@ -171,10 +189,12 @@ export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
       const [regs, all] = await Promise.all([ctx.catalog.registries(), visible()]);
       const counts = new Map<string, number>();
       for (const e of all) if (e.area) counts.set(e.area, (counts.get(e.area) ?? 0) + 1);
+      const floorName = new Map(regs.floors.map((f) => [f.floor_id, f.name]));
       return {
         items: regs.areas.map((a) => ({
           area_id: a.area_id,
           name: a.name,
+          ...(a.floor_id ? { floor: floorName.get(a.floor_id) ?? null } : {}),
           entities: counts.get(a.name) ?? 0,
         })),
         total: regs.areas.length,

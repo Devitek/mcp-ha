@@ -29,11 +29,14 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
     {
       title: "Entity history",
       description:
-        "State changes of one entity over a time window (default 24 h, max 7 days). " +
+        "State changes of one entity, or up to 5 at once to compare them, over a time window " +
+        "(default 24 h, max 7 days). The response budget is shared between entities. " +
         "For numeric sensors over long periods prefer ha_get_statistics (aggregates). " +
         "Window: hours (sliding) or start/end in ISO 8601.",
       inputSchema: {
-        entity_id: z.string().describe("E.g. sensor.living_room_temperature"),
+        entity_id: z
+          .union([z.string(), z.array(z.string()).min(1).max(5)])
+          .describe("E.g. sensor.living_room_temperature, or a list of up to 5 to compare"),
         hours: z.number().min(0.25).max(168).optional().describe("Sliding window in hours, default 24"),
         start: z.string().optional().describe("ISO 8601 start"),
         end: z.string().optional().describe("ISO 8601 end, default now"),
@@ -41,30 +44,42 @@ export function registerHistoryTools(server: McpServer, ctx: ToolContext): void 
       annotations: { readOnlyHint: true },
     },
     safe("ha_get_history", async ({ entity_id, hours, start, end }) => {
-      if (!entityReadVisible(ctx.cfg, entity_id)) {
-        throw new Error(`entity ${entity_id} is not accessible (filter_reads)`);
+      const ids = [...new Set(Array.isArray(entity_id) ? entity_id : [entity_id])];
+      for (const id of ids) {
+        if (!entityReadVisible(ctx.cfg, id)) throw new Error(`entity ${id} is not accessible (filter_reads)`);
       }
       const w = timeWindow({ start, end, hours }, 24, 168);
       const res: Record<string, any[]> = await ctx.ws.send("history/history_during_period", {
         start_time: w.start,
         end_time: w.end,
-        entity_ids: [entity_id],
+        entity_ids: ids,
         minimal_response: true,
         no_attributes: true,
         // Explicit (audit C10): the first point is the state already in
         // effect at window start, documented in the tool reference.
         include_start_time_state: true,
       });
-      // The WebSocket answers in a compressed format: s = state, lu =
-      // last_updated in epoch seconds. Normalize while accepting the long
-      // format too.
-      const raw = res?.[entity_id] ?? [];
-      const points = raw.map((r) => ({
-        t: toIso(r.lu ?? r.last_updated ?? r.last_changed),
-        state: r.s ?? r.state,
-      }));
-      const { rows, note } = downsample(points, MAX_POINTS);
-      return { entity_id, from: w.start, to: w.end, count: points.length, points: rows, ...(note ? { note } : {}) };
+      // The point budget is shared: comparing 5 entities gives 50 points
+      // each, so a multi-entity answer stays under the global size cap (#88).
+      const perEntity = Math.floor(MAX_POINTS / ids.length);
+      const seriesOf = (id: string) => {
+        // The WebSocket answers in a compressed format: s = state, lu =
+        // last_updated in epoch seconds. Normalize while accepting the long
+        // format too.
+        const raw = res?.[id] ?? [];
+        const points = raw.map((r) => ({
+          t: toIso(r.lu ?? r.last_updated ?? r.last_changed),
+          state: r.s ?? r.state,
+        }));
+        const { rows, note } = downsample(points, perEntity);
+        return { count: points.length, points: rows, ...(note ? { note } : {}) };
+      };
+      if (!Array.isArray(entity_id)) {
+        return { entity_id, from: w.start, to: w.end, ...seriesOf(entity_id) };
+      }
+      const series: Record<string, unknown> = {};
+      for (const id of ids) series[id] = seriesOf(id);
+      return { from: w.start, to: w.end, series };
     })
   );
 

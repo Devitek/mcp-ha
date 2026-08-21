@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0 - 2026-08-21
+
+- **Multi-entity history**: `ha_get_history` now accepts a list of up to 5 entity ids to compare them in one call (a list returns a `series` object per entity). The 250-point budget is shared so the answer stays compact.
+- **Richer search**: `ha_search_entities` also matches Assist aliases (same weight as the name), labels and floors. `ha_list_entities` gains `floor` and `label` filters, `ha_get_entity` exposes the entity's floor, aliases and labels, and `ha_list_areas` shows each area's floor.
+- The floor and label registries are fetched alongside the others (same cache rules) and degrade gracefully on older Home Assistant cores that do not have them.
+- 182 unit tests.
+
 ## 0.5.0 - 2026-08-21
 
 - **Camera snapshots** (new `allow_camera` option, off by default and independent from `allow_write`): `ha_get_camera_snapshot` returns the current still image of a camera as an MCP image, so the assistant can describe what it sees. `filter_reads` and `entity_denylist` still apply, and every snapshot is audited. Images above 4 MB are refused (no resize dependency).
