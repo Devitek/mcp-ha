@@ -43,7 +43,7 @@ Add-on versions 0.1.0 to 0.1.3 printed the token in full in the add-on log. If y
 ## Other guard rails
 
 - After 5 failed authentications, an IP is progressively blocked (up to 60 s, HTTP 429 with `Retry-After`); a user-set token shorter than 16 characters triggers a loud startup warning.
-- The Node server runs as a dedicated unprivileged user inside the container, confined by a custom AppArmor profile.
+- The Node server runs as a dedicated unprivileged user inside the container.
 
 ## Accepted limitations
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7 - 2026-08-21
+
+- **Hotfix**: the AppArmor profile shipped in 0.1.6 broke the container start on real installations (`/init: Permission denied` loop): the s6 init tree is made of interpreted scripts and the profile granted execute without read. The profile is removed; the add-on starts again. It will come back built from real denials (issue #72). Update straight to this version if 0.1.6 crash-loops; nothing else changed.
+
 ## 0.1.6 - 2026-08-21
 
 Second and final batch of the external audit (every finding of AUDIT.md is now either shipped or tracked with an explicit blocker).
