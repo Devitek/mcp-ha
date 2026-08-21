@@ -37,6 +37,26 @@ npm run docs:build
 
 Any diagram in the documentation must be written with Mermaid.
 
+## Pull request workflow
+
+`main` is protected: no direct pushes, not even for admins. Every change, including maintainer and agent work, lands the same way:
+
+1. Branch from an up-to-date `main` (always `git fetch` and rebase first: Dependabot merges happen on GitHub while you work).
+2. Open a PR whose description references its issue: `Closes #N` (or `Refs #N` for partial work). No linked issue usually means the work should not start; open one first.
+3. CI must be green (lint, build, typecheck, tests, image build and scan are required checks), then squash merge.
+4. Individual commits that address an issue carry a `Refs #N` footer.
+
+History is never rewritten: commit hashes are referenced by security advisories, issues and release tags. To link an already-pushed commit to an issue after the fact, use a commit comment.
+
+## Release and infrastructure safety
+
+Lessons learned from the 2026-08 audit, enforced from now on:
+
+- **Pin against artifacts, not refs.** Before pinning an action or image, verify the pinned reference resolves to a real published artifact (`home-assistant/builder` uses its git ref as its own image tag, and some of its git tags have no published image).
+- **Host-enforced features need a real host.** AppArmor profiles, ingress and anything applied by the Supervisor cannot be validated with `docker run`: test them on a disposable Home Assistant OS VM, never straight on a production instance. For AppArmor and interpreted scripts, grant `rix`, not `ix` alone.
+- **Standalone containers differ from add-ons.** `bashio::config` queries the Supervisor API, not the local file: keep `run.sh` tolerant to a missing Supervisor so dev and CI smoke runs keep working.
+- **Interacting limits are tested together** (e.g. history point caps versus the global response byte cap).
+
 ## Definition of done
 
 No task (issue or PR) is finished until every point below holds:
