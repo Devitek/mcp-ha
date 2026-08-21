@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.0 - 2026-08-21
+
+- **Helpers** (#94 tier 1): `ha_create_helper` and `ha_delete_helper` manage the seven helper types (`input_boolean`, `input_number`, `input_select`, `input_text`, `input_datetime`, `counter`, `timer`). "Create a coffee counter", "a vacation mode boolean": helpers are pure state containers with no behaviour, the mildest possible write. Both tools are behind `allow_write` and the token scope, audited; deletion honours the entity lists, resolves renamed helpers through the registry and refuses YAML-defined ones.
+- **Proposal prompts** (#94 tier 2): `propose-automation` and `propose-script` guide the assistant to draft a complete, paste-ready YAML from verified entities, without writing anything to Home Assistant.
+- 24 tools (18 read, 6 guarded write), 4 prompts. 194 unit tests.
+
 ## 0.8.1 - 2026-08-21
 
 - **Instant registry updates**: the registry cache (areas, devices, entities, floors, labels) is now invalidated by the Home Assistant registry events instead of waiting out a 60 s TTL. Rename a room or move a device and the very next tool call sees it; the TTL stays as a safety net.

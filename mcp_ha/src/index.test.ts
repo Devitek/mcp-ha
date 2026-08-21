@@ -223,7 +223,7 @@ describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
     const H = { ...ACCEPT, ...AUTH };
     const list = await fetch(`${base}/mcp`, { method: "POST", headers: H, body: rpc("prompts/list") });
     const names = ((await list.json()) as any).result.prompts.map((p: any) => p.name).sort();
-    expect(names).toEqual(["diagnose-automation", "energy-report"]);
+    expect(names).toEqual(["diagnose-automation", "energy-report", "propose-automation", "propose-script"]);
 
     const get = await fetch(`${base}/mcp`, {
       method: "POST",
