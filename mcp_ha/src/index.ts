@@ -251,6 +251,9 @@ async function main(): Promise<void> {
   ws.onConnect(() => {
     catalog.invalidate();
     void catalog.startLive();
+    // Registry events drop the registry cache the moment something is
+    // renamed or moved (#93); the TTL only remains as a safety net.
+    void catalog.watchRegistries();
   });
   ws.connect();
   const http = new HaHttp(cfg);

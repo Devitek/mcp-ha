@@ -91,7 +91,7 @@ sequenceDiagram
 
 ## Caches
 
-Pièces, appareils et registre d'entités changent rarement : cache de 60 secondes avec partage des requêtes en vol. **Les états sont une carte vivante** alimentée par un abonnement `state_changed` (v0.3) : l'add-on s'abonne d'abord, prend un instantané via un seul `get_states`, rejoue les événements tamponnés entre-temps, et sert toutes les lectures depuis la mémoire. L'abonnement est rétabli à chaque reconnexion ; s'il échoue, un repli en TTL court garde les outils fonctionnels.
+Les registres pièces, appareils, entités, étages et labels sont mis en cache avec partage des requêtes en vol et **invalidés par les événements de registre** (`area_registry_updated` et consorts) : un renommage est visible à l'appel suivant. Un TTL de 60 secondes reste en filet de sécurité si un abonnement échoue silencieusement. **Les états sont une carte vivante** alimentée par un abonnement `state_changed` (v0.3) : l'add-on s'abonne d'abord, prend un instantané via un seul `get_states`, rejoue les événements tamponnés entre-temps, et sert toutes les lectures depuis la mémoire. L'abonnement est rétabli à chaque reconnexion ; s'il échoue, un repli en TTL court garde les outils fonctionnels.
 
 ## Page de statut
 

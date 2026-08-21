@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.1 - 2026-08-21
+
+- **Instant registry updates**: the registry cache (areas, devices, entities, floors, labels) is now invalidated by the Home Assistant registry events instead of waiting out a 60 s TTL. Rename a room or move a device and the very next tool call sees it; the TTL stays as a safety net.
+- 188 unit tests.
+
 ## 0.8.0 - 2026-08-21
 
 - **Onboarding on the ingress page**: the status page now carries a "Connect a client" section with ready-to-copy configs for Claude Code (`claude mcp add`), Claude Desktop (`mcp-remote`) and Gemini CLI, with the MCP URL derived from the host you browse HA through. The API token is embedded masked on screen (explicit Reveal button; Copy always copies the full working version). Same trust boundary as the Configuration tab: the page only exists behind your authenticated HA session, and the Supervisor token never appears.

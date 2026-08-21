@@ -126,6 +126,45 @@ describe("Catalog.index", () => {
   });
 });
 
+describe("event-driven registry invalidation (#93)", () => {
+  it("subscribes to the five registry events and refetches after one fires", async () => {
+    const ws = fakeWs() as any;
+    const handlers = new Map<string, (e: unknown) => void>();
+    ws.subscribe = vi.fn(async (_t: string, p: { event_type: string }, h: (e: unknown) => void) => {
+      handlers.set(p.event_type, h);
+      return handlers.size;
+    });
+    const catalog = new Catalog(ws);
+    await catalog.watchRegistries();
+    expect([...handlers.keys()].sort()).toEqual([
+      "area_registry_updated",
+      "device_registry_updated",
+      "entity_registry_updated",
+      "floor_registry_updated",
+      "label_registry_updated",
+    ]);
+    await catalog.index();
+    handlers.get("area_registry_updated")!({});
+    await catalog.index();
+    const regCalls = ws.send.mock.calls.map((c: unknown[]) => c[0]).filter((t: any) => String(t).startsWith("config/"));
+    // Two full registry rounds: the event dropped the cache within its TTL.
+    expect(regCalls).toHaveLength(10);
+    // States were untouched by the registry event.
+    expect(ws.send.mock.calls.map((c: unknown[]) => c[0]).filter((t: any) => t === "get_states")).toHaveLength(1);
+  });
+
+  it("survives failing subscriptions, the TTL stays as the net", async () => {
+    const ws = fakeWs() as any;
+    ws.subscribe = vi.fn(async () => {
+      throw new Error("subscription refused");
+    });
+    const catalog = new Catalog(ws);
+    await catalog.watchRegistries();
+    const index = await catalog.index();
+    expect(index.length).toBeGreaterThan(0);
+  });
+});
+
 describe("live state cache (v0.3 #79)", () => {
   function liveWs() {
     const ws = fakeWs() as any;
