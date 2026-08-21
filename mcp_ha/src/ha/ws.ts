@@ -46,6 +46,8 @@ export class HaWsClient {
   /** Epoch ms of the moment the connection was last lost; null while authed. */
   private disconnectedAt: number | null = Date.now();
   private connectListeners: Array<() => void> = [];
+  /** Event handlers of active subscriptions, keyed by subscription id. */
+  private eventHandlers = new Map<number, (event: unknown) => void>();
 
   constructor(private cfg: AddonConfig) {}
 
@@ -133,6 +135,50 @@ export class HaWsClient {
     return this.raw(type, payload, timeoutMs);
   }
 
+  /**
+   * Opens a subscription: the command result confirms it, then events with
+   * the same id flow to onEvent. Subscriptions die with the socket (no
+   * unsubscribe needed): resubscribe from an onConnect listener.
+   */
+  async subscribe(
+    type: string,
+    payload: Record<string, unknown>,
+    onEvent: (event: unknown) => void
+  ): Promise<number> {
+    await this.ready();
+    const ws = this.ws;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error("Home Assistant WebSocket is not connected");
+    }
+    const id = this.nextId++;
+    log.debug(`WS subscribe ${type} (id ${id})`);
+    // Register the handler BEFORE sending: events may race the result.
+    this.eventHandlers.set(id, onEvent);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        this.eventHandlers.delete(id);
+        reject(new Error(`subscription ${type} did not answer within ${DEFAULT_TIMEOUT_MS} ms`));
+      }, DEFAULT_TIMEOUT_MS);
+      this.pending.set(id, {
+        resolve: () => resolve(id),
+        reject: (e) => {
+          this.eventHandlers.delete(id);
+          reject(e);
+        },
+        timer,
+      });
+      try {
+        ws.send(JSON.stringify({ id, type, ...payload }));
+      } catch (e) {
+        this.pending.delete(id);
+        this.eventHandlers.delete(id);
+        clearTimeout(timer);
+        reject(e instanceof Error ? e : new Error(String(e)));
+      }
+    });
+  }
+
   private ready(timeoutMs = 10_000): Promise<void> {
     if (this.authed) return Promise.resolve();
     return new Promise((resolve, reject) => {
@@ -212,6 +258,17 @@ export class HaWsClient {
         break;
       default: {
         if (typeof msg.id !== "number") return;
+        if (msg.type === "event") {
+          const handler = this.eventHandlers.get(msg.id);
+          if (handler) {
+            try {
+              handler(msg.event);
+            } catch (e) {
+              log.warning(`Subscription handler failed: ${e instanceof Error ? e.message : String(e)}`);
+            }
+          }
+          return;
+        }
         const p = this.pending.get(msg.id);
         if (!p) return;
         if (msg.type === "result") {
@@ -281,6 +338,8 @@ export class HaWsClient {
       p.reject(new Error("Home Assistant WebSocket connection was lost during the command"));
     }
     this.pending.clear();
+    // Subscriptions die with the socket; owners resubscribe via onConnect.
+    this.eventHandlers.clear();
     // Waiters must fail fast rather than sit out their 10 s timeout on a
     // connection we know is gone.
     for (const w of this.waiters.splice(0)) {

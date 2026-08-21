@@ -11,6 +11,7 @@ A Home Assistant add-on that exposes an [MCP](https://modelcontextprotocol.io) (
 - **Automations and scripts**: state, last trigger, full automation configuration.
 - **History**: state changes, long-term statistics, logbook.
 - **Add-ons and system**: installed add-ons, HA config, error log, Jinja template rendering.
+- **MCP surface beyond tools**: resources (`ha://areas`, `ha://services`, `ha://config`), guided prompts (automation diagnosis, energy report), `structuredContent` on every response, and a status page in the HA sidebar.
 
 19 tools in total (15 read, 4 guarded write), designed to preserve the LLM context window: compact, paginated, capped responses.
 

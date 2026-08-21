@@ -1,6 +1,6 @@
 # MCP Home Assistant
 
-This add-on exposes an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server that lets an AI assistant (Claude Code, Claude Desktop, Gemini CLI...) query your Home Assistant instance: entities, areas, devices, services, automations, scripts, history, statistics and add-ons.
+This add-on exposes an [MCP](https://modelcontextprotocol.io) (Model Context Protocol) server that lets an AI assistant (Claude Code, Claude Desktop, Gemini CLI...) query your Home Assistant instance: entities, areas, devices, services, automations, scripts, history, statistics and add-ons. Beyond the tools it also exposes MCP resources (`ha://areas`, `ha://services`, `ha://config`) and guided prompts (automation diagnosis, energy report).
 
 By default the add-on is **read only**. Writes (service calls) must be enabled explicitly and remain guarded by allow/deny lists.
 
@@ -12,6 +12,10 @@ Full documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/
 2. Open the add-on **Configuration** tab: an API token was generated and saved there on first start (the log only ever shows a masked prefix of it). Copy it.
 3. Configure your MCP client (see below) with `http://HA_IP:9583/mcp` and that token.
 4. Ask your assistant something like: "which lights are on?"
+
+## Status page
+
+The add-on adds an entry in the Home Assistant sidebar (and an **Open Web UI** button): a small status page showing version, uptime, WebSocket state and active options. It is served through HA ingress (your HA session authenticates you) and never displays secrets.
 
 ## Options
 

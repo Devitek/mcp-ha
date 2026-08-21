@@ -11,6 +11,7 @@ Un add-on Home Assistant qui expose un serveur [MCP](https://modelcontextprotoco
 - **Automations et scripts** : état, dernier déclenchement, configuration complète des automations.
 - **Historique** : changements d'état, statistiques long terme, logbook.
 - **Add-ons et système** : add-ons installés, config HA, journal d'erreurs, rendu de templates Jinja.
+- **Surface MCP au-delà des outils** : resources (`ha://areas`, `ha://services`, `ha://config`), prompts guidés (diagnostic d'automation, bilan énergie), `structuredContent` sur chaque réponse, et une page de statut dans la barre latérale HA.
 
 19 outils au total (15 en lecture, 4 en écriture encadrée), pensés pour préserver la fenêtre de contexte du LLM : réponses compactes, paginées, plafonnées.
 

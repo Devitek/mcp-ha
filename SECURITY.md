@@ -29,6 +29,7 @@ Giving an LLM access to your home automation is not a trivial decision. This doc
 8. **API guard rails**: capped request body, add-on slug validated by regex before being used in a URL, error messages without stack traces.
 9. **Brute-force friction**: after 5 failed authentications an IP gets progressively blocked (up to 60 s, HTTP 429 with Retry-After), and a user-set token shorter than 16 characters triggers a loud startup warning.
 10. **Template gating**: `ha_render_template` can read any entity state server-side, so it is not registered at all when `filter_reads` is enabled; the denylist cannot be bypassed through Jinja.
+10b. **Ingress status page**: authenticated by the Home Assistant session through the Supervisor proxy, served on a port internal to the container network (never published on the LAN), and it displays no secret.
 11. **Container hardening**: the Node server runs as a dedicated unprivileged user (privileges dropped after `/data` ownership is fixed) and is confined by a custom AppArmor profile. The service transitions into a tight child profile that denies `/etc/shadow`, writes outside `/data`, and `CAP_DAC_OVERRIDE`, while keeping the s6/bashio init tree working. The profile was validated on a real AppArmor-enforcing host against actual kernel denials (issue #72), after a first over-strict attempt broke container init in 0.1.6.
 
 ## Past advisories

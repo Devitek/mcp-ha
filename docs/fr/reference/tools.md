@@ -141,3 +141,22 @@ Sans `slug` : la liste des add-ons installés. Avec `slug` : le détail d'un add
 ### ha_get_system
 
 `section: "config"` : version de HA, nom, fuseau, unités, nombre d'intégrations. `section: "error_log"` : les 100 dernières lignes du journal d'erreurs de HA.
+
+## Resources et prompts
+
+Depuis la v0.3, chaque réponse d'outil porte aussi `structuredContent` (le même JSON que le texte, typé pour les clients qui le gèrent), et le serveur expose :
+
+**Resources** (`application/json`, pour les clients qui épinglent du contexte sans appel d'outil) :
+
+| URI | Contenu |
+|-----|---------|
+| `ha://areas` | toutes les pièces avec leur nombre d'entités |
+| `ha://services` | les domaines de services avec leur nombre de services |
+| `ha://config` | configuration compacte de l'instance (version, nom, fuseau, unités) |
+
+**Prompts** (parcours guidés) :
+
+| Nom | Arguments | Ce que ça fait |
+|-----|-----------|----------------|
+| `diagnose-automation` | `automation` (entity_id) | enquête pas à pas sur une automation qui n'a pas tourné |
+| `energy-report` | `hours` (optionnel) | bilan de consommation bâti sur les statistiques long terme |

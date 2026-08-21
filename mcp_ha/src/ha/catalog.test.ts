@@ -88,3 +88,71 @@ describe("Catalog.index", () => {
     await expect(catalog.index()).rejects.toThrow(/Unexpected payload from Home Assistant \(get_states\)/);
   });
 });
+
+describe("live state cache (v0.3 #79)", () => {
+  function liveWs() {
+    const ws = fakeWs() as any;
+    let handler: ((e: unknown) => void) | null = null;
+    ws.subscribe = vi.fn(async (_t: string, _p: unknown, onEvent: (e: unknown) => void) => {
+      handler = onEvent;
+      return 42;
+    });
+    return { ws, emit: (e: unknown) => handler?.(e) };
+  }
+  const changed = (entityId: string, state: string | null) => ({
+    data: {
+      entity_id: entityId,
+      new_state:
+        state === null
+          ? null
+          : { entity_id: entityId, state, attributes: {}, last_changed: "2026-01-02T00:00:00Z", last_updated: "2026-01-02T00:00:00Z" },
+    },
+  });
+
+  it("serves states from the live map and applies updates without any new get_states", async () => {
+    const { ws, emit } = liveWs();
+    const catalog = new Catalog(ws);
+    await catalog.startLive();
+    emit(changed("light.direct", "off"));
+    emit(changed("sensor.brand_new", "1"));
+    emit(changed("sensor.orphan", null));
+    const states = await catalog.states();
+    const byId = new Map(states.map((s) => [s.entity_id, s.state]));
+    expect(byId.get("light.direct")).toBe("off");
+    expect(byId.get("sensor.brand_new")).toBe("1");
+    expect(byId.has("sensor.orphan")).toBe(false);
+    await catalog.states();
+    expect(ws.send.mock.calls.map((c: unknown[]) => c[0]).filter((t: unknown) => t === "get_states")).toHaveLength(1);
+  });
+
+  it("replays events buffered during the snapshot (subscribe-first ordering)", async () => {
+    const ws = fakeWs() as any;
+    let handler: ((e: unknown) => void) | null = null;
+    ws.subscribe = vi.fn(async (_t: string, _p: unknown, onEvent: (e: unknown) => void) => {
+      handler = onEvent;
+      // The event arrives BEFORE get_states returns: it must win.
+      handler(changed("light.direct", "racing"));
+      return 42;
+    });
+    const catalog = new Catalog(ws);
+    await catalog.startLive();
+    const states = await catalog.states();
+    expect(states.find((s) => s.entity_id === "light.direct")?.state).toBe("racing");
+  });
+
+  it("falls back to TTL fetches when the subscription fails, and resubscribes after invalidate", async () => {
+    const ws = fakeWs() as any;
+    ws.subscribe = vi.fn(async () => {
+      throw new Error("subscription refused");
+    });
+    const catalog = new Catalog(ws);
+    await catalog.startLive();
+    await catalog.states();
+    expect(ws.send.mock.calls.map((c: unknown[]) => c[0])).toContain("get_states");
+    // reconnection path: invalidate drops the live map, startLive retries
+    ws.subscribe = vi.fn(async (_t: string, _p: unknown, _e: unknown) => 43);
+    catalog.invalidate();
+    await catalog.startLive();
+    expect(ws.subscribe).toHaveBeenCalled();
+  });
+});

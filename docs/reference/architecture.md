@@ -89,9 +89,13 @@ sequenceDiagram
   U->>A: reads the full token in the Configuration tab
 ```
 
-## Registry cache
+## Caches
 
-Areas, devices and entity registries change rarely: they are cached for 60 seconds. States are always fetched live (a single WS round-trip). A future version will maintain a live state cache fed by `subscribe_events`.
+Areas, devices and entity registries change rarely: they are cached for 60 seconds with shared in-flight fetches. **States are a live map** fed by a `state_changed` subscription (v0.3): the add-on subscribes first, snapshots with one `get_states`, replays the events buffered in between, and serves every read from memory. The subscription is re-established on every reconnection; if it fails, a short-TTL fetch fallback keeps the tools working.
+
+## Status page
+
+`ingress: true` exposes a small status page in the Home Assistant sidebar (authenticated by the HA session, port internal to the container network, no secret ever displayed): version, uptime, WebSocket state, active options.
 
 ## Repository layout
 

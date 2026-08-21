@@ -141,3 +141,22 @@ Evaluates a Jinja2 template server-side and returns the rendering. Read only, ve
 ### ha_get_system
 
 `section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: last 100 lines of the HA error log.
+
+## Resources and prompts
+
+Since v0.3 every tool response also carries `structuredContent` (the same JSON as the text, typed for clients that support it), and the server exposes:
+
+**Resources** (`application/json`, for clients that pin context without tool calls):
+
+| URI | Content |
+|-----|---------|
+| `ha://areas` | all areas with their entity counts |
+| `ha://services` | service domains with their service counts |
+| `ha://config` | compact instance configuration (version, name, timezone, units) |
+
+**Prompts** (guided workflows):
+
+| Name | Arguments | What it does |
+|------|-----------|--------------|
+| `diagnose-automation` | `automation` (entity_id) | step-by-step investigation of why an automation did not run |
+| `energy-report` | `hours` (optional) | consumption summary built on long-term statistics |

@@ -42,20 +42,31 @@ export interface ToolResult {
   // Index signature required for assignability to the SDK CallToolResult.
   [key: string]: unknown;
   content: Array<{ type: "text"; text: string }>;
+  structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }
 
-/** Serializes the result as compact JSON, capped at MAX_RESPONSE_BYTES (real bytes, audit B14). */
+/**
+ * Serializes the result as compact JSON, capped at MAX_RESPONSE_BYTES (real
+ * bytes, audit B14). The same object also ships as structuredContent
+ * (v0.3, #79) so typed clients get JSON without reparsing the text.
+ */
 export function jsonResult(data: unknown): ToolResult {
+  let payload = data;
   let text = JSON.stringify(data);
   if (Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES) {
-    text = JSON.stringify({
+    payload = {
       truncated: true,
       note: "Response too large, truncated. Refine with filters (domain, area, search, limit, shorter time window).",
       preview: trunc(text, MAX_RESPONSE_BYTES),
-    });
+    };
+    text = JSON.stringify(payload);
   }
-  return { content: [{ type: "text", text }] };
+  const structured =
+    typeof payload === "object" && payload !== null && !Array.isArray(payload)
+      ? (payload as Record<string, unknown>)
+      : undefined;
+  return { content: [{ type: "text", text }], ...(structured ? { structuredContent: structured } : {}) };
 }
 
 export function errorResult(message: string): ToolResult {
