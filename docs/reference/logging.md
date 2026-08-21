@@ -33,7 +33,15 @@ Write attempts through `ha_call_service` produce one JSON line each, **regardles
 {"ts":"2026-08-20T15:31:02.000Z","audit":true,"tool":"ha_call_service","domain":"light","service":"turn_on","target":{"entity_id":["light.kitchen"]},"allowed":true,"result":"ok"}
 ```
 
-Refused attempts carry `"allowed": false` and a `reason`. Secrets never appear in audit lines.
+Refused attempts carry `"allowed": false` and a `reason`, and every line names the token that made the call (`client`). Secrets never appear in audit lines.
+
+Since 0.7.0 the audit lines are also **persisted to `/data/audit.log`** (JSON lines). The file rotates by size: past ~1 MB it moves to `audit.log.1` and a fresh file starts, so disk use is bounded at about 2 MB. Writes are asynchronous and never block or break a request; if `/data` is not writable, a single warning is logged and stdout remains the source of truth.
+
+Deliberately, **no MCP tool reads or clears this file**: an attacker with a token could otherwise erase their traces. Read it over SSH or with a file editor add-on:
+
+```sh
+tail -f /data/audit.log   # from inside the add-on container
+```
 
 ## Secrets
 

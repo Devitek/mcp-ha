@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.7.0 - 2026-08-21
+
+- **Persistent audit log**: write audit lines are now also mirrored to `/data/audit.log` (JSON lines) so they survive restarts. The file rotates by size (~1 MB, one previous file kept, disk bounded at ~2 MB), writes are asynchronous and never block a request, and stdout behaviour is unchanged. Deliberately, no MCP tool reads or clears the file: read it over SSH.
+- 185 unit tests.
+
 ## 0.6.0 - 2026-08-21
 
 - **Multi-entity history**: `ha_get_history` now accepts a list of up to 5 entity ids to compare them in one call (a list returns a `series` object per entity). The 250-point budget is shared so the answer stays compact.

@@ -33,7 +33,15 @@ Les tentatives d'écriture via `ha_call_service` produisent chacune une ligne JS
 {"ts":"2026-08-20T15:31:02.000Z","audit":true,"tool":"ha_call_service","domain":"light","service":"turn_on","target":{"entity_id":["light.kitchen"]},"allowed":true,"result":"ok"}
 ```
 
-Les tentatives refusées portent `"allowed": false` et une `reason`. Aucun secret n'apparaît dans les lignes d'audit.
+Les tentatives refusées portent `"allowed": false` et une `reason`, et chaque ligne nomme le jeton à l'origine de l'appel (`client`). Aucun secret n'apparaît dans les lignes d'audit.
+
+Depuis la 0.7.0, les lignes d'audit sont aussi **persistées dans `/data/audit.log`** (JSON lines). Le fichier tourne par taille : au-delà d'environ 1 Mo il devient `audit.log.1` et un fichier neuf démarre, l'usage disque est donc borné à environ 2 Mo. Les écritures sont asynchrones et ne bloquent ni ne cassent jamais une requête ; si `/data` n'est pas accessible en écriture, un unique avertissement est journalisé et stdout reste la source de vérité.
+
+Volontairement, **aucun outil MCP ne lit ni ne vide ce fichier** : un attaquant muni d'un jeton pourrait sinon effacer ses traces. Lisez-le en SSH ou avec un add-on éditeur de fichiers :
+
+```sh
+tail -f /data/audit.log   # depuis le conteneur de l'add-on
+```
 
 ## Secrets
 
