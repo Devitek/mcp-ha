@@ -43,7 +43,7 @@ Les versions 0.1.0 à 0.1.3 de l'add-on affichaient le jeton en entier dans le j
 ## Autres garde-fous
 
 - Après 5 échecs d'authentification, une IP est bloquée progressivement (jusqu'à 60 s, HTTP 429 avec `Retry-After`) ; un jeton saisi à la main de moins de 16 caractères déclenche un avertissement bruyant au démarrage.
-- Le serveur Node tourne sous un utilisateur dédié non privilégié dans le conteneur.
+- Le serveur Node tourne sous un utilisateur dédié non privilégié dans le conteneur, confiné par un profil AppArmor qui interdit `/etc/shadow`, l'écriture hors de `/data` et l'élévation de privilèges. Le profil a été validé sur un vrai hôte AppArmor en mode enforce.
 
 ## Limites assumées
 

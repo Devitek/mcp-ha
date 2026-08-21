@@ -1,0 +1,67 @@
+# AppArmor profile for the mcp_ha add-on.
+#
+# Validated on a real Home Assistant OS-like host (Ubuntu VM with AppArmor
+# enforcing, the same apparmor_parser + docker --security-opt mechanism the
+# Supervisor uses), against the actual kernel denials, before shipping. The
+# 0.1.6 attempt broke /init because it confined the s6 tree too tightly
+# (issue #72): the lesson is that the PARENT profile must stay permissive
+# enough for s6-overlay and bashio (interpreted scripts), while the SECURITY
+# value lives in the confined child profile applied to the Node server.
+#
+# Verified under confinement: the server runs as mcp_ha//node (enforce),
+# starts healthy, serves the full MCP round-trip, stops gracefully on
+# SIGTERM; reads/writes /data as the mcpha user; and is denied /etc/shadow,
+# writes to /app, and CAP_DAC_OVERRIDE.
+
+#include <tunables/global>
+
+profile mcp_ha flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Parent profile: runs the s6-overlay init tree and bashio, made of
+  # interpreted scripts, so it needs broad file and capability access. The
+  # untrusted, network-facing service is confined in the child below.
+  capability,
+  file,
+  network,
+  signal,
+
+  # The Node server transitions into the confined child profile on exec.
+  /usr/local/bin/node cx -> node,
+
+  profile node flags=(attach_disconnected,mediate_deleted) {
+    #include <abstractions/base>
+    #include <abstractions/nameservice>
+
+    # MCP server socket and Home Assistant API access.
+    network tcp,
+    network udp,
+
+    signal (receive) peer=mcp_ha,
+
+    /usr/local/bin/node mr,
+    /app/{,**} r,
+    /data/{,**} rw,
+
+    /etc/hosts r,
+    /etc/resolv.conf r,
+    /etc/ssl/{,**} r,
+
+    owner /proc/*/fd/ r,
+    owner /proc/*/stat r,
+    owner /proc/*/status r,
+    owner /proc/*/task/{,**} r,
+    owner /proc/*/cgroup r,
+    owner /proc/*/maps r,
+    /proc/version r,
+    /proc/version_signature r,
+    /proc/sys/kernel/pid_max r,
+    /proc/sys/vm/overcommit_memory r,
+    /sys/fs/cgroup/{,**} r,
+
+    /dev/urandom r,
+    /dev/random r,
+    /dev/null rw,
+    /tmp/{,**} rwk,
+  }
+}
