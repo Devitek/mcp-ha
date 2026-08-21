@@ -89,9 +89,13 @@ sequenceDiagram
   U->>A: lit le jeton complet dans l'onglet Configuration
 ```
 
-## Cache des registres
+## Caches
 
-Pièces, appareils et registre d'entités changent rarement : cache de 60 secondes. Les états sont toujours lus en direct (un seul aller-retour WS). Une version future maintiendra un cache d'états vivant alimenté par `subscribe_events`.
+Pièces, appareils et registre d'entités changent rarement : cache de 60 secondes avec partage des requêtes en vol. **Les états sont une carte vivante** alimentée par un abonnement `state_changed` (v0.3) : l'add-on s'abonne d'abord, prend un instantané via un seul `get_states`, rejoue les événements tamponnés entre-temps, et sert toutes les lectures depuis la mémoire. L'abonnement est rétabli à chaque reconnexion ; s'il échoue, un repli en TTL court garde les outils fonctionnels.
+
+## Page de statut
+
+`ingress: true` expose une petite page de statut dans la barre latérale de Home Assistant (authentifiée par la session HA, port interne au réseau du conteneur, aucun secret affiché) : version, uptime, état du WebSocket, options actives.
 
 ## Organisation du dépôt
 

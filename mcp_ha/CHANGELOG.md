@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.0 - 2026-08-21
+
+The comfort milestone (issue #79).
+
+- **Live state cache**: the add-on now subscribes to `state_changed` and serves every read from an in-memory map (subscribe-first with an event buffer, one snapshot, automatic resubscription on reconnect, short-TTL fallback if the subscription fails). No more repeated `get_states` fetches, reads are instant even on large instances.
+- **MCP resources**: `ha://areas`, `ha://services` and `ha://config` as `application/json`.
+- **MCP prompts**: `diagnose-automation` (step-by-step investigation of an automation that did not run) and `energy-report` (consumption summary on long-term statistics).
+- **structuredContent** on every tool response: typed JSON next to the text for clients that support it.
+- **Status page in the HA sidebar** (ingress): version, uptime, WebSocket state, active options; authenticated by your HA session, internal port, no secret displayed.
+- 159 unit tests.
+
 ## 0.2.1 - 2026-08-21
 
 - **Hotfix**: on installs upgraded from 0.1.x, saving the configuration failed with "Missing option 'confirm_domains' in root". The Supervisor never injects option keys added by updates into the stored options, so the new required key blocked every save. The add-on now reconciles its stored options at startup (missing keys are added with their defaults, on top of the existing token write-back): restart once after updating and the configuration saves normally. Workaround on 0.2.0: add `confirm_domains: [lock, alarm_control_panel]` manually in the YAML editor.
