@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://devitek.github.io/mcp-ha/sitemap.xml

@@ -9,7 +9,44 @@ export default withMermaid(
     base: "/mcp-ha/",
     title: "MCP Home Assistant",
     lastUpdated: true,
-    head: [["link", { rel: "icon", type: "image/png", href: "/mcp-ha/icon.png" }]],
+    // Extensionless URLs: cleaner canonicals, GitHub Pages resolves them.
+    cleanUrls: true,
+    sitemap: { hostname: "https://devitek.github.io/mcp-ha/" },
+    head: [
+      ["link", { rel: "icon", type: "image/png", href: "/mcp-ha/icon.png" }],
+      ["meta", { property: "og:type", content: "website" }],
+      ["meta", { property: "og:site_name", content: "MCP Home Assistant" }],
+      ["meta", { property: "og:image", content: "https://devitek.github.io/mcp-ha/og.png" }],
+      ["meta", { name: "twitter:card", content: "summary" }],
+      ["meta", { name: "twitter:image", content: "https://devitek.github.io/mcp-ha/og.png" }],
+    ],
+
+    // Per-page SEO (issue #74): canonical, en/fr hreflang twins and Open
+    // Graph tags derived from the page path and title.
+    transformPageData(pageData) {
+      const site = "https://devitek.github.io/mcp-ha/";
+      const rel = pageData.relativePath.replace(/(^|\/)index\.md$/, "$1").replace(/\.md$/, "");
+      const url = site + rel;
+      const isFr = rel === "fr/" || rel.startsWith("fr/");
+      const enTwin = site + (isFr ? rel.replace(/^fr\/?/, "") : rel);
+      const frTwin = isFr ? url : site + "fr/" + rel;
+      const title = pageData.title ? `${pageData.title} | MCP Home Assistant` : "MCP Home Assistant";
+      const description =
+        pageData.description ||
+        (isFr
+          ? "Add-on Home Assistant exposant un serveur MCP : interrogez et pilotez votre instance depuis Claude, Gemini ou tout client MCP."
+          : "Home Assistant add-on exposing an MCP server: query and control your instance from Claude, Gemini or any MCP client.");
+      pageData.frontmatter.head = [
+        ...(pageData.frontmatter.head ?? []),
+        ["link", { rel: "canonical", href: url }],
+        ["link", { rel: "alternate", hreflang: "en", href: enTwin }],
+        ["link", { rel: "alternate", hreflang: "fr", href: frTwin }],
+        ["link", { rel: "alternate", hreflang: "x-default", href: enTwin }],
+        ["meta", { property: "og:title", content: title }],
+        ["meta", { property: "og:description", content: description }],
+        ["meta", { property: "og:url", content: url }],
+      ];
+    },
 
     vite: {
       plugins: [
