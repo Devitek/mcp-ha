@@ -5,6 +5,7 @@
 import { vi } from "vitest";
 import type { AddonConfig } from "../../config.js";
 import type { ToolContext } from "../../context.js";
+import { ConfirmationStore } from "../../confirm.js";
 
 export interface RegisteredTool {
   cfg: any;
@@ -44,6 +45,7 @@ export function testCfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     entityAllowlist: [],
     entityDenylist: [],
     serviceDenylist: [],
+    confirmDomains: [],
     supervisorToken: null,
     devHaUrl: null,
     devHaToken: null,
@@ -71,6 +73,7 @@ export function fakeCtx(partial: any = {}): ToolContext {
       invalidate: vi.fn(),
       ...(partial.catalog ?? {}),
     },
+    confirmations: partial.confirmations ?? new ConfirmationStore(),
   } as unknown as ToolContext;
 }
 

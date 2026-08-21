@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 - 2026-08-21
+
+The write milestone (issue #15).
+
+- Three dedicated write tools join `ha_call_service` behind `allow_write`: `ha_run_script` (with variables), `ha_trigger_automation` (with `skip_condition`) and `ha_set_automation` (enable/disable). 19 tools in total: 15 read, 4 guarded write.
+- **Two-step confirmation on sensitive domains** (new `confirm_domains` option, locks and alarms by default): the first call returns a preview and a single-use `confirm_token` bound to the exact call fingerprint (2 minutes TTL); execution requires calling again with the token. A token can never authorize a different action.
+- All four write tools share one guarded write path: service denylist, entity allow/deny lists, area/device bypass guard, dry run, confirmation and audit trail can never diverge between tools.
+- 149 unit tests (20 new, including the full confirmation matrix: issue, execute, burn, replay refused, mismatch refused).
+
 ## 0.1.8 - 2026-08-21
 
 - AppArmor profile back, this time validated on a real AppArmor-enforcing host against actual kernel denials before shipping (issue #72). The Node server is confined in a tight child profile (denies `/etc/shadow`, writes outside `/data`, `CAP_DAC_OVERRIDE`) while the s6/bashio init tree keeps working, which is what the over-strict 0.1.6 attempt got wrong. Verified: starts healthy, full MCP round-trip, graceful SIGTERM, `/data` read/write as the service user, all under confinement.

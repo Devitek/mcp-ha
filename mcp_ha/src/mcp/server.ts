@@ -3,6 +3,7 @@ import { VERSION } from "../config.js";
 import type { ToolContext } from "../context.js";
 import { registerEntityTools } from "./tools/entities.js";
 import { registerServiceTools } from "./tools/services.js";
+import { registerWriteTools } from "./tools/writes.js";
 import { registerAutomationTools } from "./tools/automations.js";
 import { registerHistoryTools } from "./tools/history.js";
 import { registerAddonTools } from "./tools/addons.js";
@@ -25,6 +26,7 @@ export function buildServer(ctx: ToolContext): McpServer {
   );
   registerEntityTools(server, ctx);
   registerServiceTools(server, ctx);
+  registerWriteTools(server, ctx);
   registerAutomationTools(server, ctx);
   registerHistoryTools(server, ctx);
   registerAddonTools(server, ctx);

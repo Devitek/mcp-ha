@@ -7,6 +7,7 @@ import { safeEqual } from "./safety.js";
 import { HaWsClient } from "./ha/ws.js";
 import { HaHttp } from "./ha/http.js";
 import { Catalog } from "./ha/catalog.js";
+import { ConfirmationStore } from "./confirm.js";
 import { buildServer } from "./mcp/server.js";
 import type { ToolContext } from "./context.js";
 
@@ -207,7 +208,7 @@ async function main(): Promise<void> {
   ws.onConnect(() => catalog.invalidate());
   ws.connect();
   const http = new HaHttp(cfg);
-  const ctx: ToolContext = { cfg, ws, http, catalog };
+  const ctx: ToolContext = { cfg, ws, http, catalog, confirmations: new ConfirmationStore() };
   void persistGeneratedToken(cfg, http);
 
   const httpServer = createServer(createHandler(ctx));

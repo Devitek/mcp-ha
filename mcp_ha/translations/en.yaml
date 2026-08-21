@@ -36,5 +36,11 @@ configuration:
     description: >-
       Services that are always refused (e.g. hassio.*, shell_command.*).
       Think twice before removing entries.
+  confirm_domains:
+    name: Domains requiring confirmation
+    description: >-
+      Writes on these domains need a two-step confirmation: the assistant
+      first receives a preview and a single-use token, and must call again
+      with it to execute. Defaults protect locks and alarms.
 network:
   9583/tcp: MCP server port (and /health endpoint)

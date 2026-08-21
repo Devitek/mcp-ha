@@ -37,5 +37,12 @@ configuration:
     description: >-
       Services interdits quel que soit le contexte (ex. hassio.*,
       shell_command.*). Réfléchissez avant d'en retirer.
+  confirm_domains:
+    name: Domaines à confirmation
+    description: >-
+      Les écritures sur ces domaines exigent une confirmation en deux
+      temps : l'assistant reçoit d'abord un aperçu et un jeton à usage
+      unique, et doit rappeler avec pour exécuter. Les défauts protègent
+      serrures et alarmes.
 network:
   9583/tcp: Port du serveur MCP (et endpoint /health)

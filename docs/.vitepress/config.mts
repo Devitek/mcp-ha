@@ -59,9 +59,10 @@ export default withMermaid(
           // itself, a domain with the path would double it.
           domain: "https://devitek.github.io",
           ignoreFiles: ["fr/**"],
-          description: "Home Assistant add-on exposing an MCP server (16 tools) so AI assistants can query and control a Home Assistant instance.",
+          description: "Home Assistant add-on exposing an MCP server (19 tools) so AI assistants can query and control a Home Assistant instance.",
           details:
-            "Read-only by default; a single guarded write tool (ha_call_service) exists behind the allow_write option. " +
+            "Read-only by default; four guarded write tools (ha_call_service, ha_run_script, ha_trigger_automation, ha_set_automation) " +
+            "exist behind the allow_write option, with a two-step confirmation on sensitive domains. " +
             "LAN-only design with bearer authentication. The add-on talks to Home Assistant over WebSocket through the Supervisor proxy.",
         }),
       ],

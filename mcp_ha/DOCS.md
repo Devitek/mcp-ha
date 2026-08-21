@@ -19,11 +19,12 @@ Full documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/
 |--------|---------|-------------|
 | `log_level` | `info` | Log verbosity: trace, debug, info, notice, warning, error, fatal. Write audit lines are always emitted. |
 | `api_token` | empty | Token expected from MCP clients (`Authorization: Bearer ...`). Leave empty to have one generated on first start and saved back into this option. The log only shows a masked prefix. |
-| `allow_write` | `false` | Exposes the `ha_call_service` tool. Without it, no write tool is even visible to the client. |
+| `allow_write` | `false` | Exposes the four write tools (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`). Without it, no write tool is even visible to the client. |
 | `filter_reads` | `false` | Also applies `entity_denylist` to reads: hidden entities disappear from listings, entity details, history, statistics and the logbook. Also disables `ha_render_template`, which could otherwise read any entity through Jinja. |
 | `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes (e.g. `light.*`). When non-empty, everything else is refused. |
 | `entity_denylist` | `[]` | Glob patterns of entities forbidden for writes (e.g. `lock.*`). The denylist always wins. |
 | `service_denylist` | see config | Services refused in any context. The defaults block HA shutdown, shell_command, recorder purge, etc. Think twice before removing entries. |
+| `confirm_domains` | `[lock, alarm_control_panel]` | Writes on these domains require a two-step confirmation: preview plus single-use token first, execution only with the token. |
 
 ## Connecting clients
 
@@ -68,7 +69,7 @@ claude mcp add --transport http home-assistant \
 
 - The add-on is designed for **LAN use only**. Do not expose port 9583 to the internet: there is no TLS and no OAuth.
 - The API token is a secret: do not paste it in a ticket or a screen share.
-- `allow_write` is disabled by default. Enable it only if you want the assistant to act, and consider `entity_allowlist` / `entity_denylist`.
+- `allow_write` is disabled by default. Enable it only if you want the assistant to act, and consider `entity_allowlist` / `entity_denylist`. Locks and alarms additionally require a two-step confirmation (`confirm_domains`).
 - Every write attempt (allowed or refused) is logged as JSON in the add-on log, at any log level.
 - `ha_render_template` evaluates Jinja templates on the HA side and can read any entity state: with `filter_reads` enabled the tool is disabled entirely.
 - Repeated failed authentications from the same IP are progressively blocked (HTTP 429).

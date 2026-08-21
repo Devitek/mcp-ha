@@ -10,7 +10,7 @@ Giving an LLM access to your home automation deserves a real security posture. T
 
 ## Write path
 
-Every `ha_call_service` call goes through this gauntlet:
+The four write tools (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`) share one guarded path; every call goes through this gauntlet:
 
 ```mermaid
 flowchart TD
@@ -24,7 +24,10 @@ flowchart TD
   E -- "yes" --> R1
   E -- "no" --> F{"dry_run?"}
   F -- "yes" --> P["Preview returned + audit,<br>nothing executed"]
-  F -- "no" --> X["call_service executed + audit"]
+  F -- "no" --> G{"domain in<br>confirm_domains?"}
+  G -- "yes, no token" --> C1["Preview + single-use<br>confirm_token returned"]
+  G -- "yes, valid token" --> X["call_service executed + audit"]
+  G -- "no" --> X
 ```
 
 The audit lines are JSON, one per attempt, and are emitted regardless of the configured log level. See [Logging](/reference/logging).

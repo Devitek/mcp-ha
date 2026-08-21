@@ -4,7 +4,7 @@ import { z } from "zod";
 import { log, setLogLevel } from "./logger.js";
 import { maskSecret } from "./safety.js";
 
-export const VERSION = "0.1.8";
+export const VERSION = "0.2.0";
 
 const OPTIONS_PATH = "/data/options.json";
 const TOKEN_PATH = "/data/token";
@@ -21,6 +21,8 @@ export interface AddonConfig {
   entityAllowlist: string[];
   entityDenylist: string[];
   serviceDenylist: string[];
+  /** Domains whose writes require the two-step confirmation (v0.2). */
+  confirmDomains: string[];
   /** Token injected by the Supervisor when running as an add-on. */
   supervisorToken: string | null;
   /** Dev mode outside the add-on: HA base URL and a long-lived access token. */
@@ -42,6 +44,7 @@ const optionsSchema = z
     entity_allowlist: z.array(z.string()).default([]),
     entity_denylist: z.array(z.string()).default([]),
     service_denylist: z.array(z.string()).default([]),
+    confirm_domains: z.array(z.string()).default(["lock", "alarm_control_panel"]),
   })
   .loose();
 
@@ -105,6 +108,7 @@ export function loadConfig(): AddonConfig {
     entityAllowlist: opts.entity_allowlist.filter((s) => s.trim().length > 0),
     entityDenylist: opts.entity_denylist.filter((s) => s.trim().length > 0),
     serviceDenylist: opts.service_denylist.filter((s) => s.trim().length > 0),
+    confirmDomains: opts.confirm_domains.filter((s) => s.trim().length > 0),
     supervisorToken: process.env.SUPERVISOR_TOKEN ?? null,
     devHaUrl: process.env.HA_URL ?? null,
     devHaToken: process.env.HA_TOKEN ?? null,
