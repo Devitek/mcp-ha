@@ -8,6 +8,7 @@ import { HaWsClient } from "./ha/ws.js";
 import { HaHttp } from "./ha/http.js";
 import { Catalog } from "./ha/catalog.js";
 import { ConfirmationStore } from "./confirm.js";
+import { createIngressHandler, INGRESS_PORT } from "./ingress.js";
 import { buildServer } from "./mcp/server.js";
 import type { ToolContext } from "./context.js";
 
@@ -224,14 +225,26 @@ async function main(): Promise<void> {
 
   const ws = new HaWsClient(cfg);
   const catalog = new Catalog(ws);
-  // Stale caches must not survive an HA restart (audit B5/C9).
-  ws.onConnect(() => catalog.invalidate());
+  // Stale caches must not survive an HA restart (audit B5/C9), and the live
+  // state cache resubscribes on every (re)connection (v0.3, #79).
+  ws.onConnect(() => {
+    catalog.invalidate();
+    void catalog.startLive();
+  });
   ws.connect();
   const http = new HaHttp(cfg);
   const ctx: ToolContext = { cfg, ws, http, catalog, confirmations: new ConfirmationStore() };
   void reconcileOptions(cfg, http);
 
   const httpServer = createServer(createHandler(ctx));
+
+  // Ingress status page (v0.3, #79): the port stays inside the container
+  // network (not in config.yaml ports), the Supervisor proxies and
+  // authenticates HA users to it.
+  const ingressServer = cfg.supervisorToken || process.env.INGRESS_TEST === "true" ? createServer(createIngressHandler(ctx)) : null;
+  ingressServer?.listen(INGRESS_PORT, "0.0.0.0", () => {
+    log.info(`Ingress status page listening on port ${INGRESS_PORT}`);
+  });
 
   httpServer.listen(cfg.port, "0.0.0.0", () => {
     log.info(`mcp-ha ${VERSION} listening on port ${cfg.port} (MCP endpoint /mcp, health /health)`);
@@ -246,6 +259,7 @@ async function main(): Promise<void> {
     if (stopping) return;
     stopping = true;
     log.info("Shutdown requested, draining in-flight requests...");
+    ingressServer?.close();
     void closeWithGrace(httpServer, SHUTDOWN_GRACE_MS).then(() => {
       ws.shutdown();
       process.exit(0);

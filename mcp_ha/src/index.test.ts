@@ -35,7 +35,7 @@ function fakeCtx(partial: any = {}) {
       ...(partial.ws ?? {}),
     },
     http: { supervisorAvailable: true, ...(partial.http ?? {}) },
-    catalog: { index: vi.fn(async () => []), registries: vi.fn(), states: vi.fn() },
+    catalog: { index: vi.fn(async () => []), registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [] })), states: vi.fn(), ...(partial.catalog ?? {}) },
   } as any;
 }
 
@@ -137,6 +137,74 @@ describe("HTTP boundary (audit E1)", () => {
     const tools = ((await list.json()) as any).result.tools.map((t: any) => t.name);
     expect(tools).toHaveLength(15);
     expect(tools).not.toContain("ha_call_service");
+  });
+});
+
+describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
+  it("lists and reads the three resources", async () => {
+    const ctx = fakeCtx({
+      ws: {
+        send: vi.fn(async (type: string) =>
+          type === "get_config"
+            ? { version: "2026.8.1", location_name: "Home", components: ["a", "b"] }
+            : { light: { turn_on: {} } }
+        ),
+      },
+      catalog: {
+        index: vi.fn(async () => []),
+        registries: vi.fn(async () => ({ at: 0, areas: [{ area_id: "a1", name: "Kitchen" }], devices: [], entities: [] })),
+      },
+    });
+    const base = await startServer(ctx);
+    const H = { ...ACCEPT, ...AUTH };
+    const list = await fetch(`${base}/mcp`, { method: "POST", headers: H, body: rpc("resources/list") });
+    const uris = ((await list.json()) as any).result.resources.map((r: any) => r.uri).sort();
+    expect(uris).toEqual(["ha://areas", "ha://config", "ha://services"]);
+
+    const read = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: H,
+      body: rpc("resources/read", { uri: "ha://config" }, 2),
+    });
+    const contents = ((await read.json()) as any).result.contents[0];
+    expect(contents.mimeType).toBe("application/json");
+    expect(JSON.parse(contents.text)).toMatchObject({ version: "2026.8.1", components: 2 });
+  });
+
+  it("lists the prompts and renders diagnose-automation with its argument", async () => {
+    const base = await startServer(fakeCtx());
+    const H = { ...ACCEPT, ...AUTH };
+    const list = await fetch(`${base}/mcp`, { method: "POST", headers: H, body: rpc("prompts/list") });
+    const names = ((await list.json()) as any).result.prompts.map((p: any) => p.name).sort();
+    expect(names).toEqual(["diagnose-automation", "energy-report"]);
+
+    const get = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: H,
+      body: rpc("prompts/get", { name: "diagnose-automation", arguments: { automation: "automation.x" } }, 2),
+    });
+    const text = ((await get.json()) as any).result.messages[0].content.text;
+    expect(text).toContain("automation.x");
+    expect(text).toContain("ha_get_automation");
+  });
+
+  it("ships structuredContent alongside the text on tool calls", async () => {
+    const base = await startServer(
+      fakeCtx({
+        catalog: {
+          index: vi.fn(async () => []),
+          registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [] })),
+        },
+      })
+    );
+    const call = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: { ...ACCEPT, ...AUTH },
+      body: rpc("tools/call", { name: "ha_list_areas", arguments: {} }),
+    });
+    const result = ((await call.json()) as any).result;
+    expect(result.structuredContent).toEqual({ items: [], total: 0 });
+    expect(JSON.parse(result.content[0].text)).toEqual(result.structuredContent);
   });
 });
 

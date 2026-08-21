@@ -8,6 +8,8 @@ import { registerAutomationTools } from "./tools/automations.js";
 import { registerHistoryTools } from "./tools/history.js";
 import { registerAddonTools } from "./tools/addons.js";
 import { registerSystemTools } from "./tools/system.js";
+import { registerResources } from "./resources.js";
+import { registerPrompts } from "./prompts.js";
 
 /**
  * Builds a complete MCP server. Called for every request (stateless mode),
@@ -31,5 +33,7 @@ export function buildServer(ctx: ToolContext): McpServer {
   registerHistoryTools(server, ctx);
   registerAddonTools(server, ctx);
   registerSystemTools(server, ctx);
+  registerResources(server, ctx);
+  registerPrompts(server);
   return server;
 }

@@ -142,6 +142,25 @@ describe("HaWsClient", () => {
     expect(c.connected).toBe(true);
   }, 10_000);
 
+  it("routes subscription events to their handler and drops them on disconnect (v0.3 #79)", async () => {
+    let serverSock: ServerSocket | null = null;
+    const port = await startServer((sock, msg) => {
+      serverSock = sock;
+      sock.send(JSON.stringify({ id: msg.id, type: "result", success: true, result: null }));
+    });
+    const c = makeClient(port);
+    const received: unknown[] = [];
+    const subId = await c.subscribe("subscribe_events", { event_type: "state_changed" }, (e) => received.push(e));
+    expect(typeof subId).toBe("number");
+    serverSock!.send(JSON.stringify({ id: subId, type: "event", event: { data: { entity_id: "light.a" } } }));
+    serverSock!.send(JSON.stringify({ id: subId, type: "event", event: { data: { entity_id: "light.b" } } }));
+    // an event for an unknown id must be ignored, not crash
+    serverSock!.send(JSON.stringify({ id: 9999, type: "event", event: {} }));
+    await new Promise((r) => setTimeout(r, 200));
+    expect(received).toHaveLength(2);
+    expect((received[0] as any).data.entity_id).toBe("light.a");
+  });
+
   it("fails fast on auth_invalid instead of letting waiters sit out their timeout", async () => {
     wss = new WebSocketServer({ port: 0 });
     wss.on("connection", (sock) => {

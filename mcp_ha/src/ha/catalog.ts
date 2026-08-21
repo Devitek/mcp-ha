@@ -1,6 +1,7 @@
 import type { HaWsClient } from "./ws.js";
 import type { HaState, IndexedEntity } from "../types.js";
-import { areasSchema, devicesSchema, entityEntriesSchema, haStatesSchema, parseHaPayload } from "./schemas.js";
+import { areasSchema, devicesSchema, entityEntriesSchema, haStateSchema, haStatesSchema, parseHaPayload } from "./schemas.js";
+import { log } from "../logger.js";
 
 const REGISTRY_TTL_MS = 60_000;
 /**
@@ -29,6 +30,9 @@ export class Catalog {
   private regInflight: Promise<RegistryCache> | null = null;
   private statesCache: { at: number; states: HaState[] } | null = null;
   private statesInflight: Promise<HaState[]> | null = null;
+  /** Live state map fed by state_changed events (v0.3, #79); null = TTL fallback. */
+  private live: Map<string, HaState> | null = null;
+  private liveStarting = false;
 
   constructor(private ws: HaWsClient) {}
 
@@ -36,6 +40,52 @@ export class Catalog {
   invalidate(): void {
     this.regCache = null;
     this.statesCache = null;
+    this.live = null;
+  }
+
+  /**
+   * Switches states() to a live map: subscribe to state_changed FIRST (with
+   * an event buffer so nothing is lost), then snapshot with get_states, then
+   * replay the buffer. Call it after every (re)connection; on failure the
+   * short-TTL fallback keeps working.
+   */
+  async startLive(): Promise<void> {
+    if (this.liveStarting) return;
+    this.liveStarting = true;
+    try {
+      const buffer: Array<{ entity_id: string; new_state: unknown }> = [];
+      let target: Map<string, HaState> | null = null;
+      const apply = (map: Map<string, HaState>, entityId: string, newState: unknown): void => {
+        if (newState === null || newState === undefined) {
+          map.delete(entityId);
+          return;
+        }
+        const parsed = haStateSchema.safeParse(newState);
+        if (parsed.success) map.set(entityId, parsed.data as HaState);
+      };
+
+      await this.ws.subscribe("subscribe_events", { event_type: "state_changed" }, (event) => {
+        const data = (event as { data?: { entity_id?: string; new_state?: unknown } })?.data;
+        if (!data?.entity_id) return;
+        if (target) apply(target, data.entity_id, data.new_state);
+        else buffer.push({ entity_id: data.entity_id, new_state: data.new_state });
+      });
+
+      const raw = await this.ws.send("get_states");
+      const states = parseHaPayload(haStatesSchema, raw, "get_states") as HaState[];
+      const map = new Map(states.map((s) => [s.entity_id, s]));
+      // Events buffered during the snapshot are newer than the snapshot.
+      for (const b of buffer) apply(map, b.entity_id, b.new_state);
+      target = map;
+      this.live = map;
+      log.info(`Live state cache active (${map.size} entities), get_states polling is over.`);
+    } catch (e) {
+      log.warning(
+        `Live state cache unavailable (${e instanceof Error ? e.message : String(e)}), falling back to short-TTL fetches.`
+      );
+    } finally {
+      this.liveStarting = false;
+    }
   }
 
   async registries(): Promise<RegistryCache> {
@@ -64,6 +114,7 @@ export class Catalog {
   }
 
   async states(): Promise<HaState[]> {
+    if (this.live) return [...this.live.values()];
     if (this.statesCache && Date.now() - this.statesCache.at < STATES_TTL_MS) return this.statesCache.states;
     if (this.statesInflight) return this.statesInflight;
     this.statesInflight = (async () => {
