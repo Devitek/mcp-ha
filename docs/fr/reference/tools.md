@@ -1,6 +1,6 @@
 # Référence des outils
 
-16 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+19 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -61,7 +61,40 @@ Enregistré uniquement quand `allow_write` est activé. Soumis aux [règles d'é
 | `target` | object | `entity_id`, `device_id`, `area_id` (préférez `entity_id`) |
 | `data` | object | données du service, ex. `{ "brightness_pct": 50 }` |
 | `dry_run` | boolean | aperçu sans exécution |
+| `confirm_token` | string | jeton issu d'une réponse `confirmation_required` (domaines sensibles) |
 | `return_response` | boolean | pour les services qui renvoient des données |
+
+Sur les domaines listés dans `confirm_domains` (serrures et alarmes par défaut), le premier appel répond `confirmation_required` avec un `confirm_token` à usage unique lié à cet appel exact ; l'exécution se fait en rappelant avec les mêmes arguments plus le jeton.
+
+### ha_run_script <Badge type="danger" text="écriture" />
+
+Lance un script, avec variables optionnelles. Même chemin gardé que `ha_call_service`.
+
+| Paramètre | Type | Notes |
+|-----------|------|-------|
+| `entity_id` | string, requis | doit être une entité `script.*` |
+| `variables` | object | transmises au script |
+| `dry_run` / `confirm_token` | | comme `ha_call_service` |
+
+### ha_trigger_automation <Badge type="danger" text="écriture" />
+
+Déclenche une automation immédiatement. `skip_condition` vaut `true` par défaut (les actions tournent même si les conditions ne tiennent pas).
+
+| Paramètre | Type | Notes |
+|-----------|------|-------|
+| `entity_id` | string, requis | doit être une entité `automation.*` |
+| `skip_condition` | boolean | défaut `true` |
+| `dry_run` / `confirm_token` | | comme `ha_call_service` |
+
+### ha_set_automation <Badge type="danger" text="écriture" />
+
+Active ou désactive une automation.
+
+| Paramètre | Type | Notes |
+|-----------|------|-------|
+| `entity_id` | string, requis | doit être une entité `automation.*` |
+| `enabled` | boolean, requis | `true` pour activer |
+| `dry_run` / `confirm_token` | | comme `ha_call_service` |
 
 ## Automations et scripts
 

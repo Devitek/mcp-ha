@@ -22,7 +22,7 @@ This Home Assistant add-on exposes an [MCP](https://modelcontextprotocol.io) (Mo
 | Add-ons | list and details (read) |
 | System | Jinja template rendering, HA config, error log |
 
-16 tools in total, designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
+19 tools in total (15 read, 4 guarded write), designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
 
 ## Why not the official HA MCP integration?
 

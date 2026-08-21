@@ -12,9 +12,9 @@ Un add-on Home Assistant qui expose un serveur [MCP](https://modelcontextprotoco
 - **Historique** : changements d'état, statistiques long terme, logbook.
 - **Add-ons et système** : add-ons installés, config HA, journal d'erreurs, rendu de templates Jinja.
 
-16 outils au total, pensés pour préserver la fenêtre de contexte du LLM : réponses compactes, paginées, plafonnées.
+19 outils au total (15 en lecture, 4 en écriture encadrée), pensés pour préserver la fenêtre de contexte du LLM : réponses compactes, paginées, plafonnées.
 
-L'add-on est en **lecture seule par défaut**. Le seul outil d'écriture, `ha_call_service`, n'existe qu'une fois `allow_write` activé, et reste contraint par des listes de services et d'entités, avec un journal d'audit JSON. Voir [Sécurité](/fr/guide/security).
+L'add-on est en **lecture seule par défaut**. Les outils d'écriture (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`) n'existent qu'une fois `allow_write` activé, passent tous par le même chemin gardé (listes de services et d'entités, dry run, journal d'audit JSON), et les domaines sensibles comme serrures et alarmes exigent une confirmation en deux temps. Voir [Sécurité](/fr/guide/security).
 
 ## Démarrage rapide
 

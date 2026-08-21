@@ -12,9 +12,9 @@ A Home Assistant add-on that exposes an [MCP](https://modelcontextprotocol.io) (
 - **History**: state changes, long-term statistics, logbook.
 - **Add-ons and system**: installed add-ons, HA config, error log, Jinja template rendering.
 
-16 tools in total, designed to preserve the LLM context window: compact, paginated, capped responses.
+19 tools in total (15 read, 4 guarded write), designed to preserve the LLM context window: compact, paginated, capped responses.
 
-The add-on is **read only by default**. The single write tool, `ha_call_service`, only exists once you enable `allow_write`, and stays constrained by service and entity deny/allow lists, with a JSON audit trail. See [Security](/guide/security).
+The add-on is **read only by default**. The write tools (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`) only exist once you enable `allow_write`, all go through the same guarded path (service and entity deny/allow lists, dry run, JSON audit trail), and sensitive domains such as locks and alarms require a two-step confirmation. See [Security](/guide/security).
 
 ## Quick start
 

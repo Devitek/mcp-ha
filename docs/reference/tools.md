@@ -1,6 +1,6 @@
 # Tool reference
 
-16 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+19 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -61,7 +61,40 @@ Only registered when `allow_write` is enabled. Subject to the [write rules](/gui
 | `target` | object | `entity_id`, `device_id`, `area_id` (prefer `entity_id`) |
 | `data` | object | service data, e.g. `{ "brightness_pct": 50 }` |
 | `dry_run` | boolean | preview without executing |
+| `confirm_token` | string | token from a `confirmation_required` answer (sensitive domains) |
 | `return_response` | boolean | for services that return data |
+
+On domains listed in `confirm_domains` (locks and alarms by default), the first call answers `confirmation_required` with a single-use `confirm_token` bound to that exact call; execute by calling again with the same arguments plus the token.
+
+### ha_run_script <Badge type="danger" text="write" />
+
+Runs a script, optionally with variables. Same guarded path as `ha_call_service`.
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `entity_id` | string, required | must be a `script.*` entity |
+| `variables` | object | passed to the script |
+| `dry_run` / `confirm_token` | | as in `ha_call_service` |
+
+### ha_trigger_automation <Badge type="danger" text="write" />
+
+Triggers an automation now. `skip_condition` defaults to `true` (actions run even if conditions do not hold).
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `entity_id` | string, required | must be an `automation.*` entity |
+| `skip_condition` | boolean | default `true` |
+| `dry_run` / `confirm_token` | | as in `ha_call_service` |
+
+### ha_set_automation <Badge type="danger" text="write" />
+
+Enables or disables an automation.
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `entity_id` | string, required | must be an `automation.*` entity |
+| `enabled` | boolean, required | `true` to enable |
+| `dry_run` / `confirm_token` | | as in `ha_call_service` |
 
 ## Automations and scripts
 

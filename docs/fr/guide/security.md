@@ -10,7 +10,7 @@ Donner à un LLM l'accès à sa domotique mérite une vraie posture de sécurit�
 
 ## Parcours d'une écriture
 
-Chaque appel à `ha_call_service` traverse ce parcours :
+Les quatre outils d'écriture (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`) partagent un chemin gardé unique ; chaque appel traverse ce parcours :
 
 ```mermaid
 flowchart TD
@@ -24,7 +24,10 @@ flowchart TD
   E -- "oui" --> R1
   E -- "non" --> F{"dry_run ?"}
   F -- "oui" --> P["Aperçu renvoyé + audit,<br>rien d'exécuté"]
-  F -- "non" --> X["call_service exécuté + audit"]
+  F -- "non" --> G{"domaine dans<br>confirm_domains ?"}
+  G -- "oui, sans jeton" --> C1["Aperçu + confirm_token<br>à usage unique renvoyés"]
+  G -- "oui, jeton valide" --> X["call_service exécuté + audit"]
+  G -- "non" --> X
 ```
 
 Les lignes d'audit sont en JSON, une par tentative, et sont émises quel que soit le niveau de log configuré. Voir [Journalisation](/fr/reference/logging).
