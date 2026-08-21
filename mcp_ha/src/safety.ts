@@ -54,6 +54,11 @@ export function entityReadVisible(cfg: AddonConfig, entityId: string): boolean {
   return !matchesAny(entityId, cfg.entityDenylist);
 }
 
+/** Writes on these domains require the two-step confirmation (v0.2). */
+export function needsConfirmation(cfg: AddonConfig, domain: string): boolean {
+  return matchesAny(domain, cfg.confirmDomains);
+}
+
 /**
  * Constant-time token comparison. Both values are hashed first so they have
  * the same length, which timingSafeEqual requires.

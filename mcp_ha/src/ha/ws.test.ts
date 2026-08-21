@@ -45,6 +45,7 @@ function makeClient(port: number): HaWsClient {
     entityAllowlist: [],
     entityDenylist: [],
     serviceDenylist: [],
+    confirmDomains: [],
     supervisorToken: null,
     devHaUrl: `http://127.0.0.1:${port}`,
     devHaToken: "dev-token",

@@ -72,6 +72,8 @@ describe("loadConfig", () => {
     expect(cfg.apiToken).toBe("env-token-long-enough");
     expect(cfg.port).toBe(9583);
     expect(cfg.supervisorToken).toBeNull();
+    // v0.2: locks and alarms require confirmation out of the box.
+    expect(cfg.confirmDomains).toEqual(["lock", "alarm_control_panel"]);
   });
 
   it("falls back to defaults when options.json is corrupted (audit F7)", () => {

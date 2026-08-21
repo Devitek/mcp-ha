@@ -2,8 +2,7 @@ import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../context.js";
 import { listEnvelope, safe, trunc } from "../helpers.js";
-import { entityWriteAllowed, serviceAllowed } from "../../safety.js";
-import { audit } from "../../logger.js";
+import { guardedServiceCall } from "../writeflow.js";
 import { parseHaPayload, servicesSchema } from "../../ha/schemas.js";
 
 function fieldSummary(fields: Record<string, any> | undefined) {
@@ -86,7 +85,10 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
         "Calls a Home Assistant service (e.g. light.turn_on on light.kitchen). " +
         "Check the service with ha_list_services and the entity with ha_search_entities first. " +
         "Use dry_run: true to preview the call without executing it. " +
-        "Subject to the allow/deny lists configured in the add-on.",
+        "Subject to the allow/deny lists configured in the add-on. Sensitive domains " +
+        "(confirm_domains option, locks and alarms by default) answer with a confirm_token " +
+        "on the first call: show the preview to the user, then call again with the same " +
+        "arguments plus confirm_token to execute.",
       inputSchema: {
         domain: z.string().describe("Service domain, e.g. light"),
         service: z.string().describe("Service name, e.g. turn_on"),
@@ -101,62 +103,22 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
         // zod 4: z.record requires both the key and the value schema.
         data: z.record(z.string(), z.any()).optional().describe("Service data, e.g. { brightness_pct: 50 }"),
         dry_run: z.boolean().optional().describe("true: preview without executing"),
+        confirm_token: z.string().optional().describe("Token from a previous confirmation_required answer (sensitive domains)"),
         return_response: z.boolean().optional().describe("true when the service returns data (e.g. weather.get_forecasts)"),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
-    safe("ha_call_service", async ({ domain, service, target, data, dry_run, return_response }) => {
-      const dom = domain.toLowerCase().trim();
-      const svc = service.toLowerCase().trim();
-      const deny = (reason: string) => {
-        audit({ tool: "ha_call_service", domain: dom, service: svc, target, allowed: false, reason });
-        throw new Error(`call refused: ${reason}`);
-      };
-
-      const sv = serviceAllowed(ctx.cfg, dom, svc);
-      if (!sv.allowed) deny(sv.reason ?? "service denied");
-
-      // Explicitly targeted entities (target, plus data just in case).
-      const ids: string[] = [];
-      const collect = (v: unknown) => {
-        if (typeof v === "string") ids.push(v);
-        else if (Array.isArray(v)) for (const x of v) if (typeof x === "string") ids.push(x);
-      };
-      collect(target?.entity_id);
-      collect((data as Record<string, unknown> | undefined)?.entity_id);
-
-      for (const id of ids) {
-        const v = entityWriteAllowed(ctx.cfg, id);
-        if (!v.allowed) deny(v.reason ?? `entity denied: ${id}`);
-      }
-
-      // Targeting by area or device would bypass the entity lists: refuse it
-      // as soon as any entity restriction is configured.
-      const hasRestrictions = ctx.cfg.entityAllowlist.length > 0 || ctx.cfg.entityDenylist.length > 0;
-      if (hasRestrictions && (target?.area_id || target?.device_id)) {
-        deny("entity restrictions are configured, target explicit entity_id values instead of area_id or device_id");
-      }
-
-      if (dry_run) {
-        audit({ tool: "ha_call_service", domain: dom, service: svc, target, data, dry_run: true, allowed: true });
-        return {
-          dry_run: true,
-          would_call: { domain: dom, service: svc, target: target ?? null, data: data ?? null },
-          note: "Nothing was executed. Call again without dry_run to execute.",
-        };
-      }
-
-      const payload: Record<string, unknown> = { domain: dom, service: svc };
-      if (target) payload.target = target;
-      if (data) payload.service_data = data;
-      if (return_response) payload.return_response = true;
-
-      const result = await ctx.ws.send("call_service", payload);
-      audit({ tool: "ha_call_service", domain: dom, service: svc, target, data, allowed: true, result: "ok" });
-      return {
-        success: true,
-        ...(result?.response !== undefined ? { response: result.response } : {}),
-      };
-    })
+    safe("ha_call_service", async ({ domain, service, target, data, dry_run, confirm_token, return_response }) =>
+      guardedServiceCall(ctx, {
+        tool: "ha_call_service",
+        domain,
+        service,
+        target,
+        data,
+        dry_run,
+        confirm_token,
+        return_response,
+      })
+    )
   );
 }
