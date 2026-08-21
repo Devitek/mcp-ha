@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.1 - 2026-08-21
+
+- **Hotfix**: on installs upgraded from 0.1.x, saving the configuration failed with "Missing option 'confirm_domains' in root". The Supervisor never injects option keys added by updates into the stored options, so the new required key blocked every save. The add-on now reconciles its stored options at startup (missing keys are added with their defaults, on top of the existing token write-back): restart once after updating and the configuration saves normally. Workaround on 0.2.0: add `confirm_domains: [lock, alarm_control_panel]` manually in the YAML editor.
+
 ## 0.2.0 - 2026-08-21
 
 The write milestone (issue #15).

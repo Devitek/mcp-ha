@@ -56,6 +56,7 @@ Lessons learned from the 2026-08 audit, enforced from now on:
 - **Host-enforced features need a real host.** AppArmor profiles, ingress and anything applied by the Supervisor cannot be validated with `docker run`: test them on a disposable Home Assistant OS VM, never straight on a production instance. For AppArmor and interpreted scripts, grant `rix`, not `ix` alone.
 - **Standalone containers differ from add-ons.** `bashio::config` queries the Supervisor API, not the local file: keep `run.sh` tolerant to a missing Supervisor so dev and CI smoke runs keep working.
 - **Interacting limits are tested together** (e.g. history point caps versus the global response byte cap).
+- **Every new option key needs a migration entry.** The Supervisor materializes defaults into stored user options at install time only and never injects keys added by updates: a newly required schema key bricks every config save on existing installs (issue #81). When adding an option to `config.yaml`, add a matching entry to `OPTION_MIGRATIONS` in `src/index.ts`.
 
 ## Definition of done
 

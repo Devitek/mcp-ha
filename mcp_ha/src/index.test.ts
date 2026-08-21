@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
 import { once } from "node:events";
-import { createHandler, persistGeneratedToken } from "./index.js";
+import { createHandler, reconcileOptions } from "./index.js";
 import { setLogLevel } from "./logger.js";
 import type { AddonConfig } from "./config.js";
 
@@ -140,38 +140,67 @@ describe("HTTP boundary (audit E1)", () => {
   });
 });
 
-describe("persistGeneratedToken (audit C7/E6/F2)", () => {
-  it("does nothing when the token was not generated or no Supervisor", async () => {
+describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
+  /** Stored options of a fully up-to-date install. */
+  const UP_TO_DATE = { log_level: "info", api_token: "user-set-token", confirm_domains: ["lock"] };
+
+  it("does nothing without a Supervisor or when everything is already in place", async () => {
     const post = vi.fn();
     expect(
-      await persistGeneratedToken(cfg({ apiTokenGenerated: false }), { supervisorAvailable: true, supervisorPost: post } as any, [])
+      await reconcileOptions(cfg({ apiTokenGenerated: true }), { supervisorAvailable: false, supervisorPost: post } as any, [])
     ).toBe(false);
-    expect(
-      await persistGeneratedToken(cfg({ apiTokenGenerated: true }), { supervisorAvailable: false, supervisorPost: post } as any, [])
-    ).toBe(false);
+    const http = {
+      supervisorAvailable: true,
+      supervisorGet: vi.fn(async () => ({ options: UP_TO_DATE })),
+      supervisorPost: post,
+    };
+    expect(await reconcileOptions(cfg({ apiTokenGenerated: false }), http as any, [])).toBe(false);
     expect(post).not.toHaveBeenCalled();
   });
 
-  it("merges the freshly read options and adds only api_token", async () => {
+  it("adds the option keys missing from an upgraded install, even without a generated token (#81)", async () => {
+    // Thomas's exact incident: token set long ago, confirm_domains absent,
+    // every config save refused by the Supervisor until the key exists.
+    const http = {
+      supervisorAvailable: true,
+      supervisorGet: vi.fn(async () => ({ options: { log_level: "info", api_token: "user-set-token", allow_write: false } })),
+      supervisorPost: vi.fn(async () => ({})),
+    };
+    expect(await reconcileOptions(cfg({ apiTokenGenerated: false }), http as any, [])).toBe(true);
+    expect(http.supervisorPost).toHaveBeenCalledWith("/addons/self/options", {
+      options: {
+        log_level: "info",
+        api_token: "user-set-token",
+        allow_write: false,
+        confirm_domains: ["lock", "alarm_control_panel"],
+      },
+    });
+  });
+
+  it("merges the generated token and the migrations in a single post", async () => {
     const http = {
       supervisorAvailable: true,
       supervisorGet: vi.fn(async () => ({ options: { log_level: "debug", api_token: "" } })),
       supervisorPost: vi.fn(async () => ({})),
     };
-    const ok = await persistGeneratedToken(cfg({ apiTokenGenerated: true }), http as any, []);
+    const ok = await reconcileOptions(cfg({ apiTokenGenerated: true }), http as any, []);
     expect(ok).toBe(true);
     expect(http.supervisorPost).toHaveBeenCalledWith("/addons/self/options", {
-      options: { log_level: "debug", api_token: "test-token-long-enough" },
+      options: {
+        log_level: "debug",
+        api_token: "test-token-long-enough",
+        confirm_domains: ["lock", "alarm_control_panel"],
+      },
     });
   });
 
-  it("skips the write when the user set a token meanwhile (audit F2 race)", async () => {
+  it("never overwrites a token the user set meanwhile (audit F2 race)", async () => {
     const http = {
       supervisorAvailable: true,
-      supervisorGet: vi.fn(async () => ({ options: { api_token: "user-set-token" } })),
+      supervisorGet: vi.fn(async () => ({ options: UP_TO_DATE })),
       supervisorPost: vi.fn(),
     };
-    expect(await persistGeneratedToken(cfg({ apiTokenGenerated: true }), http as any, [])).toBe(false);
+    expect(await reconcileOptions(cfg({ apiTokenGenerated: true }), http as any, [])).toBe(false);
     expect(http.supervisorPost).not.toHaveBeenCalled();
   });
 
@@ -186,7 +215,7 @@ describe("persistGeneratedToken (audit C7/E6/F2)", () => {
       }),
       supervisorPost: vi.fn(async () => ({})),
     };
-    expect(await persistGeneratedToken(cfg({ apiTokenGenerated: true }), http as any, [1, 1, 1])).toBe(true);
+    expect(await reconcileOptions(cfg({ apiTokenGenerated: true }), http as any, [1, 1, 1])).toBe(true);
     expect(http.supervisorGet).toHaveBeenCalledTimes(3);
   });
 
@@ -198,7 +227,7 @@ describe("persistGeneratedToken (audit C7/E6/F2)", () => {
       }),
       supervisorPost: vi.fn(),
     };
-    expect(await persistGeneratedToken(cfg({ apiTokenGenerated: true }), http as any, [1])).toBe(false);
+    expect(await reconcileOptions(cfg({ apiTokenGenerated: true }), http as any, [1])).toBe(false);
     expect(http.supervisorGet).toHaveBeenCalledTimes(2);
   });
 });
