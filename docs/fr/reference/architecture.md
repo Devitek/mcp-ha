@@ -95,7 +95,7 @@ Pièces, appareils et registre d'entités changent rarement : cache de 60 second
 
 ## Page de statut
 
-`ingress: true` expose une petite page de statut dans la barre latérale de Home Assistant (authentifiée par la session HA, port interne au réseau du conteneur, aucun secret affiché) : version, uptime, état du WebSocket, options actives.
+`ingress: true` expose une page de statut et d'onboarding dans la barre latérale de Home Assistant (authentifiée par la session HA, port interne au réseau du conteneur) : version, uptime, état du WebSocket, options actives, et des configs client prêtes à copier avec le jeton API masqué par défaut (même périmètre de confiance que l'onglet Configuration ; le jeton Supervisor n'y apparaît jamais).
 
 ## Organisation du dépôt
 

@@ -95,7 +95,7 @@ Areas, devices and entity registries change rarely: they are cached for 60 secon
 
 ## Status page
 
-`ingress: true` exposes a small status page in the Home Assistant sidebar (authenticated by the HA session, port internal to the container network, no secret ever displayed): version, uptime, WebSocket state, active options.
+`ingress: true` exposes a status and onboarding page in the Home Assistant sidebar (authenticated by the HA session, port internal to the container network): version, uptime, WebSocket state, active options, and ready-to-copy client configs with the API token masked by default (same trust boundary as the Configuration tab; the Supervisor token never appears).
 
 ## Repository layout
 

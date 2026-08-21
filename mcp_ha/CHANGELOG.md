@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.0 - 2026-08-21
+
+- **Onboarding on the ingress page**: the status page now carries a "Connect a client" section with ready-to-copy configs for Claude Code (`claude mcp add`), Claude Desktop (`mcp-remote`) and Gemini CLI, with the MCP URL derived from the host you browse HA through. The API token is embedded masked on screen (explicit Reveal button; Copy always copies the full working version). Same trust boundary as the Configuration tab: the page only exists behind your authenticated HA session, and the Supervisor token never appears.
+- The page auto-refresh goes from 10 s to 60 s.
+- 186 unit tests.
+
 ## 0.7.0 - 2026-08-21
 
 - **Persistent audit log**: write audit lines are now also mirrored to `/data/audit.log` (JSON lines) so they survive restarts. The file rotates by size (~1 MB, one previous file kept, disk bounded at ~2 MB), writes are asynchronous and never block a request, and stdout behaviour is unchanged. Deliberately, no MCP tool reads or clears the file: read it over SSH.
