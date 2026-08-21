@@ -8,17 +8,13 @@ url: https://github.com/Devitek/mcp-ha
 arch:
   - aarch64
   - amd64
+# startup is left at its default (application, started after HA Core, audit
+# A4) and hassio_role at its default too (least privilege, audit A1): the
+# add-on linter refuses keys that repeat default values.
 init: false
-# application: started after Home Assistant Core, which this add-on talks to
-# from the first second (audit A4).
-startup: application
 image: ghcr.io/devitek/mcp-ha-{arch}
 homeassistant_api: true
-# Least privilege (audit A1): the self endpoints used for the token
-# write-back accept any role, and ha_get_addons degrades with a clear
-# message if "default" turns out to be insufficient for listing.
 hassio_api: true
-hassio_role: default
 ports:
   "9583/tcp": 9583
 ports_description:

@@ -72,7 +72,7 @@ jobs:
           docker build --build-arg BUILD_FROM="$BUILD_FROM" -t mcpha-scan mcp_ha/
 
       - name: Scan de vulnérabilités de l'image (audit E10/D10)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: mcpha-scan
           format: table
