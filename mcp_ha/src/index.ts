@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { existsSync } from "node:fs";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { effectiveTokens, loadConfig, VERSION, type AddonConfig, type ApiToken } from "./config.js";
-import { getLogLevel, log } from "./logger.js";
+import { enableAuditFile, getLogLevel, log } from "./logger.js";
 import { AuthRateLimiter } from "./ratelimit.js";
 import { safeEqual } from "./safety.js";
 import { HaWsClient } from "./ha/ws.js";
@@ -235,6 +236,13 @@ function closeWithGrace(server: Server, graceMs: number): Promise<void> {
 
 async function main(): Promise<void> {
   const cfg = loadConfig();
+
+  // Persist audit lines when /data exists (i.e. inside the add-on); dev mode
+  // outside the container keeps the stdout-only behaviour (#91).
+  if (existsSync("/data")) {
+    enableAuditFile("/data/audit.log");
+    log.debug("Audit lines are mirrored to /data/audit.log (size-rotated).");
+  }
 
   const ws = new HaWsClient(cfg);
   const catalog = new Catalog(ws);
