@@ -10,6 +10,7 @@ All options live in the add-on **Configuration** tab. Restart the add-on after c
 | `api_token` | empty | Primary token (full access) expected from MCP clients in the `Authorization: Bearer ...` header. Leave empty to have one generated on first start (it is saved back into this option). |
 | `api_tokens` | `[]` | Extra named tokens with a scope. See [Named tokens](#named-tokens). |
 | `allow_write` | `false` | Exposes the `ha_call_service` tool. Without it the add-on is strictly read only: no write tool is even visible to the client. |
+| `allow_camera` | `false` | Exposes `ha_get_camera_snapshot` (still images from cameras). Independent from `allow_write`; seeing your home is not acting on it, but it gets its own switch. `filter_reads` and `entity_denylist` still apply. |
 | `filter_reads` | `false` | Also applies `entity_denylist` to reads: denied entities disappear from listings, details, history and logbook. |
 | `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes. When non-empty, writes are deny-by-default. |
 | `entity_denylist` | `[]` | Glob patterns of entities always refused for writes. Wins over the allowlist. |

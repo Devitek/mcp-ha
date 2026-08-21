@@ -38,10 +38,14 @@ export function trunc(s: unknown, max: number): string {
   return `${sliced}… (truncated, ${str.length} chars)`;
 }
 
+export type ToolContent =
+  | { type: "text"; text: string }
+  | { type: "image"; data: string; mimeType: string };
+
 export interface ToolResult {
   // Index signature required for assignability to the SDK CallToolResult.
   [key: string]: unknown;
-  content: Array<{ type: "text"; text: string }>;
+  content: ToolContent[];
   structuredContent?: Record<string, unknown>;
   isError?: boolean;
 }

@@ -91,6 +91,42 @@ export class HaHttp {
     return this.request(this.coreBase() + path, this.coreToken(), { method: "GET" }, false);
   }
 
+  /**
+   * Binary GET (camera snapshots, #86): returns the raw bytes and content
+   * type. Same timeout and one-retry policy as the other GETs; enforces a
+   * byte cap so a huge image cannot blow the client context.
+   */
+  async coreGetBinary(path: string, maxBytes: number): Promise<{ buffer: Buffer; contentType: string }> {
+    const attempt = async (): Promise<{ buffer: Buffer; contentType: string }> => {
+      const res = await fetch(this.coreBase() + path, {
+        method: "GET",
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        headers: { Authorization: `Bearer ${this.coreToken()}` },
+      });
+      if (!res.ok) {
+        const body = await res.text().catch(() => "");
+        const err = new Error(`HTTP ${res.status}: ${body.slice(0, 200) || res.statusText}`);
+        (err as any).status = res.status;
+        throw err;
+      }
+      const buffer = Buffer.from(await res.arrayBuffer());
+      if (buffer.byteLength > maxBytes) {
+        throw new Error(`image too large (${Math.round(buffer.byteLength / 1024)} KB, cap ${Math.round(maxBytes / 1024)} KB)`);
+      }
+      return { buffer, contentType: res.headers.get("content-type") ?? "image/jpeg" };
+    };
+    log.debug(`HTTP GET (binary) ${this.coreBase() + path}`);
+    try {
+      return await attempt();
+    } catch (e: any) {
+      const status: number | undefined = e?.status;
+      const timedOut = e?.name === "TimeoutError" || e?.name === "AbortError";
+      if (!(timedOut || status === undefined || RETRYABLE_STATUS.has(status ?? 0))) throw e;
+      await sleep(RETRY_BASE_DELAY_MS);
+      return attempt();
+    }
+  }
+
   coreGetText(path: string): Promise<string> {
     return this.request(this.coreBase() + path, this.coreToken(), { method: "GET" }, true);
   }

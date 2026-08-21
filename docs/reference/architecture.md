@@ -12,7 +12,7 @@ flowchart LR
   subgraph haos["Home Assistant OS"]
     subgraph addon["mcp-ha add-on"]
       T["Streamable HTTP endpoint /mcp<br/>bearer auth, stateless"]
-      S["MCP server<br/>19 tools + safety layer"]
+      S["MCP server<br/>22 tools + safety layer"]
       W["WebSocket client"]
       H["HTTP client"]
       T --> S

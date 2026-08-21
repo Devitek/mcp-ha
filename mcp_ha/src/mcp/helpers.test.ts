@@ -28,13 +28,13 @@ describe("listEnvelope", () => {
 describe("jsonResult", () => {
   it("passes small responses through unchanged", () => {
     const r = jsonResult({ a: 1 });
-    expect((r.content[0]?.text ?? "")).toBe('{"a":1}');
+    expect((r.content[0] as { text?: string })?.text ?? "").toBe('{"a":1}');
   });
 
   it("truncates oversized responses with a note", () => {
     const huge = { data: "x".repeat(MAX_RESPONSE_BYTES * 2) };
     const r = jsonResult(huge);
-    const parsed = JSON.parse((r.content[0]?.text ?? ""));
+    const parsed = JSON.parse((r.content[0] as { text?: string })?.text ?? "");
     expect(parsed.truncated).toBe(true);
     expect(parsed.note).toContain("Refine");
   });
@@ -42,7 +42,7 @@ describe("jsonResult", () => {
   it("measures the cap in real bytes, not UTF-16 units (audit B14)", () => {
     // 6000 emoji = 12000 UTF-16 units but ~24000 UTF-8 bytes: must truncate.
     const emoji = { data: "🏠".repeat(6000) };
-    const parsed = JSON.parse((jsonResult(emoji).content[0]?.text ?? ""));
+    const parsed = JSON.parse(((jsonResult(emoji).content[0] as { text?: string })?.text ?? ""));
     expect(parsed.truncated).toBe(true);
     // The preview must not end on a lone surrogate half.
     expect(parsed.preview.at(-1)).not.toMatch(/[\uD800-\uDBFF]/);

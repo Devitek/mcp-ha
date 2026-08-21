@@ -1,6 +1,6 @@
 # Tool reference
 
-19 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+22 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -123,6 +123,22 @@ Recorder aggregates (mean, min, max, sum) for numeric sensors. `statistic_id` (s
 ### ha_get_logbook
 
 Human-readable events, filterable by `entity_id`, window from 0.25 h up to 7 days, capped at 100 events.
+
+## Calendar and to-do
+
+### ha_get_calendar
+
+Without `entity_id`: lists the calendar entities. With `entity_id`: events over a window (`hours` default 24, max 720, or `start`/`end` ISO 8601).
+
+### ha_get_todo_list
+
+Without `entity_id`: lists the to-do entities. With `entity_id`: the items on that list (optional `status` filter). Read only, via `todo.get_items`.
+
+## Cameras
+
+### ha_get_camera_snapshot <Badge type="tip" text="opt-in" />
+
+Returns the current still image of a `camera.*` entity as an MCP image, so the assistant can describe what it sees. Registered only when the `allow_camera` option is enabled (independent from `allow_write`); `filter_reads` and `entity_denylist` still apply, and every snapshot is audited.
 
 ## Add-ons and system
 

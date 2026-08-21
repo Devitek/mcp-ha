@@ -13,6 +13,7 @@ function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     apiToken: "test-token-long-enough",
     apiTokenGenerated: false,
     allowWrite: false,
+    allowCamera: false,
     filterReads: false,
     entityAllowlist: [],
     entityDenylist: [],
@@ -136,7 +137,7 @@ describe("HTTP boundary (audit E1)", () => {
       body: rpc("tools/list", undefined, 2),
     });
     const tools = ((await list.json()) as any).result.tools.map((t: any) => t.name);
-    expect(tools).toHaveLength(15);
+    expect(tools).toHaveLength(17); // 15 core read + calendar + todo
     expect(tools).not.toContain("ha_call_service");
   });
 });
@@ -170,7 +171,7 @@ describe("scoped named tokens (#85)", () => {
     expect(await toolNames(base, "write-token-16chars-x")).toContain("ha_run_script");
     // named read token: allow_write is on, but the scope forbids writes
     const readTools = await toolNames(base, "read-token-16chars-xx");
-    expect(readTools).toHaveLength(15);
+    expect(readTools).toHaveLength(17);
     expect(readTools).not.toContain("ha_call_service");
     expect(readTools).not.toContain("ha_run_script");
   });
@@ -256,7 +257,7 @@ describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
 
 describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
   /** Stored options of a fully up-to-date install (all migration keys present). */
-  const UP_TO_DATE = { log_level: "info", api_token: "user-set-token", confirm_domains: ["lock"], api_tokens: [] };
+  const UP_TO_DATE = { log_level: "info", api_token: "user-set-token", confirm_domains: ["lock"], api_tokens: [], allow_camera: false };
 
   it("does nothing without a Supervisor or when everything is already in place", async () => {
     const post = vi.fn();
@@ -288,6 +289,7 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
         allow_write: false,
         confirm_domains: ["lock", "alarm_control_panel"],
         api_tokens: [],
+        allow_camera: false,
       },
     });
   });
@@ -306,6 +308,7 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
         api_token: "test-token-long-enough",
         confirm_domains: ["lock", "alarm_control_panel"],
         api_tokens: [],
+        allow_camera: false,
       },
     });
   });

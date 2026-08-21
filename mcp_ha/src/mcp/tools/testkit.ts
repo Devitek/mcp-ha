@@ -41,6 +41,7 @@ export function testCfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     apiToken: "t",
     apiTokenGenerated: false,
     allowWrite: false,
+    allowCamera: false,
     filterReads: false,
     entityAllowlist: [],
     entityDenylist: [],

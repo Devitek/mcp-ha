@@ -4,7 +4,7 @@ import { z } from "zod";
 import { log, setLogLevel } from "./logger.js";
 import { maskSecret } from "./safety.js";
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.5.0";
 
 const OPTIONS_PATH = "/data/options.json";
 const TOKEN_PATH = "/data/token";
@@ -35,6 +35,8 @@ export interface AddonConfig {
   /** Extra named tokens with a scope, on top of the primary api_token (#85). */
   apiTokens: ApiToken[];
   allowWrite: boolean;
+  /** Exposes ha_get_camera_snapshot; independent from allowWrite (#86). */
+  allowCamera: boolean;
   filterReads: boolean;
   entityAllowlist: string[];
   entityDenylist: string[];
@@ -58,6 +60,7 @@ const optionsSchema = z
     log_level: z.string().default("info"),
     api_token: z.string().default(""),
     allow_write: z.boolean().default(false),
+    allow_camera: z.boolean().default(false),
     filter_reads: z.boolean().default(false),
     entity_allowlist: z.array(z.string()).default([]),
     entity_denylist: z.array(z.string()).default([]),
@@ -146,6 +149,7 @@ export function loadConfig(): AddonConfig {
     apiTokenGenerated,
     apiTokens,
     allowWrite: opts.allow_write || process.env.MCP_ALLOW_WRITE === "true",
+    allowCamera: opts.allow_camera,
     filterReads: opts.filter_reads,
     entityAllowlist: opts.entity_allowlist.filter((s) => s.trim().length > 0),
     entityDenylist: opts.entity_denylist.filter((s) => s.trim().length > 0),
