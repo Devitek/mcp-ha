@@ -8,9 +8,17 @@ configuration:
   api_token:
     name: Jeton API
     description: >-
-      Jeton attendu dans l'en-tête Authorization des clients MCP. Laissez
-      vide pour en générer un au premier démarrage : il est alors reporté
-      dans cette option. Le journal n'affiche jamais qu'un préfixe masqué.
+      Jeton principal (accès complet) attendu dans l'en-tête Authorization
+      des clients MCP. Laissez vide pour en générer un au premier démarrage :
+      il est alors reporté dans cette option. Le journal n'affiche jamais
+      qu'un préfixe masqué.
+  api_tokens:
+    name: Jetons nommés
+    description: >-
+      Jetons supplémentaires avec un nom et une portée (read ou write), en
+      plus du jeton principal. Donnez un jeton en lecture seule à un client
+      expérimental, un jeton d'écriture à votre assistant principal. Le nom
+      du jeton apparaît dans le journal d'audit des écritures.
   allow_write:
     name: Autoriser l'écriture
     description: >-

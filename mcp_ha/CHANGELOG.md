@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0 - 2026-08-21
+
+- **Named tokens with scopes** (new `api_tokens` option): on top of the full-access primary token, configure extra tokens with a name and a `read` or `write` scope. A read token never sees the write tools; a write token behaves like the primary one. Give read-only access to an experimental client and write access to your main assistant.
+- **Nominative audit**: every write audit line now carries the name of the token that made the call, so you know which client acted.
+- 164 unit tests.
+
 ## 0.3.0 - 2026-08-21
 
 The comfort milestone (issue #79).

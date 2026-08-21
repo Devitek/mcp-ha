@@ -73,9 +73,10 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
     })
   );
 
-  // Write tool: only registered when allow_write is enabled. Invisible
-  // otherwise, that is the first layer of defense.
-  if (!ctx.cfg.allowWrite) return;
+  // Write tool: only registered when allow_write is enabled AND the
+  // authenticated token has the write scope (#85). Invisible otherwise,
+  // that is the first layer of defense.
+  if (!ctx.cfg.allowWrite || ctx.canWrite === false) return;
 
   server.registerTool(
     "ha_call_service",

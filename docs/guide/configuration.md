@@ -7,13 +7,35 @@ All options live in the add-on **Configuration** tab. Restart the add-on after c
 | Option | Default | Description |
 |--------|---------|-------------|
 | `log_level` | `info` | Log verbosity: `trace`, `debug`, `info`, `notice`, `warning`, `error`, `fatal`. See [Logging](/reference/logging). |
-| `api_token` | empty | Token expected from MCP clients in the `Authorization: Bearer ...` header. Leave empty to have one generated on first start (it is saved back into this option). |
+| `api_token` | empty | Primary token (full access) expected from MCP clients in the `Authorization: Bearer ...` header. Leave empty to have one generated on first start (it is saved back into this option). |
+| `api_tokens` | `[]` | Extra named tokens with a scope. See [Named tokens](#named-tokens). |
 | `allow_write` | `false` | Exposes the `ha_call_service` tool. Without it the add-on is strictly read only: no write tool is even visible to the client. |
 | `filter_reads` | `false` | Also applies `entity_denylist` to reads: denied entities disappear from listings, details, history and logbook. |
 | `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes. When non-empty, writes are deny-by-default. |
 | `entity_denylist` | `[]` | Glob patterns of entities always refused for writes. Wins over the allowlist. |
 | `service_denylist` | see below | Services refused in any context. |
 | `confirm_domains` | `[lock, alarm_control_panel]` | Writes on these domains require a two-step confirmation: the assistant first gets a preview and a single-use token, and must call again with it to execute. |
+
+## Named tokens
+
+The single `api_token` grants full access. To give different clients different rights, add named tokens with a scope:
+
+```yaml
+api_tokens:
+  - name: main-assistant
+    token: <a long random string>
+    scope: write
+  - name: dashboard
+    token: <another long random string>
+    scope: read
+```
+
+- `scope: read` sees only the 15 read tools; the write tools are not even registered for that token.
+- `scope: write` behaves like the primary token (subject to `allow_write` and all the lists).
+- The **token name appears in the write audit log**, so you know which client acted.
+- Generate strong values yourself (32+ hex chars); a token shorter than 16 characters triggers a startup warning.
+
+The primary `api_token` keeps working alongside these and always has full access.
 
 ## Glob patterns
 

@@ -32,9 +32,10 @@ export async function guardedServiceCall(ctx: ToolContext, req: WriteRequest): P
   const dom = req.domain.toLowerCase().trim();
   const svc = req.service.toLowerCase().trim();
   const { cfg } = ctx;
+  const client = ctx.client ?? "default";
 
   const deny = (reason: string): never => {
-    audit({ tool: req.tool, domain: dom, service: svc, target: req.target, allowed: false, reason });
+    audit({ client, tool: req.tool, domain: dom, service: svc, target: req.target, allowed: false, reason });
     throw new Error(`call refused: ${reason}`);
   };
 
@@ -65,7 +66,7 @@ export async function guardedServiceCall(ctx: ToolContext, req: WriteRequest): P
   const wouldCall = { domain: dom, service: svc, target: req.target ?? null, data: req.data ?? null };
 
   if (req.dry_run) {
-    audit({ tool: req.tool, domain: dom, service: svc, target: req.target, data: req.data, dry_run: true, allowed: true });
+    audit({ client, tool: req.tool, domain: dom, service: svc, target: req.target, data: req.data, dry_run: true, allowed: true });
     return {
       dry_run: true,
       would_call: wouldCall,
@@ -79,7 +80,7 @@ export async function guardedServiceCall(ctx: ToolContext, req: WriteRequest): P
     const hash = ConfirmationStore.fingerprint({ domain: dom, service: svc, target: req.target, data: req.data });
     if (!req.confirm_token) {
       const token = ctx.confirmations.issue(hash);
-      audit({ tool: req.tool, domain: dom, service: svc, target: req.target, allowed: true, confirmation_required: true });
+      audit({ client, tool: req.tool, domain: dom, service: svc, target: req.target, allowed: true, confirmation_required: true });
       return {
         confirmation_required: true,
         confirm_token: token,
@@ -100,7 +101,7 @@ export async function guardedServiceCall(ctx: ToolContext, req: WriteRequest): P
   if (req.return_response) payload.return_response = true;
 
   const result = await ctx.ws.send("call_service", payload);
-  audit({ tool: req.tool, domain: dom, service: svc, target: req.target, data: req.data, allowed: true, result: "ok" });
+  audit({ client, tool: req.tool, domain: dom, service: svc, target: req.target, data: req.data, allowed: true, result: "ok" });
   return {
     success: true,
     ...(result?.response !== undefined ? { response: result.response } : {}),

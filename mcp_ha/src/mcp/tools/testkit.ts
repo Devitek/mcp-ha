@@ -46,6 +46,7 @@ export function testCfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     entityDenylist: [],
     serviceDenylist: [],
     confirmDomains: [],
+    apiTokens: [],
     supervisorToken: null,
     devHaUrl: null,
     devHaToken: null,
@@ -74,6 +75,8 @@ export function fakeCtx(partial: any = {}): ToolContext {
       ...(partial.catalog ?? {}),
     },
     confirmations: partial.confirmations ?? new ConfirmationStore(),
+    ...(partial.client !== undefined ? { client: partial.client } : {}),
+    ...(partial.canWrite !== undefined ? { canWrite: partial.canWrite } : {}),
   } as unknown as ToolContext;
 }
 

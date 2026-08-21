@@ -153,6 +153,18 @@ describe("ha_call_service safety matrix", () => {
     expect(auditLines()).toContainEqual(expect.objectContaining({ dry_run: true, allowed: true }));
   });
 
+  it("stamps the authenticated client name on the audit line (#85)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => ({ context: {} })) };
+    registerServiceTools(server, fakeCtx({ cfg: { allowWrite: true }, ws, client: "writer" }));
+    await callTool(tools, "ha_call_service", {
+      domain: "light",
+      service: "turn_on",
+      target: { entity_id: "light.kitchen" },
+    });
+    expect(auditLines()).toContainEqual(expect.objectContaining({ client: "writer", allowed: true }));
+  });
+
   it("executes an allowed call and audits the success", async () => {
     const { tools, ws } = setup({ allowWrite: true, entityAllowlist: ["light.*"] });
     const res = await callTool(tools, "ha_call_service", {

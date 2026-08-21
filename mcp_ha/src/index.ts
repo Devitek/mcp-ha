@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { loadConfig, VERSION, type AddonConfig } from "./config.js";
+import { effectiveTokens, loadConfig, VERSION, type AddonConfig, type ApiToken } from "./config.js";
 import { getLogLevel, log } from "./logger.js";
 import { AuthRateLimiter } from "./ratelimit.js";
 import { safeEqual } from "./safety.js";
@@ -59,9 +59,16 @@ function rpcError(res: ServerResponse, status: number, code: number, message: st
  * The HTTP request handler, extracted from main() so the authentication and
  * transport boundary is testable by injection (see index.test.ts).
  */
+/** Matches the presented bearer against every accepted token (#85). */
+function authenticate(presented: string, tokens: ApiToken[]): ApiToken | null {
+  for (const t of tokens) if (safeEqual(presented, t.token)) return t;
+  return null;
+}
+
 export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const { cfg, ws } = ctx;
   const limiter = new AuthRateLimiter();
+  const tokens = effectiveTokens(cfg);
   return async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
 
@@ -101,21 +108,25 @@ export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: Ser
 
     const auth = req.headers.authorization ?? "";
     const presented = auth.match(/^Bearer\s+(.+)$/i)?.[1];
-    if (!presented || !safeEqual(presented.trim(), cfg.apiToken)) {
+    const identity = presented ? authenticate(presented.trim(), tokens) : null;
+    if (!identity) {
       const blocked = limiter.fail(ip);
       log.notice(`Unauthorized MCP request from ${ip}${blocked > 0 ? ` (blocked ${blocked} ms)` : ""}`);
       rpcError(res, 401, -32001, "unauthorized", { "WWW-Authenticate": "Bearer" });
       return;
     }
     limiter.succeed(ip);
+    // Per-request context carries the authenticated identity and its scope:
+    // a read-scoped token never sees the write tools (#85).
+    const reqCtx: ToolContext = { ...ctx, canWrite: identity.scope === "write", client: identity.name };
 
     try {
       const body = await readJsonBody(req);
-      log.debug(`MCP request from ${req.socket.remoteAddress ?? "unknown"}`);
+      log.debug(`MCP request from ${ip} as "${identity.name}" (${identity.scope})`);
       // Stateless mode: one server and one transport per request, no session
       // (sessionIdGenerator left undefined). The SDK types are not
       // exactOptionalPropertyTypes-clean, hence the connect cast.
-      const server = buildServer(ctx);
+      const server = buildServer(reqCtx);
       const transport = new StreamableHTTPServerTransport({
         enableJsonResponse: true,
       });
@@ -149,6 +160,7 @@ export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: Ser
  */
 const OPTION_MIGRATIONS: Array<{ key: string; value: unknown }> = [
   { key: "confirm_domains", value: ["lock", "alarm_control_panel"] },
+  { key: "api_tokens", value: [] },
 ];
 
 /**
