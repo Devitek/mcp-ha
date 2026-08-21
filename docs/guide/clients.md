@@ -53,6 +53,10 @@ In `~/.gemini/settings.json`:
 
 Anything that supports MCP over Streamable HTTP works the same way: endpoint `http://HA_IP:9583/mcp`, header `Authorization: Bearer YOUR_TOKEN`. The server is stateless: no session negotiation, each POST is independent.
 
+## From outside your network
+
+The examples above assume the client is on your LAN. To reach the add-on from a phone or the claude.ai / Gemini web connectors, set up an authenticated HTTPS tunnel: see [Remote access](/guide/remote-access). Never port-forward 9583 directly.
+
 ## First prompts to try
 
 - "Which lights are on right now?"

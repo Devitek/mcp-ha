@@ -12,7 +12,7 @@ Giving an LLM access to your home automation is not a trivial decision. This doc
 
 **What we do not protect against (out of scope):**
 
-- Internet exposure. The add-on speaks plain HTTP with a static token: it is a LAN design. For remote access, use a VPN (WireGuard, Tailscale...), not a port forward.
+- Internet exposure. The add-on speaks plain HTTP with a static token: it is a LAN design. For remote access, use an authenticated tunnel (Tailscale, Cloudflare Tunnel with Access), never a port forward. See the [Remote access guide](https://devitek.github.io/mcp-ha/guide/remote-access).
 - An attacker already on your LAN sniffing traffic (no TLS).
 - A legitimate MCP user requesting allowed but regrettable actions. Allowlists bound the blast radius, not the intent.
 
