@@ -1,5 +1,9 @@
 # Dépannage
 
+## « Failed to save: Missing option '...' in root »
+
+La sauvegarde de la configuration échoue juste après une mise à jour qui a introduit une nouvelle option. Le Supervisor matérialise les défauts dans vos options stockées à l'installation seulement et n'injecte jamais les clés ajoutées par les mises à jour : une nouvelle clé requise par le schéma bloque alors toute sauvegarde. Depuis la 0.2.1, l'add-on réconcilie ses options stockées au démarrage : redémarrez-le une fois et sauvegardez à nouveau. Sur une version antérieure, ajoutez la clé manquante à la main dans l'éditeur YAML (ex. `confirm_domains: [lock, alarm_control_panel]`) en même temps que votre changement.
+
 ## Jeton API perdu
 
 Il est visible dans l'onglet **Configuration** de l'add-on (option `api_token`) et conservé dans `/data/token`. Le journal ne le montre jamais en entier, seulement un préfixe masqué. Si l'option semble vide, redémarrez l'add-on : le report y est retenté à chaque démarrage. Pour forcer un nouveau jeton : videz l'option, supprimez `/data/token`, redémarrez.

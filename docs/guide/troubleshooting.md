@@ -1,5 +1,9 @@
 # Troubleshooting
 
+## "Failed to save: Missing option '...' in root"
+
+Saving the configuration fails right after an update that introduced a new option. The Supervisor materializes defaults into your stored options at install time only and never injects keys added by updates, so a new key the schema requires blocks every save. Since 0.2.1 the add-on reconciles its stored options at startup: restart it once and save again. On an older version, add the missing key manually in the YAML editor (e.g. `confirm_domains: [lock, alarm_control_panel]`) together with your change.
+
 ## Lost API token
 
 It is visible in the add-on **Configuration** tab (`api_token` option) and kept in `/data/token`. The log never shows it in full, only a masked prefix. If the option looks empty, restart the add-on: the write-back is retried at every start. To force a new token: clear the option, delete `/data/token`, restart.
