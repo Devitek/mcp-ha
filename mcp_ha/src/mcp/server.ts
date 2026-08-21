@@ -8,6 +8,8 @@ import { registerAutomationTools } from "./tools/automations.js";
 import { registerHistoryTools } from "./tools/history.js";
 import { registerAddonTools } from "./tools/addons.js";
 import { registerSystemTools } from "./tools/system.js";
+import { registerCameraTools } from "./tools/camera.js";
+import { registerCalendarTools } from "./tools/calendar.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
 
@@ -33,6 +35,8 @@ export function buildServer(ctx: ToolContext): McpServer {
   registerHistoryTools(server, ctx);
   registerAddonTools(server, ctx);
   registerSystemTools(server, ctx);
+  registerCameraTools(server, ctx);
+  registerCalendarTools(server, ctx);
   registerResources(server, ctx);
   registerPrompts(server);
   return server;

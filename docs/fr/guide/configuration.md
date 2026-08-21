@@ -10,6 +10,7 @@ Toutes les options se trouvent dans l'onglet **Configuration** de l'add-on. Red�
 | `api_token` | vide | Jeton principal (accès complet) attendu des clients MCP dans l'en-tête `Authorization: Bearer ...`. Laissez vide pour en générer un au premier démarrage (il est reporté dans cette option). |
 | `api_tokens` | `[]` | Jetons nommés supplémentaires avec une portée. Voir [Jetons nommés](#jetons-nommes). |
 | `allow_write` | `false` | Expose l'outil `ha_call_service`. Sans lui, l'add-on est strictement en lecture seule : aucun outil d'écriture n'est même visible du client. |
+| `allow_camera` | `false` | Expose `ha_get_camera_snapshot` (images fixes de caméras). Indépendant de `allow_write` ; voir chez soi n'est pas agir chez soi, mais mérite son propre interrupteur. `filter_reads` et `entity_denylist` s'appliquent toujours. |
 | `filter_reads` | `false` | Applique aussi `entity_denylist` aux lectures : les entités masquées disparaissent des listes, du détail, de l'historique et du logbook. |
 | `entity_allowlist` | `[]` | Motifs glob des entités autorisées à l'écriture. Non vide, l'écriture devient interdite par défaut. |
 | `entity_denylist` | `[]` | Motifs glob des entités toujours refusées à l'écriture. Gagne sur la liste blanche. |

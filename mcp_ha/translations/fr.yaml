@@ -24,6 +24,12 @@ configuration:
     description: >-
       Expose l'outil ha_call_service qui permet à l'assistant d'appeler des
       services Home Assistant. Désactivé, l'add-on est en lecture seule.
+  allow_camera:
+    name: Autoriser les captures caméra
+    description: >-
+      Expose l'outil ha_get_camera_snapshot pour que l'assistant voie une
+      image fixe d'une caméra. Indépendant de allow_write. Les caméras
+      masquées (filter_reads / entity_denylist) restent exclues.
   filter_reads:
     name: Filtrer aussi les lectures
     description: >-

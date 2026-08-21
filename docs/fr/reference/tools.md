@@ -1,6 +1,6 @@
 # Référence des outils
 
-19 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+22 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -123,6 +123,22 @@ Agrégats du recorder (moyenne, min, max, somme) pour les capteurs numériques. 
 ### ha_get_logbook
 
 Événements lisibles, filtrables par `entity_id`, fenêtre de 0.25 h à 7 jours, plafonné à 100 événements.
+
+## Calendrier et todo
+
+### ha_get_calendar
+
+Sans `entity_id` : liste les entités calendrier. Avec `entity_id` : les événements sur une fenêtre (`hours` défaut 24, max 720, ou `start`/`end` en ISO 8601).
+
+### ha_get_todo_list
+
+Sans `entity_id` : liste les entités todo. Avec `entity_id` : les éléments de la liste (filtre `status` optionnel). Lecture seule, via `todo.get_items`.
+
+## Caméras
+
+### ha_get_camera_snapshot <Badge type="tip" text="opt-in" />
+
+Renvoie l'image fixe courante d'une entité `camera.*` sous forme d'image MCP, pour que l'assistant décrive ce qu'il voit. Enregistré uniquement quand l'option `allow_camera` est active (indépendante de `allow_write`) ; `filter_reads` et `entity_denylist` s'appliquent toujours, et chaque capture est auditée.
 
 ## Add-ons et système
 

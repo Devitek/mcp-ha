@@ -161,6 +161,7 @@ export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: Ser
 const OPTION_MIGRATIONS: Array<{ key: string; value: unknown }> = [
   { key: "confirm_domains", value: ["lock", "alarm_control_panel"] },
   { key: "api_tokens", value: [] },
+  { key: "allow_camera", value: false },
 ];
 
 /**

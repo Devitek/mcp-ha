@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.0 - 2026-08-21
+
+- **Camera snapshots** (new `allow_camera` option, off by default and independent from `allow_write`): `ha_get_camera_snapshot` returns the current still image of a camera as an MCP image, so the assistant can describe what it sees. `filter_reads` and `entity_denylist` still apply, and every snapshot is audited. Images above 4 MB are refused (no resize dependency).
+- **Calendar and to-do**: `ha_get_calendar` (events over a bounded window, or the list of calendars) and `ha_get_todo_list` (list items via `todo.get_items`, or the list of to-do entities). Both read only.
+- 22 tools total (18 read including calendar/to-do/camera, 4 guarded write). 173 unit tests.
+
 ## 0.4.0 - 2026-08-21
 
 - **Named tokens with scopes** (new `api_tokens` option): on top of the full-access primary token, configure extra tokens with a name and a `read` or `write` scope. A read token never sees the write tools; a write token behaves like the primary one. Give read-only access to an experimental client and write access to your main assistant.

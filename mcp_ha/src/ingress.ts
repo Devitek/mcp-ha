@@ -32,12 +32,16 @@ export function createIngressHandler(
     const wsBadge = ws.connected
       ? '<span class="ok">connected</span>'
       : `<span class="ko">down${downFor !== null ? ` for ${fmtUptime(downFor)}` : ""}</span>`;
-    const toolCount = cfg.allowWrite ? 19 : 15;
+    // 15 core read tools + 2 calendar/todo, plus camera and the write tools
+    // depending on the options.
+    const readTools = 17 + (cfg.allowCamera ? 1 : 0);
+    const writeTools = cfg.allowWrite ? 4 : 0;
+    const toolBreakdown = `${readTools + writeTools} (${readTools} read${writeTools ? ` + ${writeTools} write` : ""})`;
     const rows: Array<[string, string]> = [
       ["Version", esc(VERSION)],
       ["Uptime", fmtUptime(Date.now() - startedAt)],
       ["Home Assistant WebSocket", wsBadge],
-      ["MCP tools", `${toolCount} (${cfg.allowWrite ? "15 read + 4 write" : "read only"})`],
+      ["MCP tools", toolBreakdown],
       ["MCP resources / prompts", "3 / 2"],
       ["allow_write", cfg.allowWrite ? '<span class="warn">enabled</span>' : "disabled"],
       ["filter_reads", cfg.filterReads ? "enabled" : "disabled"],

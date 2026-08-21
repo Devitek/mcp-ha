@@ -23,6 +23,12 @@ configuration:
     description: >-
       Exposes the ha_call_service tool so the assistant can call Home
       Assistant services. When disabled the add-on is read only.
+  allow_camera:
+    name: Allow camera snapshots
+    description: >-
+      Exposes the ha_get_camera_snapshot tool so the assistant can see a
+      still image from a camera. Independent from allow_write. Denied
+      cameras (filter_reads / entity_denylist) still apply.
   filter_reads:
     name: Filter reads too
     description: >-

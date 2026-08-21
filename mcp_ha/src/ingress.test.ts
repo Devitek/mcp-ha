@@ -50,7 +50,7 @@ describe("ingress status page (v0.3 #79)", () => {
     const html = await r.text();
     expect(r.status).toBe(200);
     expect(html).toContain("MCP Home Assistant");
-    expect(html).toContain("19 (15 read + 4 write)");
+    expect(html).toContain("21 (17 read + 4 write)");
     expect(html).toContain("lock");
     expect(html).not.toContain(SECRET);
     expect(html).not.toContain("sup-secret");
