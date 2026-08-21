@@ -18,6 +18,7 @@ function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     entityDenylist: [],
     serviceDenylist: [],
     confirmDomains: [],
+    apiTokens: [],
     supervisorToken: "sup",
     devHaUrl: null,
     devHaToken: null,
@@ -140,6 +141,51 @@ describe("HTTP boundary (audit E1)", () => {
   });
 });
 
+describe("scoped named tokens (#85)", () => {
+  const toolNames = async (base: string, token: string) => {
+    const r = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", Authorization: `Bearer ${token}` },
+      body: rpc("tools/list"),
+    });
+    return ((await r.json()) as any).result.tools.map((t: any) => t.name);
+  };
+
+  it("accepts a named write token and shows the write tools, but a read token does not", async () => {
+    const base = await startServer(
+      fakeCtx({
+        cfg: {
+          allowWrite: true,
+          apiToken: "test-token-long-enough",
+          apiTokens: [
+            { name: "writer", token: "write-token-16chars-x", scope: "write" },
+            { name: "reader", token: "read-token-16chars-xx", scope: "read" },
+          ],
+        },
+      })
+    );
+    // default (primary) token is write scope
+    expect(await toolNames(base, "test-token-long-enough")).toContain("ha_call_service");
+    // named write token
+    expect(await toolNames(base, "write-token-16chars-x")).toContain("ha_run_script");
+    // named read token: allow_write is on, but the scope forbids writes
+    const readTools = await toolNames(base, "read-token-16chars-xx");
+    expect(readTools).toHaveLength(15);
+    expect(readTools).not.toContain("ha_call_service");
+    expect(readTools).not.toContain("ha_run_script");
+  });
+
+  it("rejects a token that matches none of the configured ones", async () => {
+    const base = await startServer(fakeCtx({ cfg: { apiTokens: [{ name: "x", token: "known-token-16chars-x", scope: "read" }] } }));
+    const r = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", Authorization: "Bearer wrong-token" },
+      body: rpc("tools/list"),
+    });
+    expect(r.status).toBe(401);
+  });
+});
+
 describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
   it("lists and reads the three resources", async () => {
     const ctx = fakeCtx({
@@ -209,8 +255,8 @@ describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
 });
 
 describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
-  /** Stored options of a fully up-to-date install. */
-  const UP_TO_DATE = { log_level: "info", api_token: "user-set-token", confirm_domains: ["lock"] };
+  /** Stored options of a fully up-to-date install (all migration keys present). */
+  const UP_TO_DATE = { log_level: "info", api_token: "user-set-token", confirm_domains: ["lock"], api_tokens: [] };
 
   it("does nothing without a Supervisor or when everything is already in place", async () => {
     const post = vi.fn();
@@ -241,6 +287,7 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
         api_token: "user-set-token",
         allow_write: false,
         confirm_domains: ["lock", "alarm_control_panel"],
+        api_tokens: [],
       },
     });
   });
@@ -258,6 +305,7 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
         log_level: "debug",
         api_token: "test-token-long-enough",
         confirm_domains: ["lock", "alarm_control_panel"],
+        api_tokens: [],
       },
     });
   });

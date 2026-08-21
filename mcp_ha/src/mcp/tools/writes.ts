@@ -11,7 +11,8 @@ import { guardedServiceCall } from "../writeflow.js";
  * confirmation, audit). Only registered when allow_write is enabled.
  */
 export function registerWriteTools(server: McpServer, ctx: ToolContext): void {
-  if (!ctx.cfg.allowWrite) return;
+  // Gated by allow_write and by the token scope (#85).
+  if (!ctx.cfg.allowWrite || ctx.canWrite === false) return;
 
   const requireDomain = (entityId: string, domain: string): void => {
     if (!entityId.startsWith(`${domain}.`)) {

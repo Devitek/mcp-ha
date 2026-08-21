@@ -8,9 +8,16 @@ configuration:
   api_token:
     name: API token
     description: >-
-      Token expected in the Authorization header of MCP clients. Leave empty
-      to generate one on first start: it is then saved back into this option.
-      The log only ever shows a masked prefix of it.
+      Primary token (full access) expected in the Authorization header of MCP
+      clients. Leave empty to generate one on first start: it is then saved
+      back into this option. The log only ever shows a masked prefix of it.
+  api_tokens:
+    name: Named tokens
+    description: >-
+      Extra tokens with a name and a scope (read or write), on top of the
+      primary token. Give a read-only token to an experimental client, a
+      write token to your main assistant. The token name appears in the
+      write audit log.
   allow_write:
     name: Allow write
     description: >-

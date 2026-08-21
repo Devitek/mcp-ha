@@ -11,4 +11,11 @@ export interface ToolContext {
   http: HaHttp;
   catalog: Catalog;
   confirmations: ConfirmationStore;
+  /**
+   * Per-request: whether the authenticated token may write (#85). Undefined
+   * means "yes" for backward compatibility with the single-token setup.
+   */
+  canWrite?: boolean;
+  /** Per-request: name of the authenticated token, for the audit trail (#85). */
+  client?: string;
 }

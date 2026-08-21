@@ -7,13 +7,35 @@ Toutes les options se trouvent dans l'onglet **Configuration** de l'add-on. Red�
 | Option | Défaut | Description |
 |--------|--------|-------------|
 | `log_level` | `info` | Verbosité du journal : `trace`, `debug`, `info`, `notice`, `warning`, `error`, `fatal`. Voir [Journalisation](/fr/reference/logging). |
-| `api_token` | vide | Jeton attendu des clients MCP dans l'en-tête `Authorization: Bearer ...`. Laissez vide pour en générer un au premier démarrage (il est reporté dans cette option). |
+| `api_token` | vide | Jeton principal (accès complet) attendu des clients MCP dans l'en-tête `Authorization: Bearer ...`. Laissez vide pour en générer un au premier démarrage (il est reporté dans cette option). |
+| `api_tokens` | `[]` | Jetons nommés supplémentaires avec une portée. Voir [Jetons nommés](#jetons-nommes). |
 | `allow_write` | `false` | Expose l'outil `ha_call_service`. Sans lui, l'add-on est strictement en lecture seule : aucun outil d'écriture n'est même visible du client. |
 | `filter_reads` | `false` | Applique aussi `entity_denylist` aux lectures : les entités masquées disparaissent des listes, du détail, de l'historique et du logbook. |
 | `entity_allowlist` | `[]` | Motifs glob des entités autorisées à l'écriture. Non vide, l'écriture devient interdite par défaut. |
 | `entity_denylist` | `[]` | Motifs glob des entités toujours refusées à l'écriture. Gagne sur la liste blanche. |
 | `service_denylist` | voir plus bas | Services refusés quel que soit le contexte. |
 | `confirm_domains` | `[lock, alarm_control_panel]` | Les écritures sur ces domaines exigent une confirmation en deux temps : l'assistant reçoit d'abord un aperçu et un jeton à usage unique, et doit rappeler avec pour exécuter. |
+
+## Jetons nommés
+
+L'unique `api_token` donne un accès complet. Pour accorder des droits différents à des clients différents, ajoutez des jetons nommés avec une portée :
+
+```yaml
+api_tokens:
+  - name: assistant-principal
+    token: <une longue chaîne aléatoire>
+    scope: write
+  - name: tableau-de-bord
+    token: <une autre longue chaîne aléatoire>
+    scope: read
+```
+
+- `scope: read` ne voit que les 15 outils de lecture ; les outils d'écriture ne sont même pas enregistrés pour ce jeton.
+- `scope: write` se comporte comme le jeton principal (soumis à `allow_write` et à toutes les listes).
+- Le **nom du jeton apparaît dans le journal d'audit des écritures**, vous savez donc quel client a agi.
+- Générez vous-même des valeurs solides (32+ caractères hex) ; un jeton de moins de 16 caractères déclenche un avertissement au démarrage.
+
+Le jeton principal `api_token` continue de fonctionner en parallèle et garde toujours l'accès complet.
 
 ## Motifs glob
 
