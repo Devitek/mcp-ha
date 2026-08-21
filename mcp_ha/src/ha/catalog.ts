@@ -90,6 +90,36 @@ export class Catalog {
     }
   }
 
+  /**
+   * Event-driven registry invalidation (#93): a rename or a reassignment
+   * must be visible on the next call, not up to 60 s later. Subscriptions
+   * are re-established after every (re)connection, like the live state map.
+   * The 60 s TTL stays as a safety net in case a subscription silently
+   * fails; with the events active it simply never triggers a stale read.
+   */
+  async watchRegistries(): Promise<void> {
+    const events = [
+      "area_registry_updated",
+      "device_registry_updated",
+      "entity_registry_updated",
+      "floor_registry_updated",
+      "label_registry_updated",
+    ];
+    await Promise.all(
+      events.map(async (event_type) => {
+        try {
+          await this.ws.subscribe("subscribe_events", { event_type }, () => {
+            this.regCache = null;
+          });
+        } catch (e) {
+          log.debug(
+            `Registry watch unavailable for ${event_type} (${e instanceof Error ? e.message : String(e)}), the 60 s TTL covers it.`
+          );
+        }
+      })
+    );
+  }
+
   async registries(): Promise<RegistryCache> {
     if (this.regCache && Date.now() - this.regCache.at < REGISTRY_TTL_MS) return this.regCache;
     if (this.regInflight) return this.regInflight;

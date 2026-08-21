@@ -91,7 +91,7 @@ sequenceDiagram
 
 ## Caches
 
-Areas, devices and entity registries change rarely: they are cached for 60 seconds with shared in-flight fetches. **States are a live map** fed by a `state_changed` subscription (v0.3): the add-on subscribes first, snapshots with one `get_states`, replays the events buffered in between, and serves every read from memory. The subscription is re-established on every reconnection; if it fails, a short-TTL fetch fallback keeps the tools working.
+Areas, devices, entities, floors and labels registries are cached with shared in-flight fetches and **invalidated by the registry events** (`area_registry_updated` and friends): a rename is visible on the next call. A 60-second TTL remains as a safety net if a subscription silently fails. **States are a live map** fed by a `state_changed` subscription (v0.3): the add-on subscribes first, snapshots with one `get_states`, replays the events buffered in between, and serves every read from memory. The subscription is re-established on every reconnection; if it fails, a short-TTL fetch fallback keeps the tools working.
 
 ## Status page
 
