@@ -17,6 +17,7 @@ import { registerNotifyTools } from "./tools/notify.js";
 import { registerSceneTools } from "./tools/scenes.js";
 import { registerAnnounceTools } from "./tools/announce.js";
 import { registerExplainTools } from "./tools/explain.js";
+import { registerBlueprintTools } from "./tools/blueprints.js";
 import { registerEnergyTools } from "./tools/energy.js";
 import { registerPresenceTools } from "./tools/presence.js";
 import { registerResources } from "./resources.js";
@@ -79,6 +80,7 @@ export function buildServer(ctx: ToolContext): McpServer {
   registerSceneTools(server, ctx);
   registerAnnounceTools(server, ctx);
   registerExplainTools(server, ctx);
+  registerBlueprintTools(server, ctx);
   registerEnergyTools(server, ctx);
   registerPresenceTools(server, ctx);
   registerResources(server, ctx);

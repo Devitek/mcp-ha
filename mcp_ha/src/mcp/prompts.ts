@@ -101,6 +101,7 @@ export function registerPrompts(server: McpServer, ctx: ToolContext): void {
             type: "text",
             text:
               `Draft a Home Assistant automation for this goal: "${goal}". Proceed step by step:\n` +
+              "0. Check ha_list_blueprints first: if an installed blueprint matches the goal, prefer it (ha_create_from_blueprint fills vetted behaviour) and just present which inputs you would use.\n" +
               "1. Find the real entities involved with ha_search_entities / ha_list_entities, and check their current state and attributes (ha_get_entity) so triggers use values that actually exist.\n" +
               "2. If a similar automation exists (ha_list_automations, ha_get_automation), reuse its conventions.\n" +
               "3. Write the complete YAML: alias, description, mode, triggers, conditions (only if truly needed) and actions, using the verified entity_ids. Prefer simple, readable constructs.\n" +

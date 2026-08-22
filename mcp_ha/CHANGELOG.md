@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.21.0 - 2026-08-22
+
+- **Blueprints** (#127): `ha_list_blueprints` shows the installed blueprints with their typed inputs, and `ha_create_from_blueprint` creates an automation (or script) from one, the safest way to program the house: the behaviour is already written and vetted, required inputs are checked before anything is offered, and the usual guarded two-step flow applies. The `propose-automation` prompt now checks blueprints first.
+- 38 tools (24 read, 14 guarded write). 277 unit tests.
+
 ## 0.20.0 - 2026-08-22
 
 - **Causality chains** (`ha_explain_event`): "why did this light turn on at 3am?" now has an exact answer. Follows Home Assistant's context records from the entity to its immediate actor (an automation, a user) and to what triggered that in turn, up to 4 hops; points to `ha_get_automation_trace` when an automation is in the chain. Honest "no recorded cause" when the history has nothing.

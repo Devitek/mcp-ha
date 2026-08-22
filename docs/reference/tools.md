@@ -1,6 +1,6 @@
 # Tool reference
 
-36 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+38 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -153,6 +153,10 @@ Creates a NEW script, same guarded two-step flow. The entity id derives from the
 | `sequence` | array, required | action sequence |
 | `dry_run` / `confirm_token` | | preview / second-step token |
 
+### ha_create_from_blueprint <Badge type="danger" text="config write" />
+
+Creates a NEW automation (or script) from an installed blueprint: the behaviour is already written and vetted, the assistant only fills its typed inputs (required ones are checked before anything is offered, unknown ones are refused). Paradoxically the SAFEST way to program the house. Same guarded two-step flow and creation-only rule as `ha_create_automation`.
+
 ### ha_update_automation / ha_update_script <Badge type="danger" text="config write" />
 
 Update an EXISTING UI-managed automation or script. Provided blocks replace the current ones wholesale (a provided `actions` list replaces all actions); untouched blocks are preserved. The confirmation shows a **before/after diff**, and the base configuration is fingerprinted: if it changes between the two passes (simultaneous UI edit), the token is refused and the flow restarts. The success answer carries the full previous YAML for manual rollback. YAML-defined targets are refused; deletion does not exist.
@@ -170,6 +174,10 @@ State plus, for UI-created automations, the full configuration (triggers, condit
 ### ha_list_scripts
 
 entity_id, name, running, last_triggered. Params: `limit`, `offset`.
+
+### ha_list_blueprints
+
+Installed automation (or script) blueprints with their inputs: name, description, which inputs are required, defaults and selector types. The natural first stop before creating an automation: `ha_create_from_blueprint` fills typed holes in vetted behaviour.
 
 ### ha_get_automation_trace
 

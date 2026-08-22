@@ -1,6 +1,6 @@
 # Référence des outils
 
-36 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+38 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -153,6 +153,10 @@ Crée un NOUVEAU script, même parcours gardé en deux temps. L'entity_id dériv
 | `sequence` | array, requis | séquence d'actions |
 | `dry_run` / `confirm_token` | | aperçu / jeton de seconde étape |
 
+### ha_create_from_blueprint <Badge type="danger" text="écriture config" />
+
+Crée une NOUVELLE automation (ou script) depuis un blueprint installé : le comportement est déjà écrit et éprouvé, l'assistant ne remplit que ses inputs typés (les requis sont vérifiés avant toute offre, les inconnus refusés). Paradoxalement le chemin le PLUS SÛR pour programmer la maison. Même parcours gardé en deux temps et même règle de création seule que `ha_create_automation`.
+
 ### ha_update_automation / ha_update_script <Badge type="danger" text="écriture config" />
 
 Modifient une automation ou un script EXISTANT géré par l'interface. Les blocs fournis remplacent intégralement les blocs courants (une liste `actions` fournie remplace toutes les actions) ; les blocs non fournis sont conservés. La confirmation montre un **diff avant/après**, et la configuration de base est empreinte : si elle change entre les deux passes (édition simultanée dans l'interface), le jeton est refusé et le parcours recommence. La réponse de succès porte le YAML précédent complet pour un retour arrière manuel. Les cibles définies en YAML sont refusées ; la suppression n'existe pas.
@@ -170,6 +174,10 @@ L'état plus, pour les automations créées via l'interface, la configuration co
 ### ha_list_scripts
 
 entity_id, nom, running, last_triggered. Paramètres : `limit`, `offset`.
+
+### ha_list_blueprints
+
+Les blueprints d'automations (ou de scripts) installés avec leurs inputs : nom, description, lesquels sont requis, défauts et types de selectors. Le premier arrêt naturel avant de créer une automation : `ha_create_from_blueprint` remplit des trous typés dans du comportement éprouvé.
 
 ### ha_get_automation_trace
 
