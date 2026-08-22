@@ -116,6 +116,32 @@ export function registerPrompts(server: McpServer): void {
   );
 
   server.registerPrompt(
+    "propose-dashboard-card",
+    {
+      title: "Propose a dashboard card",
+      description: "Drafts a complete, paste-ready Lovelace card YAML for a stated goal, without writing anything.",
+      argsSchema: { goal: z.string().describe("What the card should show, in plain words") },
+    },
+    ({ goal }) => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text:
+              `Draft a Home Assistant dashboard card for this goal: "${goal}". Proceed step by step:\n` +
+              "1. Find the real entities involved (ha_search_entities, ha_list_entities with area/floor filters) and check their states, attributes and units with ha_get_entity: thresholds and units must come from reality, not guesses.\n" +
+              "2. Pick the card type that fits the data: gauge or sensor for one numeric value (set severity thresholds from the observed range), history-graph or statistics-graph for trends, tile or a grid of tiles for lights and switches of a room, thermostat for climate, media-control for players, picture-entity for a camera, entities as the general fallback. Prefer modern native cards (tile) over custom ones.\n" +
+              "3. Write the complete card YAML with the verified entity_ids, a clear title, and sensible options; keep it minimal, no decorative noise.\n" +
+              "4. Present the YAML in one block, explain in two sentences what it shows, and remind me how to paste it: edit the dashboard, Add card, search 'Manual', paste, save.\n" +
+              "Do NOT create or modify anything in Home Assistant yourself.",
+          },
+        },
+      ],
+    })
+  );
+
+  server.registerPrompt(
     "energy-report",
     {
       title: "Energy report",

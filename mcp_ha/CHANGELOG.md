@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.0 - 2026-08-22
+
+- **Dashboard card proposals** (`propose-dashboard-card` prompt): the assistant drafts a complete, paste-ready Lovelace card YAML for a stated goal, picking the card type from the real data (gauge with observed thresholds, history-graph, tiles for a room, thermostat...) and using verified entity ids and units. Nothing is written to Home Assistant: paste it in your dashboard's Manual card. 6 prompts.
+
 ## 0.16.0 - 2026-08-22
 
 - **Energy report** (`ha_get_energy`): totals per source straight from the configured energy dashboard (grid import/export, solar, battery, gas, water, top consuming devices), over a day, week or month, with an optional comparison to the previous period ("this week vs last week"). The `energy-report` prompt now starts there and only falls back to sensor guessing without a dashboard.

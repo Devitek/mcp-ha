@@ -61,7 +61,7 @@ export function createIngressHandler(
       ["Uptime", fmtUptime(Date.now() - startedAt)],
       ["Home Assistant WebSocket", wsBadge],
       ["MCP tools", toolBreakdown],
-      ["MCP resources / prompts", "3 / 5"],
+      ["MCP resources / prompts", "3 / 6"],
       ["allow_write", cfg.allowWrite ? '<span class="warn">enabled</span>' : "disabled"],
       ["allow_config_write", cfg.allowConfigWrite ? '<span class="warn">enabled</span>' : "disabled"],
       ["MCP sessions", cfg.enableSessions ? "enabled" : "disabled"],
