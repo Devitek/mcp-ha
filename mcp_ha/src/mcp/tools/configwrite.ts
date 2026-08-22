@@ -87,6 +87,12 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
     path: string;
     /** Resulting entity id, for the collision check and the answer. */
     entityId: string;
+    /**
+     * Blueprint payloads have no triggers/actions blocks for validate_config;
+     * their inputs are checked against the blueprint metadata instead and HA
+     * validates at write time (#127).
+     */
+    skipWsValidation?: boolean | undefined;
     dry_run?: boolean | undefined;
     confirm_token?: string | undefined;
   }
@@ -141,7 +147,7 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
     if (!req.confirm_token) {
       // Validate before offering anything: an invalid config must never
       // reach the confirmation stage.
-      await validateBlocks(req.kind, req.payload);
+      if (!req.skipWsValidation) await validateBlocks(req.kind, req.payload);
       // In a session with an elicitation-capable client (#90), the human
       // reviews the YAML in-protocol; the token flow stays the fallback.
       const answer = ctx.elicit
@@ -298,6 +304,66 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
       note: "Keep previous_yaml somewhere if you may want to revert; the add-on does not store it.",
     };
   }
+
+  server.registerTool(
+    "ha_create_from_blueprint",
+    {
+      title: "Create from a blueprint",
+      description:
+        "Creates a NEW automation (or script) from an installed blueprint: the behaviour is already " +
+        "written and vetted, only its typed inputs are filled. Discover blueprints and their inputs with " +
+        "ha_list_blueprints. Same guarded two-step flow as ha_create_automation (YAML preview, " +
+        "confirm_token, creation only).",
+      inputSchema: {
+        blueprint_path: z.string().describe("Blueprint path from ha_list_blueprints, e.g. homeassistant/motion_light.yaml"),
+        alias: z.string().min(1).describe("Name of the new automation"),
+        inputs: z.record(z.string(), z.unknown()).default({}).describe("Blueprint inputs; required ones must all be present"),
+        domain: z.enum(["automation", "script"]).optional().describe("Default automation"),
+        dry_run: z.boolean().optional(),
+        confirm_token: z.string().optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+    },
+    safe("ha_create_from_blueprint", async ({ blueprint_path, alias, inputs, domain, dry_run, confirm_token }) => {
+      const kind = domain ?? "automation";
+      // The blueprint must exist and its required inputs must all be there
+      // BEFORE anything is offered; HA validates the values at write time.
+      const list: Record<string, any> = (await ctx.ws.send("blueprint/list", { domain: kind })) ?? {};
+      const bp = list[blueprint_path];
+      if (!bp) {
+        throw new Error(`unknown blueprint: ${blueprint_path}. List them with ha_list_blueprints (domain ${kind}).`);
+      }
+      const declared: Record<string, any> = bp?.metadata?.input ?? {};
+      const missing = Object.entries(declared)
+        .filter(([, def]) => !("default" in ((def ?? {}) as object)))
+        .map(([name]) => name)
+        .filter((name) => !(name in inputs));
+      if (missing.length > 0) {
+        throw new Error(`missing required blueprint inputs: ${missing.join(", ")}`);
+      }
+      const unknown = Object.keys(inputs).filter((k) => !(k in declared));
+      if (unknown.length > 0) {
+        throw new Error(`unknown blueprint inputs: ${unknown.join(", ")} (this blueprint declares: ${Object.keys(declared).join(", ")})`);
+      }
+
+      const objectId = slugify(alias);
+      if (!objectId) throw new Error("the alias must contain at least one alphanumeric character");
+      const payload: Record<string, unknown> = {
+        alias,
+        use_blueprint: { path: blueprint_path, input: inputs },
+      };
+      return guardedCreate({
+        tool: "ha_create_from_blueprint",
+        kind,
+        payload,
+        path: kind === "automation" ? `/config/automation/config/${Date.now()}` : `/config/script/config/${objectId}`,
+        entityId: `${kind}.${objectId}`,
+        skipWsValidation: true,
+        dry_run,
+        confirm_token,
+      });
+    })
+  );
 
   server.registerTool(
     "ha_update_automation",

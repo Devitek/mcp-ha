@@ -53,7 +53,7 @@ describe("config write registration (#94 tier 3)", () => {
   it("is independent from allow_write", () => {
     const { server, tools } = fakeServer();
     registerConfigWriteTools(server, fakeCtx({ cfg: { allowConfigWrite: true, allowWrite: false } }));
-    expect([...tools.keys()].sort()).toEqual(["ha_create_automation", "ha_create_script", "ha_update_automation", "ha_update_script"]);
+    expect([...tools.keys()].sort()).toEqual(["ha_create_automation", "ha_create_from_blueprint", "ha_create_script", "ha_update_automation", "ha_update_script"]);
   });
 });
 
@@ -135,6 +135,85 @@ describe("ha_create_automation", () => {
     expect(res.isError).toBe(true);
     expect(res.text).toContain("already exists");
     expect(ws.send).not.toHaveBeenCalled();
+  });
+});
+
+describe("ha_create_from_blueprint (#127)", () => {
+  const BP_LIST = {
+    "homeassistant/motion_light.yaml": {
+      metadata: {
+        name: "Motion light",
+        input: {
+          motion_entity: { selector: { entity: {} } },
+          light_target: { selector: { target: {} } },
+          no_motion_wait: { default: 120 },
+        },
+      },
+    },
+  };
+
+  function bpSetup(over: any = {}) {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async (type: string) => (type === "blueprint/list" ? BP_LIST : {})) };
+    const corePost = vi.fn(async () => ({ result: "ok" }));
+    const ctx = fakeCtx({
+      cfg: { allowConfigWrite: true },
+      ws,
+      http: { corePost },
+      catalog: { index: async () => over.entities ?? [] },
+      client: "writer",
+    });
+    registerConfigWriteTools(server, ctx);
+    return { tools, ws, corePost };
+  }
+  const GOOD_ARGS = {
+    blueprint_path: "homeassistant/motion_light.yaml",
+    alias: "Hall motion light",
+    inputs: { motion_entity: "binary_sensor.hall", light_target: { entity_id: "light.hall" } },
+  };
+
+  it("checks required inputs before offering anything", async () => {
+    const { tools, corePost } = bpSetup();
+    const missing = await callTool(tools, "ha_create_from_blueprint", {
+      blueprint_path: "homeassistant/motion_light.yaml",
+      alias: "Hall",
+      inputs: { motion_entity: "binary_sensor.hall" },
+    });
+    expect(missing.isError).toBe(true);
+    expect(missing.text).toContain("light_target");
+    const unknown = await callTool(tools, "ha_create_from_blueprint", {
+      ...GOOD_ARGS,
+      inputs: { ...GOOD_ARGS.inputs, typo_input: 1 },
+    });
+    expect(unknown.isError).toBe(true);
+    expect(unknown.text).toContain("typo_input");
+    expect(corePost).not.toHaveBeenCalled();
+  });
+
+  it("runs the guarded two-step flow and writes the use_blueprint payload", async () => {
+    const { tools, ws, corePost } = bpSetup();
+    const first = await callTool(tools, "ha_create_from_blueprint", GOOD_ARGS);
+    expect(first.data.confirmation_required).toBe(true);
+    expect(first.data.yaml).toContain("use_blueprint");
+    // no triggers/actions to validate over WS for a blueprint payload
+    expect(ws.send).not.toHaveBeenCalledWith("validate_config", expect.anything());
+    const res = await callTool(tools, "ha_create_from_blueprint", { ...GOOD_ARGS, confirm_token: first.data.confirm_token });
+    expect(res.data.created).toBe("automation.hall_motion_light");
+    const [, payload] = corePost.mock.calls[0] as any;
+    expect(payload).toEqual({
+      alias: "Hall motion light",
+      use_blueprint: { path: "homeassistant/motion_light.yaml", input: GOOD_ARGS.inputs },
+    });
+  });
+
+  it("refuses unknown blueprints and existing aliases", async () => {
+    const { tools } = bpSetup({ entities: [entity("automation.hall_motion_light", { name: "Hall motion light" })] });
+    const nope = await callTool(tools, "ha_create_from_blueprint", { ...GOOD_ARGS, blueprint_path: "nope.yaml" });
+    expect(nope.isError).toBe(true);
+    expect(nope.text).toContain("unknown blueprint");
+    const dup = await callTool(tools, "ha_create_from_blueprint", GOOD_ARGS);
+    expect(dup.isError).toBe(true);
+    expect(dup.text).toContain("already exists");
   });
 });
 
