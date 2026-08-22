@@ -187,7 +187,7 @@ Le pas à pas des exécutions récentes d'une automation ou d'un script, le prem
 
 ### ha_explain_event
 
-Explique POURQUOI une entité a changé : suit la chaîne de contexte de Home Assistant (l'acteur immédiat, ce qui l'a déclenché à son tour, l'humain le cas échéant), jusqu'à 4 sauts. Sans `at` : le dernier changement de l'entité. Les causes masquées apparaissent comme `(hidden entity)` sous `filter_reads`. Le chaînon manquant entre le logbook (quoi) et `ha_get_automation_trace` (comment) ; la réponse renvoie vers la trace quand une automation est dans la chaîne.
+Explique POURQUOI une entité a changé : suit la chaîne de contexte de Home Assistant (l'acteur immédiat, ce qui l'a déclenché à son tour, l'humain le cas échéant, résolu vers son entité person quand elle est liée et visible), jusqu'à 4 sauts. Sans `at` : le dernier changement de l'entité. Les causes masquées apparaissent comme `(hidden entity)` sous `filter_reads`. Le chaînon manquant entre le logbook (quoi) et `ha_get_automation_trace` (comment) ; la réponse renvoie vers la trace quand une automation est dans la chaîne.
 
 ### ha_get_health
 

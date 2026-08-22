@@ -52,12 +52,32 @@ export function registerExplainTools(server: McpServer, ctx: ToolContext): void 
       }
       let moment = at ? Date.parse(at) : NaN;
       if (at && !Number.isFinite(moment)) throw new Error(`invalid ISO 8601 date: ${at}`);
+      const index = await ctx.catalog.index();
       if (!at) {
-        const e = (await ctx.catalog.index()).find((x) => x.entity_id === entity_id);
+        const e = index.find((x) => x.entity_id === entity_id);
         if (!e) throw new Error(`unknown entity: ${entity_id}`);
         moment = Date.parse(e.last_changed);
         if (!Number.isFinite(moment)) throw new Error(`no last change recorded for ${entity_id}`);
       }
+
+      // Resolving a user id needs no admin rights (#134): person entities
+      // carry their linked user_id as an attribute, and the catalog is
+      // already cached. Hidden persons do not resolve: causality must not
+      // leak identities past filter_reads.
+      const personByUserId = new Map(
+        index
+          .filter((e) => e.domain === "person" && entityReadVisible(ctx.cfg, e.entity_id) && typeof e.attributes.user_id === "string")
+          .map((e) => [String(e.attributes.user_id), e])
+      );
+      const userInfo = (userId: string): Record<string, unknown> => {
+        const p = personByUserId.get(userId);
+        return p
+          ? { user: p.name, person: p.entity_id, user_id: userId }
+          : {
+              user_id: userId,
+              user_note: "a Home Assistant user without a linked visible person; resolving the name would need admin rights",
+            };
+      };
 
       const fetchAround = async (id: string): Promise<LogEntry[]> =>
         ((await ctx.ws.send("logbook/get_events", {
@@ -105,7 +125,7 @@ export function registerExplainTools(server: McpServer, ctx: ToolContext): void 
           ...(entry.message ? { message: String(entry.message) } : {}),
           ...(entry.context_message ? { context_message: String(entry.context_message) } : {}),
           ...(entry.context_service ? { via_service: `${entry.context_domain ?? "?"}.${entry.context_service}` } : {}),
-          ...(entry.context_user_id ? { user_id: String(entry.context_user_id), user_note: "a Home Assistant user (id shown; name resolution needs admin rights)" } : {}),
+          ...(entry.context_user_id ? userInfo(String(entry.context_user_id)) : {}),
         });
 
         const actor = typeof entry.context_entity_id === "string" ? entry.context_entity_id : null;

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.1 - 2026-08-23
+
+- `ha_explain_event` now resolves a `context_user_id` to its person entity when one is linked ("by Thomas (person.thomas)" instead of an opaque id), with no extra privileges: person entities carry their user id as an attribute. Hidden persons do not resolve (`filter_reads`), unlinked accounts keep the raw id. Born from a real-world test of #124.
+
 ## 0.22.0 - 2026-08-22
 
 - **Dashboard card insertion** (#129): `ha_list_dashboards` shows your Lovelace dashboards and views; `ha_add_dashboard_card` (behind `allow_config_write`) inserts ONE card into a view, with the full guarded flow: before/after diff of the view, concurrent-edit guard (a simultaneous UI edit invalidates the token), previous view YAML returned for rollback. Classic and sections layouts both handled, YAML dashboards refused, insertion only by design. The `propose-dashboard-card` prompt can now offer the direct insertion.
