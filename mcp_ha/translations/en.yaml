@@ -29,6 +29,14 @@ configuration:
       Exposes the ha_get_camera_snapshot tool so the assistant can see a
       still image from a camera. Independent from allow_write. Denied
       cameras (filter_reads / entity_denylist) still apply.
+  allow_config_write:
+    name: Allow automation and script creation
+    description: >-
+      Exposes ha_create_automation and ha_create_script: the assistant can
+      program NEW behaviour into your home. Independent from allow_write.
+      Every creation is validated by Home Assistant first and requires a
+      two-step confirmation showing the full YAML. Existing automations and
+      scripts are never modified.
   filter_reads:
     name: Filter reads too
     description: >-

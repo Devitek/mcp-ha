@@ -163,6 +163,7 @@ const OPTION_MIGRATIONS: Array<{ key: string; value: unknown }> = [
   { key: "confirm_domains", value: ["lock", "alarm_control_panel"] },
   { key: "api_tokens", value: [] },
   { key: "allow_camera", value: false },
+  { key: "allow_config_write", value: false },
 ];
 
 /**

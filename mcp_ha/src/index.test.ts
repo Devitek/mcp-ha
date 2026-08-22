@@ -14,6 +14,7 @@ function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     apiTokenGenerated: false,
     allowWrite: false,
     allowCamera: false,
+    allowConfigWrite: false,
     filterReads: false,
     entityAllowlist: [],
     entityDenylist: [],
@@ -257,7 +258,7 @@ describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
 
 describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
   /** Stored options of a fully up-to-date install (all migration keys present). */
-  const UP_TO_DATE = { log_level: "info", api_token: "user-set-token", confirm_domains: ["lock"], api_tokens: [], allow_camera: false };
+  const UP_TO_DATE = { log_level: "info", api_token: "user-set-token", confirm_domains: ["lock"], api_tokens: [], allow_camera: false, allow_config_write: false };
 
   it("does nothing without a Supervisor or when everything is already in place", async () => {
     const post = vi.fn();
@@ -290,6 +291,7 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
         confirm_domains: ["lock", "alarm_control_panel"],
         api_tokens: [],
         allow_camera: false,
+        allow_config_write: false,
       },
     });
   });
@@ -309,6 +311,7 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
         confirm_domains: ["lock", "alarm_control_panel"],
         api_tokens: [],
         allow_camera: false,
+        allow_config_write: false,
       },
     });
   });

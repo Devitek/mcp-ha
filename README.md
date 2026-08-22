@@ -16,7 +16,7 @@ This Home Assistant add-on exposes an [MCP](https://modelcontextprotocol.io) (Mo
 |--------|-------|
 | Entities, areas, devices | fuzzy search, paginated lists, full details |
 | Services | catalog per domain, search, guarded call (opt-in) |
-| Automations | list, state, last trigger, full configuration |
+| Automations | list, state, last trigger, full configuration, guarded creation (opt-in) |
 | Scripts | list, running state |
 | History | state changes, long-term statistics, logbook |
 | Helpers | create and delete input_*, counters, timers (opt-in) |
@@ -25,7 +25,7 @@ This Home Assistant add-on exposes an [MCP](https://modelcontextprotocol.io) (Mo
 | Add-ons | list and details (read) |
 | System | Jinja template rendering, HA config, error log |
 
-24 tools (18 read, 6 guarded write), designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
+26 tools (18 read, 8 guarded write), designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
 
 ## Why not the official HA MCP integration?
 
