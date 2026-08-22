@@ -132,9 +132,9 @@ export function registerPrompts(server: McpServer): void {
             type: "text",
             text:
               `Build an energy report for the last ${hours ?? "24"} hours. Proceed step by step:\n` +
-              "1. ha_list_entities with domain: 'sensor' and search: 'energy' (also try 'power' and 'consumption') to find the relevant sensors.\n" +
-              `2. ha_get_statistics on the most relevant statistic ids with period 'hour' (or 'day' for long windows) over ${hours ?? "24"} hours.\n` +
-              "3. Summarize: total consumption, peak periods, and the biggest consumers if per-device sensors exist. Use the unit from the sensor attributes and keep the numbers honest: name the sensors you used.",
+              "1. Call ha_get_energy first (period day or week, compare: true when a comparison helps): it reads the exact statistics the energy dashboard is configured with.\n" +
+              "2. Only if the dashboard is not configured, fall back to ha_list_entities (domain 'sensor', search 'energy'/'power'/'consumption') and ha_get_statistics on the most relevant ids.\n" +
+              "3. Summarize: totals per source, the comparison if requested, and the biggest consumers. Keep the numbers honest: name the statistics you used.",
           },
         },
       ],

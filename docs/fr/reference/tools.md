@@ -1,6 +1,6 @@
 # Référence des outils
 
-32 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+34 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -190,6 +190,16 @@ Agrégats du recorder (moyenne, min, max, somme) pour les capteurs numériques. 
 ### ha_get_logbook
 
 Événements lisibles, filtrables par `entity_id`, fenêtre de 0.25 h à 7 jours, plafonné à 100 événements.
+
+## Énergie et présence
+
+### ha_get_energy
+
+Les totaux d'énergie du **dashboard énergie configuré** (`energy/get_prefs` nomme les statistiques exactes : import/export réseau, solaire, batterie, gaz, eau, consommation par appareil) sur `period` (`day` par défaut, `week`, `month`). Avec `compare: true`, la période précédente et les deltas en pourcentage (« cette semaine vs la semaine dernière »). Les totaux somment la statistique `change` par période, le calcul du dashboard lui-même. Erreur claire si aucun dashboard n'est configuré.
+
+### ha_get_presence
+
+Qui est à la maison, dans quelle zone, depuis quand, plus une timeline compacte des changements de zone sur la fenêtre (`hours`, défaut 24, max 168) et les zones avec leur nombre d'occupants. **Noms de zones uniquement, jamais de coordonnées** : latitude, longitude et sources de trackers ne sont jamais lues, par conception. `filter_reads` masque les personnes comme toute entité ; si vous confiez des jetons read à des tiers, denylister `person.*` est le contrôle prévu.
 
 ## Calendrier et todo
 

@@ -1,6 +1,6 @@
 # Tool reference
 
-32 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+34 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -190,6 +190,16 @@ Recorder aggregates (mean, min, max, sum) for numeric sensors. `statistic_id` (s
 ### ha_get_logbook
 
 Human-readable events, filterable by `entity_id`, window from 0.25 h up to 7 days, capped at 100 events.
+
+## Energy and presence
+
+### ha_get_energy
+
+Energy totals from the **configured energy dashboard** (`energy/get_prefs` names the exact statistics: grid import/export, solar, battery, gas, water, per-device consumption) over `period` (`day` default, `week`, `month`). With `compare: true`, the previous period and the deltas in percent ("this week vs last week"). Totals sum the per-period `change` statistic, the dashboard's own math. Clear error when no dashboard is configured.
+
+### ha_get_presence
+
+Who is home, in which zone, since when, plus a compact timeline of zone changes over the window (`hours`, default 24, max 168) and the zones with their occupant counts. **Zone names only, never coordinates**: latitude, longitude and tracker sources are never read, by design. `filter_reads` hides persons like any entity; if you hand out read tokens to third parties, denylisting `person.*` is the intended control.
 
 ## Calendar and to-do
 
