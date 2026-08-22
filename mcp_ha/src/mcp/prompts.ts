@@ -157,8 +157,8 @@ export function registerPrompts(server: McpServer, ctx: ToolContext): void {
               "1. Find the real entities involved (ha_search_entities, ha_list_entities with area/floor filters) and check their states, attributes and units with ha_get_entity: thresholds and units must come from reality, not guesses.\n" +
               "2. Pick the card type that fits the data: gauge or sensor for one numeric value (set severity thresholds from the observed range), history-graph or statistics-graph for trends, tile or a grid of tiles for lights and switches of a room, thermostat for climate, media-control for players, picture-entity for a camera, entities as the general fallback. Prefer modern native cards (tile) over custom ones.\n" +
               "3. Write the complete card YAML with the verified entity_ids, a clear title, and sensible options; keep it minimal, no decorative noise.\n" +
-              "4. Present the YAML in one block, explain in two sentences what it shows, and remind me how to paste it: edit the dashboard, Add card, search 'Manual', paste, save.\n" +
-              "Do NOT create or modify anything in Home Assistant yourself.",
+              "4. Present the YAML in one block and explain in two sentences what it shows. If allow_config_write is enabled, offer to insert it directly with ha_add_dashboard_card (I will confirm on a view diff); otherwise remind me how to paste it: edit the dashboard, Add card, search 'Manual', paste, save.\n" +
+              "Do NOT create or modify anything without my explicit confirmation.",
           },
         },
       ],
