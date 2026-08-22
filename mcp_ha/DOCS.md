@@ -15,7 +15,7 @@ Full documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/
 
 ## Status page
 
-The add-on adds an entry in the Home Assistant sidebar (and an **Open Web UI** button): a status page showing version, uptime, WebSocket state and active options, plus a **Connect a client** section with ready-to-copy configs for Claude Code, Claude Desktop and Gemini CLI. The snippets embed the URL you browse HA through and your API token, masked on screen (the Copy button always copies the full working version). The page is served through HA ingress: your HA session authenticates you, the same trust level as the Configuration tab where the token already lives. The Supervisor token never appears.
+The add-on adds an entry in the Home Assistant sidebar (and an **Open Web UI** button): a status page showing version, uptime, WebSocket state and active options, plus a **Connect a client** section with ready-to-copy configs for Claude Code, Claude Desktop and Gemini CLI, **usage counters** (tool calls since start, per token) and the **recent write audit** (last 50 entries; MCP clients can never read or clear the audit, only you can, behind your HA session). The snippets embed the URL you browse HA through and your API token, masked on screen (the Copy button always copies the full working version). The page is served through HA ingress: your HA session authenticates you, the same trust level as the Configuration tab where the token already lives. The Supervisor token never appears.
 
 ## Options
 

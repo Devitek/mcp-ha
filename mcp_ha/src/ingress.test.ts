@@ -88,4 +88,46 @@ describe("ingress status page (v0.3 #79, onboarding #92)", () => {
     const html = await (await fetch(`${base}/`)).text();
     expect(html).toContain("down");
   });
+
+  it("renders usage counters when a tracker is provided (#128)", async () => {
+    const { UsageTracker } = await import("./usage.js");
+    const usage = new UsageTracker();
+    usage.record("ha_get_entity", "writer");
+    usage.record("ha_get_entity", "writer");
+    usage.record("ha_call_service", "default");
+    const base = await serve(createIngressHandler(ctx(), Date.now(), { usage }));
+    const html = await (await fetch(`${base}/`)).text();
+    expect(html).toContain("Usage since start");
+    expect(html).toContain("ha_get_entity (2)");
+    expect(html).toContain('by "writer"');
+  });
+
+  it("renders the audit tail newest first and escapes it (#126)", async () => {
+    const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = await mkdtemp(join(tmpdir(), "mcpha-ingress-audit-"));
+    const file = join(dir, "audit.log");
+    const lines = [
+      JSON.stringify({ ts: "2026-08-22T10:00:00.000Z", audit: true, client: "writer", tool: "ha_call_service", domain: "light", service: "turn_on", allowed: true }),
+      JSON.stringify({ ts: "2026-08-22T10:05:00.000Z", audit: true, client: "reader", tool: "ha_delete_helper", entity_id: "input_boolean.x", allowed: false, reason: "<script>alert(1)</script>" }),
+    ];
+    await writeFile(file, lines.join("\n") + "\n");
+    const base = await serve(createIngressHandler(ctx(), Date.now(), { auditPath: file }));
+    const html = await (await fetch(`${base}/`)).text();
+    expect(html).toContain("Recent write audit");
+    // newest first
+    expect(html.indexOf("ha_delete_helper")).toBeLessThan(html.indexOf("ha_call_service"));
+    expect(html).toContain("light.turn_on");
+    expect(html).toContain("refused");
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;");
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  it("says so when there is no audit file yet", async () => {
+    const base = await serve(createIngressHandler(ctx(), Date.now(), { auditPath: "/nonexistent-mcpha/audit.log" }));
+    const html = await (await fetch(`${base}/`)).text();
+    expect(html).toContain("No audit entries yet");
+  });
 });

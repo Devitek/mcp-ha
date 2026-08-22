@@ -11,6 +11,7 @@ import { HaHttp } from "./ha/http.js";
 import { Catalog } from "./ha/catalog.js";
 import { ConfirmationStore } from "./confirm.js";
 import { createIngressHandler, INGRESS_PORT } from "./ingress.js";
+import { UsageTracker } from "./usage.js";
 import { buildServer } from "./mcp/server.js";
 import type { ToolContext } from "./context.js";
 
@@ -81,6 +82,8 @@ export interface HandlerOptions {
   maxSessions?: number;
   /** Idle sessions are closed after this long. */
   sessionIdleMs?: number;
+  /** Shared usage counters displayed on the ingress page (#128). */
+  usage?: UsageTracker;
 }
 
 export function createHandler(
@@ -92,6 +95,7 @@ export function createHandler(
   const tokens = effectiveTokens(cfg);
   const maxSessions = opts.maxSessions ?? 16;
   const sessionIdleMs = opts.sessionIdleMs ?? 30 * 60_000;
+  const usage = opts.usage ?? new UsageTracker();
   const sessions = new Map<string, McpSession>();
 
   // Idle sweep (#90, audit lesson: caps and cleanup from day one). unref so
@@ -184,11 +188,13 @@ export function createHandler(
         }
         session.lastSeen = Date.now();
         const body = req.method === "POST" ? await readJsonBody(req) : undefined;
+        if (body !== undefined) usage.recordBody(body, identity.name);
         await session.transport.handleRequest(req, res, body);
         return;
       }
 
       const body = await readJsonBody(req);
+      usage.recordBody(body, identity.name);
       log.debug(`MCP request from ${ip} as "${identity.name}" (${identity.scope})`);
 
       // New session: an initialize without a session id opens one (#90).
@@ -357,12 +363,18 @@ async function main(): Promise<void> {
   const ctx: ToolContext = { cfg, ws, http, catalog, confirmations: new ConfirmationStore() };
   void reconcileOptions(cfg, http);
 
-  const httpServer = createServer(createHandler(ctx));
+  // Shared between the MCP handler (which counts) and the ingress page
+  // (which displays), #128.
+  const usage = new UsageTracker();
+  const httpServer = createServer(createHandler(ctx, { usage }));
 
   // Ingress status page (v0.3, #79): the port stays inside the container
   // network (not in config.yaml ports), the Supervisor proxies and
   // authenticates HA users to it.
-  const ingressServer = cfg.supervisorToken || process.env.INGRESS_TEST === "true" ? createServer(createIngressHandler(ctx)) : null;
+  const ingressServer =
+    cfg.supervisorToken || process.env.INGRESS_TEST === "true"
+      ? createServer(createIngressHandler(ctx, Date.now(), { usage }))
+      : null;
   ingressServer?.listen(INGRESS_PORT, "0.0.0.0", () => {
     log.info(`Ingress status page listening on port ${INGRESS_PORT}`);
   });
