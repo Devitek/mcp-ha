@@ -35,6 +35,8 @@ export class Catalog {
   /** Live state map fed by state_changed events (v0.3, #79); null = TTL fallback. */
   private live: Map<string, HaState> | null = null;
   private liveStarting = false;
+  /** Session subscriptions hook (#90): notified on every state_changed. */
+  private changeListeners = new Set<(entityId: string) => void>();
 
   constructor(private ws: HaWsClient) {}
 
@@ -71,6 +73,7 @@ export class Catalog {
         if (!data?.entity_id) return;
         if (target) apply(target, data.entity_id, data.new_state);
         else buffer.push({ entity_id: data.entity_id, new_state: data.new_state });
+        for (const listener of this.changeListeners) listener(data.entity_id);
       });
 
       const raw = await this.ws.send("get_states");
@@ -88,6 +91,17 @@ export class Catalog {
     } finally {
       this.liveStarting = false;
     }
+  }
+
+  /**
+   * Registers a listener fired on every state_changed event (#90, resource
+   * subscriptions). Only fires while the live map is active, which is also
+   * the only situation where sessions can promise fresh notifications.
+   * Returns the detach function; sessions MUST call it on close.
+   */
+  onEntityChange(listener: (entityId: string) => void): () => void {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
   }
 
   /**

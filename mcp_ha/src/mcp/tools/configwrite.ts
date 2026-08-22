@@ -102,28 +102,40 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
       // Validate before offering anything: an invalid config must never
       // reach the confirmation stage.
       await validateBlocks(req);
-      const confirm_token = ctx.confirmations.issue(hash);
-      audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: "confirmation_required" });
-      return {
-        confirmation_required: true,
-        confirm_token,
-        expires_in_seconds: 120,
-        would_create: req.entityId,
-        yaml,
-        note:
-          "Show this YAML to the user and get their explicit approval, then call again with the SAME arguments plus confirm_token.",
-      };
-    }
-
-    const verdict = ctx.confirmations.consume(req.confirm_token, hash);
-    if (verdict !== "ok") {
-      audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: `confirm_token ${verdict}` });
-      throw new Error(
-        `confirm_token ${verdict}: ` +
-          (verdict === "mismatch"
-            ? "the arguments differ from the confirmed ones; restart the confirmation."
-            : "request a fresh confirmation and try again.")
-      );
+      // In a session with an elicitation-capable client (#90), the human
+      // reviews the YAML in-protocol; the token flow stays the fallback.
+      const answer = ctx.elicit
+        ? await ctx.elicit(`About to create ${req.entityId} with this configuration:\n\n${yaml}\nConfirm the creation?`)
+        : null;
+      if (answer === false) {
+        audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: "declined by the user (elicitation)" });
+        throw new Error("creation declined by the user");
+      }
+      if (answer === null) {
+        const confirm_token = ctx.confirmations.issue(hash);
+        audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: "confirmation_required" });
+        return {
+          confirmation_required: true,
+          confirm_token,
+          expires_in_seconds: 120,
+          would_create: req.entityId,
+          yaml,
+          note:
+            "Show this YAML to the user and get their explicit approval, then call again with the SAME arguments plus confirm_token.",
+        };
+      }
+      audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: true, confirmed_via: "elicitation" });
+    } else {
+      const verdict = ctx.confirmations.consume(req.confirm_token, hash);
+      if (verdict !== "ok") {
+        audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: `confirm_token ${verdict}` });
+        throw new Error(
+          `confirm_token ${verdict}: ` +
+            (verdict === "mismatch"
+              ? "the arguments differ from the confirmed ones; restart the confirmation."
+              : "request a fresh confirmation and try again.")
+        );
+      }
     }
     await ctx.http.corePost(req.path, req.payload);
     audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: true });

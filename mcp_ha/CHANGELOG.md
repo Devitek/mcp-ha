@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0 - 2026-08-22
+
+- **Optional MCP sessions** (#90, new `enable_sessions` option, default off): an `initialize` opens a long-lived session (SSE streams) while stateless clients keep working unchanged. Sessions are bound to the token that opened them, capped at 16 with a 30-minute idle timeout, and unlock:
+  - **entity subscriptions**: subscribe to the new `ha://entity/{entity_id}` resource and get notified when it changes (live state map, at most one notification per second per entity);
+  - **in-protocol confirmations**: with an elicitation-capable client, sensitive calls and config writes ask the human directly; the `confirm_token` flow stays the universal fallback.
+- 216 unit tests.
+
 ## 0.10.0 - 2026-08-22
 
 - **Guarded automation and script creation** (#94 tier 3, new `allow_config_write` option, default off and independent from `allow_write`): `ha_create_automation` and `ha_create_script` let the assistant program NEW behaviour, through the most guarded path in the add-on. Home Assistant validates the blocks first (`validate_config`); the first call answers with the complete YAML and a single-use `confirm_token` bound to the exact payload, to be confirmed after human review; creation only, existing automations (same alias) and scripts (same id) are refused; every step is in the nominative audit trail. See the new "Configuration writes" chapter in SECURITY.md.

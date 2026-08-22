@@ -43,6 +43,7 @@ export function testCfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     allowWrite: false,
     allowCamera: false,
     allowConfigWrite: false,
+    enableSessions: false,
     filterReads: false,
     entityAllowlist: [],
     entityDenylist: [],
@@ -73,12 +74,14 @@ export function fakeCtx(partial: any = {}): ToolContext {
       index: vi.fn(async () => []),
       registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [], floors: [], labels: [] })),
       states: vi.fn(async () => []),
+      onEntityChange: vi.fn(() => () => {}),
       invalidate: vi.fn(),
       ...(partial.catalog ?? {}),
     },
     confirmations: partial.confirmations ?? new ConfirmationStore(),
     ...(partial.client !== undefined ? { client: partial.client } : {}),
     ...(partial.canWrite !== undefined ? { canWrite: partial.canWrite } : {}),
+    ...(partial.elicit !== undefined ? { elicit: partial.elicit } : {}),
   } as unknown as ToolContext;
 }
 

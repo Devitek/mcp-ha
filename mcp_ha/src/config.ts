@@ -4,7 +4,7 @@ import { z } from "zod";
 import { log, setLogLevel } from "./logger.js";
 import { maskSecret } from "./safety.js";
 
-export const VERSION = "0.10.0";
+export const VERSION = "0.11.0";
 
 const OPTIONS_PATH = "/data/options.json";
 const TOKEN_PATH = "/data/token";
@@ -39,6 +39,8 @@ export interface AddonConfig {
   allowCamera: boolean;
   /** Exposes automation/script creation; independent from allowWrite (#94). */
   allowConfigWrite: boolean;
+  /** Long-lived MCP sessions: SSE streams, subscriptions, elicitation (#90). */
+  enableSessions: boolean;
   filterReads: boolean;
   entityAllowlist: string[];
   entityDenylist: string[];
@@ -64,6 +66,7 @@ const optionsSchema = z
     allow_write: z.boolean().default(false),
     allow_camera: z.boolean().default(false),
     allow_config_write: z.boolean().default(false),
+    enable_sessions: z.boolean().default(false),
     filter_reads: z.boolean().default(false),
     entity_allowlist: z.array(z.string()).default([]),
     entity_denylist: z.array(z.string()).default([]),
@@ -154,6 +157,7 @@ export function loadConfig(): AddonConfig {
     allowWrite: opts.allow_write || process.env.MCP_ALLOW_WRITE === "true",
     allowCamera: opts.allow_camera,
     allowConfigWrite: opts.allow_config_write,
+    enableSessions: opts.enable_sessions,
     filterReads: opts.filter_reads,
     entityAllowlist: opts.entity_allowlist.filter((s) => s.trim().length > 0),
     entityDenylist: opts.entity_denylist.filter((s) => s.trim().length > 0),

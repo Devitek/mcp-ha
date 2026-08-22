@@ -75,24 +75,37 @@ export async function guardedServiceCall(ctx: ToolContext, req: WriteRequest): P
   }
 
   // Two-step confirmation on sensitive domains: the first call returns a
-  // single-use token bound to this exact call; executing requires it.
+  // single-use token bound to this exact call; executing requires it. In a
+  // session with an elicitation-capable client (#90), the human is asked
+  // in-protocol instead; the token flow stays the universal fallback.
   if (needsConfirmation(cfg, dom)) {
     const hash = ConfirmationStore.fingerprint({ domain: dom, service: svc, target: req.target, data: req.data });
     if (!req.confirm_token) {
-      const token = ctx.confirmations.issue(hash);
-      audit({ client, tool: req.tool, domain: dom, service: svc, target: req.target, allowed: true, confirmation_required: true });
-      return {
-        confirmation_required: true,
-        confirm_token: token,
-        expires_in_seconds: 120,
-        would_call: wouldCall,
-        note:
-          `The ${dom} domain requires an explicit confirmation. Show this preview to the user, ` +
-          "then call the SAME tool with the SAME arguments plus confirm_token to execute. The token is single use.",
-      };
+      const answer = ctx.elicit
+        ? await ctx.elicit(
+            `Sensitive action: ${dom}.${svc} on ${JSON.stringify(req.target ?? {})}` +
+              `${req.data ? ` with ${JSON.stringify(req.data)}` : ""}. Confirm?`
+          )
+        : null;
+      if (answer === false) deny("declined by the user (elicitation)");
+      if (answer === null) {
+        const token = ctx.confirmations.issue(hash);
+        audit({ client, tool: req.tool, domain: dom, service: svc, target: req.target, allowed: true, confirmation_required: true });
+        return {
+          confirmation_required: true,
+          confirm_token: token,
+          expires_in_seconds: 120,
+          would_call: wouldCall,
+          note:
+            `The ${dom} domain requires an explicit confirmation. Show this preview to the user, ` +
+            "then call the SAME tool with the SAME arguments plus confirm_token to execute. The token is single use.",
+        };
+      }
+      audit({ client, tool: req.tool, domain: dom, service: svc, target: req.target, allowed: true, confirmed_via: "elicitation" });
+    } else {
+      const verdict = ctx.confirmations.consume(req.confirm_token, hash);
+      if (verdict !== "ok") deny(`confirmation ${verdict} (request a fresh token by calling without confirm_token)`);
     }
-    const verdict = ctx.confirmations.consume(req.confirm_token, hash);
-    if (verdict !== "ok") deny(`confirmation ${verdict} (request a fresh token by calling without confirm_token)`);
   }
 
   const payload: Record<string, unknown> = { domain: dom, service: svc };

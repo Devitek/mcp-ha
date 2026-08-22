@@ -59,9 +59,18 @@ Two HTTP leftovers exist because they have no WebSocket equivalent:
 | Template rendering | REST `POST /api/template` (the WS command is a subscription, unsuited to one-shot stateless calls) |
 | HA error log | REST `GET /api/error_log` |
 
-## Stateless MCP transport
+## MCP transport: stateless by default, sessions opt-in
 
-The server implements MCP over **Streamable HTTP** in stateless mode: one MCP server instance and one transport per request, no session. That makes the endpoint trivially compatible with multiple simultaneous clients and with restarts. `GET /mcp` answers 405; `/health` is the only unauthenticated route.
+The server implements MCP over **Streamable HTTP**. By default it is stateless: one MCP server instance and one transport per request, no session, which makes the endpoint trivially compatible with multiple simultaneous clients and with restarts. `/health` is the only unauthenticated route.
+
+With `enable_sessions` (#90), an `initialize` without a session id opens a **long-lived session** (`mcp-session-id` header, SSE streams). Sessions unlock what one-shot requests structurally cannot do:
+
+- **Entity subscriptions**: subscribe to `ha://entity/{entity_id}` and receive `notifications/resources/updated` when it changes, fed by the live state map (at most one notification per second per entity; the client re-reads the resource).
+- **In-protocol confirmations (elicitation)**: when the client supports it, sensitive-domain calls and config writes ask the human directly through `elicitation/create` instead of round-tripping a `confirm_token` through the model. The token flow remains the universal fallback.
+
+Stateless requests keep working unchanged alongside sessions.
+
+**Session lifecycle and memory** (designed for a Pi): at most 16 simultaneous sessions (503 beyond, clients can fall back to stateless), idle sessions are closed after 30 minutes (swept every minute), `DELETE /mcp` ends one explicitly. A session is bound to the API token that opened it: presenting another valid token on it answers 403. Each session holds one MCP server instance, one transport, a set of subscribed URIs (capped at 50) and one `state_changed` listener, all released on close; the marginal cost per session is a few tens of kilobytes, negligible next to the live state map.
 
 ## Context-window discipline
 

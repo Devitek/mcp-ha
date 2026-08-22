@@ -12,6 +12,7 @@ Toutes les options se trouvent dans l'onglet **Configuration** de l'add-on. Red�
 | `allow_write` | `false` | Expose l'outil `ha_call_service`. Sans lui, l'add-on est strictement en lecture seule : aucun outil d'écriture n'est même visible du client. |
 | `allow_camera` | `false` | Expose `ha_get_camera_snapshot` (images fixes de caméras). Indépendant de `allow_write` ; voir chez soi n'est pas agir chez soi, mais mérite son propre interrupteur. `filter_reads` et `entity_denylist` s'appliquent toujours. |
 | `allow_config_write` | `false` | Expose `ha_create_automation` et `ha_create_script` : l'assistant peut programmer un NOUVEAU comportement (validé par HA, confirmation en deux temps obligatoire avec le YAML complet, création seule). Indépendant d'`allow_write`. Voir le [modèle de sécurité](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md). |
+| `enable_sessions` | `false` | Sessions MCP longues : flux SSE, abonnements `ha://entity/{id}` avec notifications de changement, et confirmations dans le protocole (elicitation). Les clients sans session fonctionnent inchangés. 16 sessions max, fermées après 30 min d'inactivité. |
 | `filter_reads` | `false` | Applique aussi `entity_denylist` aux lectures : les entités masquées disparaissent des listes, du détail, de l'historique et du logbook. |
 | `entity_allowlist` | `[]` | Motifs glob des entités autorisées à l'écriture. Non vide, l'écriture devient interdite par défaut. |
 | `entity_denylist` | `[]` | Motifs glob des entités toujours refusées à l'écriture. Gagne sur la liste blanche. |
