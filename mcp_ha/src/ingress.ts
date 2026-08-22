@@ -1,9 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
-import { VERSION } from "./config.js";
+import { effectiveTokens, VERSION } from "./config.js";
 import { maskSecret } from "./safety.js";
 import type { ToolContext } from "./context.js";
 import type { UsageTracker } from "./usage.js";
+
+/** Ingress listens here inside the container; never published on the LAN. */
+export const INGRESS_PORT = 9584;
 
 /** How many audit lines the page shows; SSH remains the full-history path. */
 const AUDIT_DISPLAY_LINES = 50;
@@ -14,33 +17,6 @@ export interface IngressOptions {
   /** Audit file location, injectable for tests (#126). */
   auditPath?: string;
 }
-
-/**
- * Last audit lines for the page (#126). The #91 contract is untouched: no
- * MCP tool reads or clears the audit; this renders it to the HUMAN behind
- * the HA session, the same trust boundary as the Configuration tab.
- */
-async function readAuditTail(path: string): Promise<Array<Record<string, unknown>> | null> {
-  try {
-    const lines = (await readFile(path, "utf8")).trim().split("\n");
-    return lines
-      .slice(-AUDIT_DISPLAY_LINES)
-      .map((l) => {
-        try {
-          return JSON.parse(l) as Record<string, unknown>;
-        } catch {
-          return null;
-        }
-      })
-      .filter((x): x is Record<string, unknown> => x !== null)
-      .reverse();
-  } catch {
-    return null; // dev mode or nothing written yet
-  }
-}
-
-/** Ingress listens here inside the container; never published on the LAN. */
-export const INGRESS_PORT = 9584;
 
 function fmtUptime(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -69,13 +45,59 @@ function detectHaHost(req: IncomingMessage): string {
 }
 
 /**
- * Status and onboarding page served through Home Assistant ingress (v0.3
- * #79, onboarding #92). The Supervisor authenticates the HA session, which
- * is the same trust level as the add-on Configuration tab where the token
- * already sits: the page may therefore carry ready-to-copy client configs
- * with the real token. It is masked by default and revealed on explicit
- * action; the Supervisor token never appears. Links and assets stay
- * relative so the ingress path rewriting works untouched.
+ * Last audit lines for the page (#126). The #91 contract is untouched: no
+ * MCP tool reads or clears the audit; this renders it to the HUMAN behind
+ * the HA session, the same trust boundary as the Configuration tab.
+ */
+async function readAuditTail(path: string): Promise<Array<Record<string, unknown>> | null> {
+  try {
+    const lines = (await readFile(path, "utf8")).trim().split("\n");
+    return lines
+      .slice(-AUDIT_DISPLAY_LINES)
+      .map((l) => {
+        try {
+          return JSON.parse(l) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+      .filter((x): x is Record<string, unknown> => x !== null)
+      .reverse();
+  } catch {
+    return null; // dev mode or nothing written yet
+  }
+}
+
+// --- small design system lifted from the mockup (#136): everything is
+// inline styles over CSS variables; only the interactive states (tabs,
+// filter pills, client sub-tabs) use classes so vanilla JS can toggle them.
+const MONO = "font-family:'IBM Plex Mono',ui-monospace,monospace";
+const CARD = "background:var(--card);border:1px solid var(--border);border-radius:8px";
+const STAT_LABEL = "font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600";
+const STAT_VALUE = `font-size:26px;font-weight:700;margin-top:4px;${MONO}`;
+const STAT_SUB = "font-size:12px;color:var(--muted);margin-top:2px";
+const PILL_ON = "font-size:11px;font-weight:700;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:12px;padding:2px 10px";
+const PILL_OFF = "font-size:11px;font-weight:600;color:var(--muted);background:var(--border);border-radius:12px;padding:2px 10px";
+const SCOPE_READ = "font-size:11px;font-weight:700;border-radius:12px;padding:2px 10px;justify-self:start;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border)";
+const SCOPE_WRITE = "font-size:11px;font-weight:700;border-radius:12px;padding:2px 10px;justify-self:start;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-border)";
+
+function statCard(label: string, value: string, sub: string): string {
+  return `<div style="${CARD};padding:14px 16px"><div style="${STAT_LABEL}">${label}</div><div style="${STAT_VALUE}">${value}</div><div style="${STAT_SUB}">${sub}</div></div>`;
+}
+
+function safetyRow(name: string, value: string): string {
+  return `<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--muted);${MONO}">${esc(name)}</span>${value}</div>`;
+}
+
+/**
+ * Status and onboarding dashboard served through Home Assistant ingress
+ * (v0.3 #79, onboarding #92, observability #126/#128, redesign #136). The
+ * Supervisor authenticates the HA session, the same trust level as the
+ * add-on Configuration tab: the page may carry ready-to-copy client
+ * configs with the real primary token, masked by default and revealed on
+ * explicit action. Named tokens are only ever rendered masked; the
+ * Supervisor token never appears. Everything is one server-rendered
+ * response, links relative, no framework, no network dependency.
  */
 export function createIngressHandler(
   ctx: ToolContext,
@@ -87,93 +109,115 @@ export function createIngressHandler(
     const { cfg, ws } = ctx;
     const downFor = ws.disconnectedForMs();
     const wsBadge = ws.connected
-      ? '<span class="ok">connected</span>'
-      : `<span class="ko">down${downFor !== null ? ` for ${fmtUptime(downFor)}` : ""}</span>`;
-    // 17 core read tools + 2 diagnostics (trace, health), plus camera and
-    // the write tools depending on the options.
+      ? `<div style="display:flex;align-items:center;gap:7px;background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:20px;padding:5px 12px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok-glow)"></span><span style="font-size:12px;font-weight:600;color:var(--ok)">WebSocket connected</span></div>`
+      : `<div style="display:flex;align-items:center;gap:7px;background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:20px;padding:5px 12px"><span style="width:8px;height:8px;border-radius:50%;background:var(--err)"></span><span style="font-size:12px;font-weight:600;color:var(--err)">WebSocket down${downFor !== null ? ` for ${esc(fmtUptime(downFor))}` : ""}</span></div>`;
+
+    // Tool counts: core read tools plus camera and the write families
+    // depending on the options (kept in sync with buildServer).
     const readTools = 24 + (cfg.allowCamera ? 1 : 0);
     const writeTools = (cfg.allowWrite ? 9 : 0) + (cfg.allowConfigWrite ? 6 : 0);
-    const toolBreakdown = `${readTools + writeTools} (${readTools} read${writeTools ? ` + ${writeTools} write` : ""})`;
-    const rows: Array<[string, string]> = [
-      ["Version", esc(VERSION)],
-      ["Uptime", fmtUptime(Date.now() - startedAt)],
-      ["Home Assistant WebSocket", wsBadge],
-      ["MCP tools", toolBreakdown],
-      ["MCP resources / prompts", "3 / 6"],
-      ["allow_write", cfg.allowWrite ? '<span class="warn">enabled</span>' : "disabled"],
-      ["allow_config_write", cfg.allowConfigWrite ? '<span class="warn">enabled</span>' : "disabled"],
-      ["MCP sessions", cfg.enableSessions ? "enabled" : "disabled"],
-      ["filter_reads", cfg.filterReads ? "enabled" : "disabled"],
-      ["Confirmation domains", esc(cfg.confirmDomains.join(", ") || "none")],
-      ["Entity allowlist / denylist", `${cfg.entityAllowlist.length} / ${cfg.entityDenylist.length} patterns`],
-    ];
 
-    // Onboarding blocks (#92): same shapes as the Clients guide, with the
-    // detected URL baked in and the token as a placeholder that the page
-    // script substitutes (masked on screen, full value on copy).
+    const snap = opts.usage?.snapshot();
+    const audit = await readAuditTail(auditPath);
     const mcpUrl = `http://${detectHaHost(req)}:9583/mcp`;
-    const blocks: Array<{ id: string; title: string; note: string; tpl: string }> = [
+
+    // --- Overview -------------------------------------------------------
+    const statCards = [
+      statCard("MCP tools", String(readTools + writeTools), `${readTools} read${writeTools ? ` · <span style="color:var(--warn)">${writeTools} write</span>` : ""}`),
+      statCard("Tool calls", String(snap?.total ?? 0), snap && snap.by_client.length > 0 ? `since start · ${snap.by_client.length} client${snap.by_client.length > 1 ? "s" : ""}` : "since start"),
+      statCard("Resources / prompts", "3 / 6", "MCP capabilities"),
+      statCard("Write audit", String(audit?.length ?? 0), "entries · /data/audit.log"),
+    ].join("");
+
+    const flag = (on: boolean): string => (on ? `<span style="${PILL_ON}">ENABLED</span>` : `<span style="${PILL_OFF}">disabled</span>`);
+    const safetyCard = `<div style="${CARD};padding:16px"><div style="font-size:13px;font-weight:700;margin-bottom:12px">Safety configuration</div><div style="display:flex;flex-direction:column;gap:8px">
+${safetyRow("allow_write", flag(cfg.allowWrite))}
+${safetyRow("allow_config_write", flag(cfg.allowConfigWrite))}
+${safetyRow("allow_camera", flag(cfg.allowCamera))}
+${safetyRow("enable_sessions", flag(cfg.enableSessions))}
+${safetyRow("filter_reads", flag(cfg.filterReads))}
+${safetyRow("confirm_domains", `<span style="font-size:12px;${MONO};color:var(--text)">${esc(cfg.confirmDomains.join(", ") || "none")}</span>`)}
+${safetyRow("allow / deny patterns", `<span style="font-size:12px;${MONO};color:var(--text)">${cfg.entityAllowlist.length} / ${cfg.entityDenylist.length}</span>`)}
+</div></div>`;
+
+    const maxCalls = snap?.top_tools[0]?.calls ?? 1;
+    const topToolsRows =
+      snap && snap.top_tools.length > 0
+        ? snap.top_tools
+            .map(
+              (t) =>
+                `<div style="display:flex;align-items:center;gap:10px"><span style="font-size:12px;${MONO};color:var(--text);width:170px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.tool)}</span><div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden"><div style="height:100%;width:${Math.round((t.calls / maxCalls) * 100)}%;background:var(--accent);border-radius:4px"></div></div><span style="font-size:12px;${MONO};color:var(--muted);min-width:16px;text-align:right">${t.calls}</span></div>`
+            )
+            .join("")
+        : `<div style="font-size:12px;color:var(--muted)">No tool call yet.</div>`;
+    const byClientLine =
+      snap && snap.by_client.length > 0
+        ? `All calls: ${snap.by_client.map((c) => `<span style="${MONO};color:var(--text)">"${esc(c.client)}"</span> ${c.calls}`).join(" · ")}`
+        : "Counters reset on restart; the persistent audit covers write history.";
+    const topToolsCard = `<div style="${CARD};padding:16px"><div style="font-size:13px;font-weight:700;margin-bottom:12px">Top tools since start</div><div style="display:flex;flex-direction:column;gap:9px">${topToolsRows}</div><div style="font-size:12px;color:var(--muted);margin-top:14px;padding-top:12px;border-top:1px solid var(--border)">${byClientLine}</div></div>`;
+
+    // --- Connect a client (#92 mechanics untouched) ---------------------
+    const blocks: Array<{ id: string; label: string; note: string; tpl: string }> = [
       {
         id: "claude-code",
-        title: "Claude Code (CLI)",
+        label: "Claude Code",
         note: "Run in a terminal:",
         tpl: `claude mcp add --transport http home-assistant \\\n  ${mcpUrl} \\\n  --header "Authorization: Bearer ___TOKEN___"`,
       },
       {
         id: "claude-desktop",
-        title: "Claude Desktop",
+        label: "Claude Desktop",
         note: "In claude_desktop_config.json (restart Claude Desktop afterwards):",
         tpl: `{\n  "mcpServers": {\n    "home-assistant": {\n      "command": "npx",\n      "args": ["-y", "mcp-remote", "${mcpUrl}",\n               "--header", "Authorization: Bearer ___TOKEN___"]\n    }\n  }\n}`,
       },
       {
         id: "gemini-cli",
-        title: "Gemini CLI",
+        label: "Gemini CLI",
         note: "In ~/.gemini/settings.json:",
         tpl: `{\n  "mcpServers": {\n    "home-assistant": {\n      "httpUrl": "${mcpUrl}",\n      "headers": { "Authorization": "Bearer ___TOKEN___" }\n    }\n  }\n}`,
       },
     ];
-    const blockHtml = blocks
+    const clientTabs = blocks
+      .map((b, i) => `<button class="ctab${i === 0 ? " on" : ""}" data-client="${b.id}">${esc(b.label)}</button>`)
+      .join("");
+    const clientPanels = blocks
       .map(
-        (b) => `<h3>${esc(b.title)}</h3>
-<p class="note">${esc(b.note)}</p>
-<div class="blk"><pre id="${b.id}" data-tpl="${esc(b.tpl)}"></pre>
-<button class="copy" data-for="${b.id}">Copy</button></div>`
+        (b, i) => `<div class="cpanel" data-cpanel="${b.id}"${i === 0 ? "" : " hidden"}>
+<div style="font-size:12px;color:var(--muted);margin-bottom:10px">${esc(b.note)}</div>
+<div style="position:relative"><pre style="margin:0;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:14px 16px;${MONO};font-size:12.5px;line-height:1.6;color:var(--text);overflow-x:auto" data-tpl="${esc(b.tpl)}"></pre>
+<button class="btn copy" data-for="${b.id}" style="position:absolute;top:10px;right:10px">Copy</button></div></div>`
       )
-      .join("\n");
+      .join("");
 
-    // Usage counters (#128): what the assistant has been doing since start.
-    const snap = opts.usage?.snapshot();
-    const usageHtml = !snap
-      ? ""
-      : snap.total === 0
-        ? `<h2>Usage since start</h2><p>No tool call yet.</p>`
-        : `<h2>Usage since start</h2>
-<table><tr><td>Total tool calls</td><td>${snap.total}</td></tr>
-${snap.by_client.map((c) => `<tr><td>by "${esc(c.client)}"</td><td>${c.calls}</td></tr>`).join("")}</table>
-<p>${snap.top_tools.map((t) => `${esc(t.tool)} (${t.calls})`).join(", ")}</p>`;
+    // --- Tokens (#85): named tokens are ONLY ever rendered masked -------
+    const tokenRows = effectiveTokens(cfg)
+      .map(
+        (t, i) =>
+          `<div style="display:grid;grid-template-columns:1.2fr 2fr .8fr 1fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:13px;font-weight:600;${MONO}">${esc(t.name)}</span><span style="font-size:12.5px;${MONO};color:var(--muted)">${esc(maskSecret(t.token))}</span><span style="${t.scope === "write" ? SCOPE_WRITE : SCOPE_READ}">${t.scope}</span><span style="font-size:12px;color:var(--muted)">${i === 0 ? "api_token (primary)" : "api_tokens"}</span></div>`
+      )
+      .join("");
 
-    // Audit tail (#126): human-visible behind the HA session only.
-    const audit = await readAuditTail(auditPath);
+    // --- Write audit (#126) with client-side filters --------------------
     const auditRow = (a: Record<string, unknown>): string => {
       const time = String(a.ts ?? "").slice(11, 19) || "?";
       const target =
-        a.entity_id ?? (a.domain && a.service ? `${a.domain}.${a.service}` : (a.target ? JSON.stringify(a.target) : ""));
+        a.entity_id ?? (a.domain && a.service ? `${a.domain}.${a.service}` : a.target ? JSON.stringify(a.target) : "");
+      const kind = a.dry_run === true ? "dry" : a.confirmation_required === true ? "confirm" : a.allowed === true ? "ok" : "refused";
       const status =
-        a.dry_run === true
-          ? "dry run"
-          : a.confirmation_required === true
-            ? "confirmation asked"
-            : a.allowed === true
-              ? '<span class="ok">ok</span>'
-              : `<span class="warn">refused</span> ${esc(a.reason ?? "")}`;
-      return `<tr><td>${esc(time)}</td><td>${esc(a.client ?? "")}</td><td>${esc(a.tool ?? "")}</td><td>${esc(target)}</td><td>${status}</td></tr>`;
+        kind === "dry"
+          ? `<span style="color:var(--warn);font-weight:600">dry run</span>`
+          : kind === "confirm"
+            ? `<span style="color:var(--warn);font-weight:600">confirmation asked</span>`
+            : kind === "ok"
+              ? `<span style="color:var(--ok);font-weight:600">ok</span>`
+              : `<span style="color:var(--err);font-weight:600">refused</span> <span style="color:var(--muted)">${esc(a.reason ?? "")}</span>`;
+      return `<div class="arow" data-kind="${kind}" style="display:grid;grid-template-columns:.7fr .9fr 1.6fr 1.8fr 1.4fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--row-border);align-items:center;${MONO};font-size:12.5px"><span style="color:var(--muted)">${esc(time)}</span><span>${esc(a.client ?? "")}</span><span style="color:var(--code)">${esc(a.tool ?? "")}</span><span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(target)}</span><span>${status}</span></div>`;
     };
-    const auditHtml =
+    const auditTable =
       audit === null || audit.length === 0
-        ? `<h2>Recent write audit</h2><p>No audit entries yet. Every write attempt lands here (and in /data/audit.log); MCP clients can never read or clear it.</p>`
-        : `<h2>Recent write audit</h2>
-<table>${audit.map(auditRow).join("")}</table>
-<p>Last ${audit.length} entries, newest first. Full history in /data/audit.log (SSH); MCP clients can never read or clear it.</p>`;
+        ? `<div style="${CARD};margin-top:12px;padding:16px;font-size:12px;color:var(--muted)">No audit entries yet. Every write attempt lands here and in /data/audit.log; MCP clients can never read or clear it.</div>`
+        : `<div style="${CARD};margin-top:12px;overflow:hidden"><div style="display:grid;grid-template-columns:.7fr .9fr 1.6fr 1.8fr 1.4fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Time</span><span>Client</span><span>Tool</span><span>Target</span><span>Status</span></div>${audit.map(auditRow).join("")}</div>
+<div style="font-size:12px;color:var(--muted);margin-top:12px">Every write attempt lands here and in <code style="${MONO}">/data/audit.log</code>; MCP clients can never read or clear it.</div>`;
 
     const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
@@ -181,37 +225,104 @@ ${snap.by_client.map((c) => `<tr><td>by "${esc(c.client)}"</td><td>${c.calls}</t
 <meta http-equiv="refresh" content="60">
 <title>MCP Home Assistant</title>
 <style>
-  body{font:14px/1.5 system-ui,sans-serif;margin:2rem auto;max-width:38rem;padding:0 1rem;color:#1c1c1e}
-  h1{font-size:1.2rem} h2{font-size:1.05rem;margin-top:2rem} h3{font-size:.95rem;margin:1.2rem 0 .2rem}
-  table{border-collapse:collapse;width:100%}
-  td{padding:.4rem .6rem;border-bottom:1px solid #e5e5ea} td:first-child{color:#6e6e73}
-  .ok{color:#1a7f37;font-weight:600}.ko{color:#b91c1c;font-weight:600}.warn{color:#b45309;font-weight:600}
-  p{color:#6e6e73;font-size:.85rem} .note{margin:.2rem 0}
-  .blk{position:relative}
-  pre{background:#f2f2f7;border:1px solid #e5e5ea;border-radius:6px;padding:.7rem .8rem;overflow-x:auto;font-size:.8rem;margin:.3rem 0}
-  button{font:inherit;font-size:.8rem;padding:.25rem .7rem;border:1px solid #c7c7cc;border-radius:6px;background:#fff;cursor:pointer}
-  button:hover{background:#f2f2f7}
-  .copy{position:absolute;top:.6rem;right:.5rem}
-  @media (prefers-color-scheme: dark){
-    body{background:#111;color:#eee}td{border-color:#333}td:first-child{color:#999}p{color:#999}
-    pre{background:#1c1c1e;border-color:#333}button{background:#1c1c1e;border-color:#444;color:#eee}button:hover{background:#2c2c2e}
-  }
+body{--bg:#0d1117;--card:#161b22;--border:#21262d;--row-border:#1c2128;--btn-border:#30363d;--muted:#8b949e;--text:#e6edf3;--faint:#484f58;--code:#79c0ff;--link:#58a6ff;--accent:#33ff66;--ok:#3fb950;--ok-glow:#3fb95088;--ok-bg:#0f1f14;--ok-border:#1f4429;--warn:#d29922;--warn-bg:#2d2308;--warn-border:#4d3d0e;--err:#f85149;margin:0;background:var(--bg);font-family:'IBM Plex Sans',-apple-system,system-ui,sans-serif;color:var(--text)}
+@media (prefers-color-scheme: light){body{--bg:#f6f8fa;--card:#ffffff;--border:#d0d7de;--row-border:#eaeef2;--btn-border:#afb8c1;--muted:#57606a;--text:#1f2328;--faint:#8c959f;--code:#0550ae;--link:#0969da;--accent:#1a7f37;--ok:#1a7f37;--ok-glow:rgba(26,127,55,.35);--ok-bg:#dafbe1;--ok-border:#aceebb;--warn:#9a6700;--warn-bg:#fff8c5;--warn-border:#d4a72c;--err:#cf222e}}
+a{color:var(--link)}
+.btn{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border:1px solid var(--btn-border);border-radius:6px;background:var(--border);color:var(--text);cursor:pointer}
+.btn:hover{background:var(--btn-border)}
+.tab{font-family:inherit;font-size:13px;font-weight:600;padding:9px 16px;background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);cursor:pointer}
+.tab:hover{color:var(--text)}
+.tab.on{color:var(--text);border-bottom-color:var(--accent)}
+.ctab{font-family:inherit;font-size:12.5px;font-weight:600;padding:8px 16px;border:1px solid var(--border);border-bottom:none;border-radius:8px 8px 0 0;background:var(--bg);color:var(--muted);cursor:pointer}
+.ctab.on{background:var(--card);color:var(--text)}
+.fpill{font-family:inherit;font-size:12px;font-weight:600;padding:5px 14px;border:1px solid var(--btn-border);border-radius:16px;background:none;color:var(--muted);cursor:pointer}
+.fpill:hover{border-color:var(--muted)}
+.fpill.on{border-color:var(--accent);background:var(--ok-bg);color:var(--accent)}
 </style></head><body>
-<h1>MCP Home Assistant</h1>
-<table>${rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("")}</table>
-<h2>Connect a client</h2>
-<p>MCP endpoint: <code>${esc(mcpUrl)}</code>. The snippets below embed your API token,
-masked on screen; <b>Copy</b> always copies the full working version.
-<button id="reveal"></button></p>
-${blockHtml}
-${usageHtml}
-${auditHtml}
-<p>This page is only reachable through your authenticated Home Assistant session,
-like the Configuration tab where the token already lives. It refreshes every minute.</p>
+<div style="max-width:980px;margin:0 auto;padding:28px 24px 48px">
+<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+<div style="width:40px;height:40px;border-radius:9px;background:#060d06;display:flex;align-items:center;justify-content:center;border:1px solid #1f2a1f"><span style="${MONO};font-size:20px;color:#33ff66;line-height:1">&gt;_</span></div>
+<div style="display:flex;flex-direction:column;gap:1px"><div style="font-size:18px;font-weight:700;letter-spacing:-.01em">MCP Home Assistant</div><div style="font-size:12px;color:var(--muted);${MONO}">v${esc(VERSION)} · uptime ${esc(fmtUptime(Date.now() - startedAt))}</div></div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:10px">${wsBadge}<div style="font-size:11px;color:var(--muted)">auto-refresh 60s</div></div>
+</div>
+
+<div style="display:flex;gap:2px;margin-top:24px;border-bottom:1px solid var(--border)">
+<button class="tab on" data-tab="overview">Overview</button>
+<button class="tab" data-tab="connect">Connect a client</button>
+<button class="tab" data-tab="tokens">Tokens</button>
+<button class="tab" data-tab="audit">Write audit</button>
+</div>
+
+<div data-panel="overview">
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px">${statCards}</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">${safetyCard}${topToolsCard}</div>
+</div>
+
+<div data-panel="connect" hidden>
+<div style="${CARD};padding:16px;margin-top:20px">
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><div style="font-size:13px;font-weight:700">MCP endpoint</div><code style="${MONO};font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 10px;color:var(--code)">${esc(mcpUrl)}</code><button class="btn" id="reveal" style="margin-left:auto"></button></div>
+<div style="font-size:12px;color:var(--muted);margin-top:8px">Snippets embed your API token, masked on screen. <b style="color:var(--text)">Copy</b> always copies the full working version.</div>
+</div>
+<div style="display:flex;gap:2px;margin-top:16px">${clientTabs}</div>
+<div style="${CARD};border-radius:0 8px 8px 8px;padding:16px">${clientPanels}</div>
+</div>
+
+<div data-panel="tokens" hidden>
+<div style="${CARD};margin-top:20px;overflow:hidden">
+<div style="display:grid;grid-template-columns:1.2fr 2fr .8fr 1fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Name</span><span>Token</span><span>Scope</span><span>Source</span></div>
+${tokenRows}
+</div>
+<div style="font-size:12px;color:var(--muted);margin-top:12px">Tokens are managed in the add-on <b style="color:var(--text)">Configuration</b> tab (<code style="${MONO}">api_token</code> and <code style="${MONO}">api_tokens</code> options). Named tokens carry a read or write scope; the primary token always has write scope.</div>
+</div>
+
+<div data-panel="audit" hidden>
+<div style="display:flex;gap:8px;margin-top:20px;align-items:center;flex-wrap:wrap">
+<button class="fpill on" data-filter="all">All</button>
+<button class="fpill" data-filter="ok">OK</button>
+<button class="fpill" data-filter="refused">Refused</button>
+<button class="fpill" data-filter="dryconfirm">Dry run / confirm</button>
+<span style="margin-left:auto;font-size:12px;color:var(--muted)">${audit?.length ?? 0} entries · newest first · full history in /data/audit.log</span>
+</div>
+${auditTable}
+</div>
+
+<div style="font-size:11px;color:var(--faint);margin-top:32px;border-top:1px solid var(--border);padding-top:14px">This page is only reachable through your authenticated Home Assistant session, like the Configuration tab where the token already lives.</div>
+</div>
 <script>
 (function () {
   var TOKEN = ${JSON.stringify(cfg.apiToken)};
   var MASK = ${JSON.stringify(maskSecret(cfg.apiToken))};
+
+  // Tabs: state lives in location.hash so it survives the 60s refresh.
+  var tabs = document.querySelectorAll(".tab");
+  function showTab(name) {
+    var known = false;
+    tabs.forEach(function (t) { known = known || t.getAttribute("data-tab") === name; });
+    if (!known) name = "overview";
+    tabs.forEach(function (t) { t.classList.toggle("on", t.getAttribute("data-tab") === name); });
+    document.querySelectorAll("[data-panel]").forEach(function (p) {
+      p.hidden = p.getAttribute("data-panel") !== name;
+    });
+  }
+  tabs.forEach(function (t) {
+    t.addEventListener("click", function () {
+      location.hash = t.getAttribute("data-tab");
+      showTab(t.getAttribute("data-tab"));
+    });
+  });
+  showTab((location.hash || "#overview").slice(1));
+
+  // Client sub-tabs.
+  document.querySelectorAll(".ctab").forEach(function (t) {
+    t.addEventListener("click", function () {
+      document.querySelectorAll(".ctab").forEach(function (x) { x.classList.toggle("on", x === t); });
+      document.querySelectorAll("[data-cpanel]").forEach(function (p) {
+        p.hidden = p.getAttribute("data-cpanel") !== t.getAttribute("data-client");
+      });
+    });
+  });
+
+  // Reveal/copy: unchanged #92 mechanics, revealed state in sessionStorage.
   var shown = sessionStorage.getItem("mcpha-show-token") === "1";
   function render() {
     document.querySelectorAll("pre[data-tpl]").forEach(function (p) {
@@ -226,7 +337,8 @@ like the Configuration tab where the token already lives. It refreshes every min
   });
   document.querySelectorAll("button.copy").forEach(function (btn) {
     btn.addEventListener("click", function () {
-      var tpl = document.getElementById(btn.getAttribute("data-for")).getAttribute("data-tpl");
+      var panel = btn.closest("[data-cpanel]");
+      var tpl = panel.querySelector("pre[data-tpl]").getAttribute("data-tpl");
       navigator.clipboard.writeText(tpl.split("___TOKEN___").join(TOKEN)).then(function () {
         btn.textContent = "Copied!";
         setTimeout(function () { btn.textContent = "Copy"; }, 1200);
@@ -234,6 +346,19 @@ like the Configuration tab where the token already lives. It refreshes every min
     });
   });
   render();
+
+  // Audit filters, pure client-side.
+  document.querySelectorAll(".fpill").forEach(function (b) {
+    b.addEventListener("click", function () {
+      document.querySelectorAll(".fpill").forEach(function (x) { x.classList.toggle("on", x === b); });
+      var f = b.getAttribute("data-filter");
+      document.querySelectorAll(".arow").forEach(function (r) {
+        var k = r.getAttribute("data-kind");
+        var show = f === "all" || (f === "ok" && k === "ok") || (f === "refused" && k === "refused") || (f === "dryconfirm" && (k === "dry" || k === "confirm"));
+        r.style.display = show ? "grid" : "none";
+      });
+    });
+  });
 })();
 </script>
 </body></html>`;
