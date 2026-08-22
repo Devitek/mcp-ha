@@ -31,13 +31,14 @@ configuration:
       image fixe d'une caméra. Indépendant de allow_write. Les caméras
       masquées (filter_reads / entity_denylist) restent exclues.
   allow_config_write:
-    name: Autoriser la création d'automations et de scripts
+    name: Autoriser la création et la modification d'automations et de scripts
     description: >-
-      Expose ha_create_automation et ha_create_script : l'assistant peut
-      programmer un NOUVEAU comportement dans votre maison. Indépendant
-      d'allow_write. Chaque création est d'abord validée par Home Assistant
-      et exige une confirmation en deux temps montrant le YAML complet. Les
-      automations et scripts existants ne sont jamais modifiés.
+      Expose ha_create_automation, ha_create_script, ha_update_automation et
+      ha_update_script : l'assistant peut programmer du comportement dans
+      votre maison. Indépendant d'allow_write. Tout est d'abord validé par
+      Home Assistant et exige une confirmation en deux temps (YAML complet à
+      la création, diff avant/après à la modification). La suppression reste
+      impossible.
   enable_sessions:
     name: Activer les sessions MCP
     description: >-

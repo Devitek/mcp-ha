@@ -1,6 +1,6 @@
 # Référence des outils
 
-29 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+31 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -144,6 +144,10 @@ Crée un NOUVEAU script, même parcours gardé en deux temps. L'entity_id dériv
 | `description` / `mode` | | comme ci-dessus |
 | `sequence` | array, requis | séquence d'actions |
 | `dry_run` / `confirm_token` | | aperçu / jeton de seconde étape |
+
+### ha_update_automation / ha_update_script <Badge type="danger" text="écriture config" />
+
+Modifient une automation ou un script EXISTANT géré par l'interface. Les blocs fournis remplacent intégralement les blocs courants (une liste `actions` fournie remplace toutes les actions) ; les blocs non fournis sont conservés. La confirmation montre un **diff avant/après**, et la configuration de base est empreinte : si elle change entre les deux passes (édition simultanée dans l'interface), le jeton est refusé et le parcours recommence. La réponse de succès porte le YAML précédent complet pour un retour arrière manuel. Les cibles définies en YAML sont refusées ; la suppression n'existe pas.
 
 ## Automations et scripts
 

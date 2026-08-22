@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.0 - 2026-08-22
+
+- **Guarded automation and script modification** (`ha_update_automation`, `ha_update_script`, behind the existing `allow_config_write`): provided blocks replace the current ones wholesale, Home Assistant validates first, and the mandatory confirmation shows a **before/after diff** instead of just the new YAML. The base configuration is part of the confirmation fingerprint, so an automation edited in the UI between the two passes invalidates the token. The success answer returns the previous YAML for manual rollback. Deletion remains unsupported.
+- 31 tools (20 read, 11 guarded write). 238 unit tests.
+
 ## 0.13.0 - 2026-08-22
 
 - **Outbound notifications** (`ha_send_notification`): "tell me when the wash is done". Lists the real targets when called without one, routes legacy `notify.*` services and modern notify entities automatically, flows through the same guarded write path as every service call, and is capped at 6 notifications per minute per target because a notification physically disturbs someone.

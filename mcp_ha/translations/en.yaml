@@ -30,13 +30,14 @@ configuration:
       still image from a camera. Independent from allow_write. Denied
       cameras (filter_reads / entity_denylist) still apply.
   allow_config_write:
-    name: Allow automation and script creation
+    name: Allow automation and script creation and modification
     description: >-
-      Exposes ha_create_automation and ha_create_script: the assistant can
-      program NEW behaviour into your home. Independent from allow_write.
-      Every creation is validated by Home Assistant first and requires a
-      two-step confirmation showing the full YAML. Existing automations and
-      scripts are never modified.
+      Exposes ha_create_automation, ha_create_script, ha_update_automation
+      and ha_update_script: the assistant can program behaviour into your
+      home. Independent from allow_write. Everything is validated by Home
+      Assistant first and requires a two-step confirmation (full YAML on
+      creation, before/after diff on modification). Deletion stays
+      unsupported.
   enable_sessions:
     name: Enable MCP sessions
     description: >-

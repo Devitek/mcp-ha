@@ -1,6 +1,6 @@
 # Tool reference
 
-29 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+31 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -144,6 +144,10 @@ Creates a NEW script, same guarded two-step flow. The entity id derives from the
 | `description` / `mode` | | as above |
 | `sequence` | array, required | action sequence |
 | `dry_run` / `confirm_token` | | preview / second-step token |
+
+### ha_update_automation / ha_update_script <Badge type="danger" text="config write" />
+
+Update an EXISTING UI-managed automation or script. Provided blocks replace the current ones wholesale (a provided `actions` list replaces all actions); untouched blocks are preserved. The confirmation shows a **before/after diff**, and the base configuration is fingerprinted: if it changes between the two passes (simultaneous UI edit), the token is refused and the flow restarts. The success answer carries the full previous YAML for manual rollback. YAML-defined targets are refused; deletion does not exist.
 
 ## Automations and scripts
 
