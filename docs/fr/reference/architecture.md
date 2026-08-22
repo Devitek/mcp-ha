@@ -59,9 +59,18 @@ Deux restes HTTP existent faute d'équivalent WebSocket :
 | Rendu de template | REST `POST /api/template` (la commande WS est un abonnement, inadapté au one-shot stateless) |
 | Journal d'erreurs HA | REST `GET /api/error_log` |
 
-## Transport MCP stateless
+## Transport MCP : stateless par défaut, sessions en option
 
-Le serveur implémente MCP en **Streamable HTTP** en mode stateless : une instance de serveur MCP et un transport par requête, aucune session. L'endpoint est ainsi trivialement compatible avec plusieurs clients simultanés et avec les redémarrages. `GET /mcp` répond 405 ; `/health` est la seule route sans authentification.
+Le serveur implémente MCP en **Streamable HTTP**. Par défaut il est stateless : une instance de serveur MCP et un transport par requête, aucune session, ce qui rend l'endpoint trivialement compatible avec plusieurs clients simultanés et avec les redémarrages. `/health` est la seule route sans authentification.
+
+Avec `enable_sessions` (#90), un `initialize` sans identifiant de session ouvre une **session longue** (en-tête `mcp-session-id`, flux SSE). Les sessions débloquent ce que le one-shot interdit structurellement :
+
+- **Abonnements aux entités** : abonnez-vous à `ha://entity/{entity_id}` et recevez `notifications/resources/updated` quand elle change, alimenté par la carte d'états vivante (au plus une notification par seconde et par entité ; le client relit la resource).
+- **Confirmations dans le protocole (elicitation)** : quand le client le gère, les appels sur domaines sensibles et les écritures de config interrogent l'humain directement via `elicitation/create` au lieu de faire transiter un `confirm_token` par le modèle. Le flux à jeton reste le repli universel.
+
+Les requêtes stateless continuent de fonctionner telles quelles à côté des sessions.
+
+**Cycle de vie et mémoire** (dimensionné pour un Pi) : au plus 16 sessions simultanées (503 au-delà, les clients peuvent retomber en stateless), les sessions inactives sont fermées après 30 minutes (balayage chaque minute), `DELETE /mcp` en termine une explicitement. Une session est liée au jeton API qui l'a ouverte : présenter un autre jeton valide dessus répond 403. Chaque session porte une instance de serveur MCP, un transport, un ensemble d'URIs abonnées (plafonné à 50) et un écouteur `state_changed`, tous libérés à la fermeture ; le coût marginal par session est de quelques dizaines de kilo-octets, négligeable devant la carte d'états.
 
 ## Discipline de contexte
 

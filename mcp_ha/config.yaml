@@ -1,5 +1,5 @@
 name: MCP Home Assistant
-version: "0.10.0"
+version: "0.11.0"
 slug: mcp_ha
 description: >-
   MCP (Model Context Protocol) server to query and control Home Assistant
@@ -31,6 +31,7 @@ options:
   allow_write: false
   allow_camera: false
   allow_config_write: false
+  enable_sessions: false
   filter_reads: false
   entity_allowlist: []
   entity_denylist: []
@@ -55,6 +56,7 @@ schema:
   allow_write: bool
   allow_camera: bool
   allow_config_write: bool
+  enable_sessions: bool
   filter_reads: bool
   entity_allowlist:
     - str

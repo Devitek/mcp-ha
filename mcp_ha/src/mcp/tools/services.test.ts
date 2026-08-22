@@ -153,6 +153,50 @@ describe("ha_call_service safety matrix", () => {
     expect(auditLines()).toContainEqual(expect.objectContaining({ dry_run: true, allowed: true }));
   });
 
+  it("confirms in-protocol through elicitation when available (#90)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => ({ context: {} })) };
+    const elicit = vi.fn(async () => true);
+    registerServiceTools(server, fakeCtx({ cfg: { allowWrite: true, confirmDomains: ["lock"] }, ws, elicit }));
+    const res = await callTool(tools, "ha_call_service", {
+      domain: "lock",
+      service: "unlock",
+      target: { entity_id: "lock.front" },
+    });
+    expect(res.data.success).toBe(true);
+    expect(elicit).toHaveBeenCalledOnce();
+    expect(ws.send).toHaveBeenCalledWith("call_service", expect.objectContaining({ domain: "lock" }));
+    expect(auditLines()).toContainEqual(expect.objectContaining({ confirmed_via: "elicitation", allowed: true }));
+  });
+
+  it("treats an elicitation decline as a refusal (#90)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn() };
+    registerServiceTools(server, fakeCtx({ cfg: { allowWrite: true, confirmDomains: ["lock"] }, ws, elicit: async () => false }));
+    const res = await callTool(tools, "ha_call_service", {
+      domain: "lock",
+      service: "unlock",
+      target: { entity_id: "lock.front" },
+    });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("declined");
+    expect(ws.send).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the confirm_token flow when elicitation is unavailable (#90)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn() };
+    registerServiceTools(server, fakeCtx({ cfg: { allowWrite: true, confirmDomains: ["lock"] }, ws, elicit: async () => null }));
+    const res = await callTool(tools, "ha_call_service", {
+      domain: "lock",
+      service: "unlock",
+      target: { entity_id: "lock.front" },
+    });
+    expect(res.data.confirmation_required).toBe(true);
+    expect(res.data.confirm_token).toBeDefined();
+    expect(ws.send).not.toHaveBeenCalled();
+  });
+
   it("stamps the authenticated client name on the audit line (#85)", async () => {
     const { server, tools } = fakeServer();
     const ws = { send: vi.fn(async () => ({ context: {} })) };

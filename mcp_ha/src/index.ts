@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { effectiveTokens, loadConfig, VERSION, type AddonConfig, type ApiToken } from "./config.js";
@@ -66,10 +67,52 @@ function authenticate(presented: string, tokens: ApiToken[]): ApiToken | null {
   return null;
 }
 
-export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
+/** One long-lived MCP session (#90): transport + server + token binding. */
+interface McpSession {
+  transport: StreamableHTTPServerTransport;
+  server: ReturnType<typeof buildServer>;
+  /** Name of the token that opened the session; others get a 403. */
+  identity: string;
+  lastSeen: number;
+}
+
+export interface HandlerOptions {
+  /** Session cap (#90); sized for a Pi, overridable in tests. */
+  maxSessions?: number;
+  /** Idle sessions are closed after this long. */
+  sessionIdleMs?: number;
+}
+
+export function createHandler(
+  ctx: ToolContext,
+  opts: HandlerOptions = {}
+): (req: IncomingMessage, res: ServerResponse) => Promise<void> {
   const { cfg, ws } = ctx;
   const limiter = new AuthRateLimiter();
   const tokens = effectiveTokens(cfg);
+  const maxSessions = opts.maxSessions ?? 16;
+  const sessionIdleMs = opts.sessionIdleMs ?? 30 * 60_000;
+  const sessions = new Map<string, McpSession>();
+
+  // Idle sweep (#90, audit lesson: caps and cleanup from day one). unref so
+  // the timer never keeps the process alive.
+  if (cfg.enableSessions) {
+    setInterval(() => {
+      const now = Date.now();
+      for (const [sid, s] of sessions) {
+        if (now - s.lastSeen > sessionIdleMs) {
+          log.info(`Closing idle MCP session ${sid.slice(0, 8)}… (inactive ${Math.round((now - s.lastSeen) / 60_000)} min)`);
+          s.transport.close();
+        }
+      }
+    }, 60_000).unref();
+  }
+
+  const isInitialize = (body: unknown): boolean =>
+    Array.isArray(body)
+      ? body.some((m) => (m as { method?: string } | null)?.method === "initialize")
+      : (body as { method?: string } | null)?.method === "initialize";
+
   return async (req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
 
@@ -91,9 +134,13 @@ export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: Ser
       return;
     }
 
-    if (req.method !== "POST") {
-      rpcError(res, 405, -32000, "method not allowed, this server is stateless (POST only)", {
-        Allow: "POST",
+    // GET (SSE stream) and DELETE (session end) only make sense against an
+    // existing session (#90); anything else keeps the historic 405.
+    const sessionHeader = String(req.headers["mcp-session-id"] ?? "") || null;
+    const sessionVerb = cfg.enableSessions && (req.method === "GET" || req.method === "DELETE") && sessionHeader !== null;
+    if (req.method !== "POST" && !sessionVerb) {
+      rpcError(res, 405, -32000, "method not allowed (POST; with sessions enabled, GET/DELETE carry mcp-session-id)", {
+        Allow: cfg.enableSessions ? "POST, GET, DELETE" : "POST",
       });
       return;
     }
@@ -122,8 +169,56 @@ export function createHandler(ctx: ToolContext): (req: IncomingMessage, res: Ser
     const reqCtx: ToolContext = { ...ctx, canWrite: identity.scope === "write", client: identity.name };
 
     try {
+      // Existing session: route to its transport. Every request must still
+      // authenticate, and with the very token that opened the session; a
+      // valid but different token cannot ride someone else's session.
+      if (cfg.enableSessions && sessionHeader) {
+        const session = sessions.get(sessionHeader);
+        if (!session) {
+          rpcError(res, 404, -32001, "unknown or expired session, reinitialize");
+          return;
+        }
+        if (session.identity !== identity.name) {
+          rpcError(res, 403, -32001, "this session belongs to another token");
+          return;
+        }
+        session.lastSeen = Date.now();
+        const body = req.method === "POST" ? await readJsonBody(req) : undefined;
+        await session.transport.handleRequest(req, res, body);
+        return;
+      }
+
       const body = await readJsonBody(req);
       log.debug(`MCP request from ${ip} as "${identity.name}" (${identity.scope})`);
+
+      // New session: an initialize without a session id opens one (#90).
+      // Non-initialize requests without a session id keep the stateless
+      // one-shot path, so historic clients continue working unchanged.
+      if (cfg.enableSessions && isInitialize(body)) {
+        if (sessions.size >= maxSessions) {
+          rpcError(res, 503, -32000, `session limit reached (${maxSessions}), retry later or use stateless requests`);
+          return;
+        }
+        const server = buildServer({ ...reqCtx, sessionMode: true });
+        const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          onsessioninitialized: (sid: string) => {
+            sessions.set(sid, { transport, server, identity: identity.name, lastSeen: Date.now() });
+            log.info(`MCP session ${sid.slice(0, 8)}… opened by "${identity.name}" (${sessions.size}/${maxSessions})`);
+          },
+        } as ConstructorParameters<typeof StreamableHTTPServerTransport>[0]);
+        transport.onclose = () => {
+          const sid = transport.sessionId;
+          if (sid && sessions.delete(sid)) {
+            log.info(`MCP session ${sid.slice(0, 8)}… closed (${sessions.size}/${maxSessions})`);
+            server.close();
+          }
+        };
+        await server.connect(transport as Parameters<typeof server.connect>[0]);
+        await transport.handleRequest(req, res, body);
+        return;
+      }
+
       // Stateless mode: one server and one transport per request, no session
       // (sessionIdGenerator left undefined). The SDK types are not
       // exactOptionalPropertyTypes-clean, hence the connect cast.
@@ -164,6 +259,7 @@ const OPTION_MIGRATIONS: Array<{ key: string; value: unknown }> = [
   { key: "api_tokens", value: [] },
   { key: "allow_camera", value: false },
   { key: "allow_config_write", value: false },
+  { key: "enable_sessions", value: false },
 ];
 
 /**

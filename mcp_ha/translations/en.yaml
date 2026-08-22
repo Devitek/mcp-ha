@@ -37,6 +37,14 @@ configuration:
       Every creation is validated by Home Assistant first and requires a
       two-step confirmation showing the full YAML. Existing automations and
       scripts are never modified.
+  enable_sessions:
+    name: Enable MCP sessions
+    description: >-
+      Long-lived sessions with an SSE stream: entity subscriptions (the
+      client is notified when a watched entity changes) and in-protocol
+      confirmation prompts (elicitation). Stateless clients keep working
+      unchanged. At most 16 simultaneous sessions, idle ones close after
+      30 minutes.
   filter_reads:
     name: Filter reads too
     description: >-

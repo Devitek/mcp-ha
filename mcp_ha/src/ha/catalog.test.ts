@@ -216,6 +216,20 @@ describe("live state cache (v0.3 #79)", () => {
     expect(states.find((s) => s.entity_id === "light.direct")?.state).toBe("racing");
   });
 
+  it("dispatches entity change events to listeners until detached (#90)", async () => {
+    const { ws, emit } = liveWs();
+    const catalog = new Catalog(ws);
+    await catalog.startLive();
+    const seen: string[] = [];
+    const detach = catalog.onEntityChange((id) => seen.push(id));
+    emit(changed("light.direct", "off"));
+    emit(changed("sensor.new", "1"));
+    expect(seen).toEqual(["light.direct", "sensor.new"]);
+    detach();
+    emit(changed("light.direct", "on"));
+    expect(seen).toHaveLength(2);
+  });
+
   it("falls back to TTL fetches when the subscription fails, and resubscribes after invalidate", async () => {
     const ws = fakeWs() as any;
     ws.subscribe = vi.fn(async () => {

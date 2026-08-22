@@ -26,6 +26,7 @@ The add-on adds an entry in the Home Assistant sidebar (and an **Open Web UI** b
 | `allow_write` | `false` | Exposes the six write tools (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`, `ha_create_helper`, `ha_delete_helper`). Without it, no write tool is even visible to the client. |
 | `allow_camera` | `false` | Exposes `ha_get_camera_snapshot` (camera still images). Independent from `allow_write`. |
 | `allow_config_write` | `false` | Exposes `ha_create_automation` and `ha_create_script` (creation only, HA-validated, mandatory two-step confirmation with the full YAML). Independent from `allow_write`. |
+| `enable_sessions` | `false` | Long-lived MCP sessions: entity subscriptions with notifications and in-protocol confirmations. Stateless clients keep working. 16 max, 30 min idle timeout. |
 | `filter_reads` | `false` | Also applies `entity_denylist` to reads: hidden entities disappear from listings, entity details, history, statistics and the logbook. Also disables `ha_render_template`, which could otherwise read any entity through Jinja. |
 | `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes (e.g. `light.*`). When non-empty, everything else is refused. |
 | `entity_denylist` | `[]` | Glob patterns of entities forbidden for writes (e.g. `lock.*`). The denylist always wins. |

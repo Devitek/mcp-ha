@@ -18,4 +18,13 @@ export interface ToolContext {
   canWrite?: boolean;
   /** Per-request: name of the authenticated token, for the audit trail (#85). */
   client?: string;
+  /** True when serving a long-lived session (SSE stream available, #90). */
+  sessionMode?: boolean;
+  /**
+   * Asks the human for confirmation through MCP elicitation (#90). Wired by
+   * buildServer in session mode only. Resolves true (confirmed), false
+   * (explicitly declined) or null (client cannot elicit: fall back to the
+   * confirm_token flow, which stays the universal path).
+   */
+  elicit?: (message: string) => Promise<boolean | null>;
 }

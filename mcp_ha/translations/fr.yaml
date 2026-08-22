@@ -38,6 +38,14 @@ configuration:
       d'allow_write. Chaque création est d'abord validée par Home Assistant
       et exige une confirmation en deux temps montrant le YAML complet. Les
       automations et scripts existants ne sont jamais modifiés.
+  enable_sessions:
+    name: Activer les sessions MCP
+    description: >-
+      Sessions longues avec flux SSE : abonnements aux entités (le client
+      est notifié quand une entité surveillée change) et confirmations dans
+      le protocole (elicitation). Les clients sans session continuent de
+      fonctionner tels quels. Au plus 16 sessions simultanées, fermées
+      après 30 minutes d'inactivité.
   filter_reads:
     name: Filtrer aussi les lectures
     description: >-

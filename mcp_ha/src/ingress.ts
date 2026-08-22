@@ -64,6 +64,7 @@ export function createIngressHandler(
       ["MCP resources / prompts", "3 / 4"],
       ["allow_write", cfg.allowWrite ? '<span class="warn">enabled</span>' : "disabled"],
       ["allow_config_write", cfg.allowConfigWrite ? '<span class="warn">enabled</span>' : "disabled"],
+      ["MCP sessions", cfg.enableSessions ? "enabled" : "disabled"],
       ["filter_reads", cfg.filterReads ? "enabled" : "disabled"],
       ["Confirmation domains", esc(cfg.confirmDomains.join(", ") || "none")],
       ["Entity allowlist / denylist", `${cfg.entityAllowlist.length} / ${cfg.entityDenylist.length} patterns`],
