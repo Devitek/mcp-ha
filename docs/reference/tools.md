@@ -255,4 +255,5 @@ Since v0.3 every tool response also carries `structuredContent` (the same JSON a
 | `energy-report` | `hours` (optional) | consumption summary built on long-term statistics |
 | `health-report` | none | guided instance health check built on ha_get_health |
 | `propose-automation` | `goal` | drafts a paste-ready automation YAML from verified entities, writes nothing |
+| `propose-dashboard-card` | `goal` | drafts a paste-ready Lovelace card YAML from verified entities, writes nothing |
 | `propose-script` | `goal` | drafts a paste-ready script YAML from verified entities, writes nothing |

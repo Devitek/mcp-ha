@@ -255,4 +255,5 @@ Depuis la v0.3, chaque réponse d'outil porte aussi `structuredContent` (le mêm
 | `energy-report` | `hours` (optionnel) | bilan de consommation bâti sur les statistiques long terme |
 | `health-report` | aucun | bilan de santé guidé bâti sur ha_get_health |
 | `propose-automation` | `goal` | rédige un YAML d'automation prêt à coller depuis des entités vérifiées, n'écrit rien |
+| `propose-dashboard-card` | `goal` | rédige un YAML de carte Lovelace prêt à coller depuis des entités vérifiées, n'écrit rien |
 | `propose-script` | `goal` | rédige un YAML de script prêt à coller depuis des entités vérifiées, n'écrit rien |
