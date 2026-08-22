@@ -169,6 +169,27 @@ describe("ingress dashboard (#136)", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  it("ships the three-state theme switcher (#136 follow-up)", async () => {
+    const base = await serve(createIngressHandler(ctx()));
+    const html = await (await fetch(`${base}/`)).text();
+    expect(html).toContain('id="theme"');
+    expect(html).toContain('body[data-theme="light"]');
+    expect(html).toContain('body:not([data-theme="dark"])');
+    expect(html).toContain("mcpha-theme");
+  });
+
+  it("inlines the add-on icon as a data URI, with the >_ fallback (#136 follow-up)", async () => {
+    const base = await serve(createIngressHandler(ctx()));
+    const html = await (await fetch(`${base}/`)).text();
+    // vitest runs from mcp_ha/, where the real icon.png lives.
+    expect(html).toContain("data:image/png;base64,");
+    expect(html).not.toContain("&gt;_");
+    const fallback = await serve(createIngressHandler(ctx(), Date.now(), { iconPath: "/nonexistent-mcpha/icon.png" }));
+    const html2 = await (await fetch(`${fallback}/`)).text();
+    expect(html2).toContain("&gt;_");
+    expect(html2).not.toContain("data:image/png");
+  });
+
   it("says so when there is no audit file yet", async () => {
     const base = await serve(createIngressHandler(ctx(), Date.now(), { auditPath: "/nonexistent-mcpha/audit.log" }));
     const html = await (await fetch(`${base}/`)).text();

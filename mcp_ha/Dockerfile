@@ -29,6 +29,8 @@ RUN /usr/local/bin/node --version
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+# Inlined by the ingress page header (data URI, #136 follow-up).
+COPY icon.png ./icon.png
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 
