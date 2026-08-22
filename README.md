@@ -20,6 +20,8 @@ This Home Assistant add-on exposes an [MCP](https://modelcontextprotocol.io) (Mo
 | Diagnostics | one-call health report (repairs, unavailable, batteries, stale automations) |
 | Scripts | list, running state |
 | History | state changes, long-term statistics, logbook |
+| Energy | dashboard-backed totals and period comparisons |
+| Presence | who is where, zone timeline (zones only, never coordinates) |
 | Helpers | create and delete input_*, counters, timers (opt-in) |
 | Notifications | send to phones and notify targets (opt-in, rate capped) |
 | Scenes | snapshot the current mood as a scene (opt-in, volatile) |
@@ -28,7 +30,7 @@ This Home Assistant add-on exposes an [MCP](https://modelcontextprotocol.io) (Mo
 | Add-ons | list and details (read) |
 | System | Jinja template rendering, HA config, error log |
 
-32 tools (20 read, 12 guarded write), designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
+34 tools (22 read, 12 guarded write), designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
 
 ## Why not the official HA MCP integration?
 

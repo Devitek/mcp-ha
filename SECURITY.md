@@ -51,6 +51,8 @@ Residual risk to understand: once `allow_config_write` is on, a confirmed creati
 
 ## Known and accepted limitations
 
+- **Presence is the most sensitive read the add-on serves.** `ha_get_presence` (0.16.0) deliberately speaks in zone names only and never reads coordinates or tracker sources, but "who is home and since when" remains personal data. The intended controls are `filter_reads` plus a `person.*` (and `device_tracker.*`) denylist on any read token you hand to a third party, and the named-token audit that says who asked.
+
 - `ha_render_template` evaluates Jinja on the HA side and can read the state of any entity. Without `filter_reads` the tool is available (nothing is hidden anyway); with `filter_reads` it is disabled entirely.
 - The generated token is stored in the add-on options, which means it also ends up in add-on backups. The options are only visible to HA admins; the log never contains it in full.
 - The add-on runs with `hassio_role: default`, the least privileged role. If `ha_get_addons` answers a 403 on your installation, please report it so the required role can be reassessed.

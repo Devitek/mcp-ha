@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.0 - 2026-08-22
+
+- **Energy report** (`ha_get_energy`): totals per source straight from the configured energy dashboard (grid import/export, solar, battery, gas, water, top consuming devices), over a day, week or month, with an optional comparison to the previous period ("this week vs last week"). The `energy-report` prompt now starts there and only falls back to sensor guessing without a dashboard.
+- **Presence summary** (`ha_get_presence`): who is home, in which zone, since when, zone occupant counts and a compact zone-change timeline. Zone names only, never coordinates, by design; see the privacy note in SECURITY.md.
+- 34 tools (22 read, 12 guarded write). 253 unit tests.
+
 ## 0.15.0 - 2026-08-22
 
 - **Scene snapshots** (`ha_snapshot_scene`): capture the current state of chosen entities as a scene ("capture the living room mood as Movie night"), volatile by Home Assistant design, replayable with `scene.turn_on`. Entity lists apply, existing scene ids are refused.
