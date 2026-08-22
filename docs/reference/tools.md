@@ -1,6 +1,6 @@
 # Tool reference
 
-38 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+40 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -206,6 +206,16 @@ Recorder aggregates (mean, min, max, sum) for numeric sensors. `statistic_id` (s
 ### ha_get_logbook
 
 Human-readable events, filterable by `entity_id`, window from 0.25 h up to 7 days, capped at 100 events.
+
+## Dashboards
+
+### ha_list_dashboards
+
+Without `dashboard`: the Lovelace dashboards (title, url_path, editable or YAML-managed). With `dashboard`: its views (index, title, layout, card count), what `ha_add_dashboard_card` needs.
+
+### ha_add_dashboard_card <Badge type="danger" text="config write" />
+
+Inserts ONE card into a dashboard view (draft it with `propose-dashboard-card` first). Same guarded flow as `ha_update_automation`: before/after diff **of the view**, the whole-dashboard hash in the confirmation fingerprint (a simultaneous UI edit invalidates the token), previous view YAML returned for rollback. Classic `cards` and modern `sections` layouts are both handled; YAML-managed dashboards are refused. Only insertion exists: no card removal, no view rewrite.
 
 ## Energy and presence
 

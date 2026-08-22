@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.22.0 - 2026-08-22
+
+- **Dashboard card insertion** (#129): `ha_list_dashboards` shows your Lovelace dashboards and views; `ha_add_dashboard_card` (behind `allow_config_write`) inserts ONE card into a view, with the full guarded flow: before/after diff of the view, concurrent-edit guard (a simultaneous UI edit invalidates the token), previous view YAML returned for rollback. Classic and sections layouts both handled, YAML dashboards refused, insertion only by design. The `propose-dashboard-card` prompt can now offer the direct insertion.
+- 40 tools (25 read, 15 guarded write). 283 unit tests.
+
 ## 0.21.0 - 2026-08-22
 
 - **Blueprints** (#127): `ha_list_blueprints` shows the installed blueprints with their typed inputs, and `ha_create_from_blueprint` creates an automation (or script) from one, the safest way to program the house: the behaviour is already written and vetted, required inputs are checked before anything is offered, and the usual guarded two-step flow applies. The `propose-automation` prompt now checks blueprints first.

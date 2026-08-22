@@ -1,6 +1,6 @@
 # Référence des outils
 
-38 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+40 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -206,6 +206,16 @@ Agrégats du recorder (moyenne, min, max, somme) pour les capteurs numériques. 
 ### ha_get_logbook
 
 Événements lisibles, filtrables par `entity_id`, fenêtre de 0.25 h à 7 jours, plafonné à 100 événements.
+
+## Dashboards
+
+### ha_list_dashboards
+
+Sans `dashboard` : les dashboards Lovelace (titre, url_path, éditable ou géré en YAML). Avec `dashboard` : ses vues (index, titre, layout, nombre de cartes), ce dont `ha_add_dashboard_card` a besoin.
+
+### ha_add_dashboard_card <Badge type="danger" text="écriture config" />
+
+Insère UNE carte dans une vue de dashboard (rédigez-la d'abord avec `propose-dashboard-card`). Même parcours gardé que `ha_update_automation` : diff avant/après **de la vue**, hash du dashboard entier dans l'empreinte de confirmation (une édition simultanée dans l'interface invalide le jeton), YAML de la vue précédente renvoyé pour retour arrière. Les layouts classiques `cards` et modernes `sections` sont gérés ; les dashboards en YAML sont refusés. Seule l'insertion existe : pas de suppression de carte, pas de réécriture de vue.
 
 ## Énergie et présence
 

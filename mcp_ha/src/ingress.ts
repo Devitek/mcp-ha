@@ -91,8 +91,8 @@ export function createIngressHandler(
       : `<span class="ko">down${downFor !== null ? ` for ${fmtUptime(downFor)}` : ""}</span>`;
     // 17 core read tools + 2 diagnostics (trace, health), plus camera and
     // the write tools depending on the options.
-    const readTools = 23 + (cfg.allowCamera ? 1 : 0);
-    const writeTools = (cfg.allowWrite ? 9 : 0) + (cfg.allowConfigWrite ? 5 : 0);
+    const readTools = 24 + (cfg.allowCamera ? 1 : 0);
+    const writeTools = (cfg.allowWrite ? 9 : 0) + (cfg.allowConfigWrite ? 6 : 0);
     const toolBreakdown = `${readTools + writeTools} (${readTools} read${writeTools ? ` + ${writeTools} write` : ""})`;
     const rows: Array<[string, string]> = [
       ["Version", esc(VERSION)],

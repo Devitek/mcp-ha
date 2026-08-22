@@ -53,7 +53,7 @@ describe("config write registration (#94 tier 3)", () => {
   it("is independent from allow_write", () => {
     const { server, tools } = fakeServer();
     registerConfigWriteTools(server, fakeCtx({ cfg: { allowConfigWrite: true, allowWrite: false } }));
-    expect([...tools.keys()].sort()).toEqual(["ha_create_automation", "ha_create_from_blueprint", "ha_create_script", "ha_update_automation", "ha_update_script"]);
+    expect([...tools.keys()].sort()).toEqual(["ha_add_dashboard_card", "ha_create_automation", "ha_create_from_blueprint", "ha_create_script", "ha_update_automation", "ha_update_script"]);
   });
 });
 
@@ -135,6 +135,91 @@ describe("ha_create_automation", () => {
     expect(res.isError).toBe(true);
     expect(res.text).toContain("already exists");
     expect(ws.send).not.toHaveBeenCalled();
+  });
+});
+
+describe("ha_add_dashboard_card (#129)", () => {
+  const CLASSIC_CONFIG = {
+    views: [
+      { title: "Home", path: "home", cards: [{ type: "weather-forecast", entity: "weather.maison" }] },
+      { title: "Salon", type: "sections", sections: [{ type: "grid", cards: [{ type: "tile", entity: "light.salon" }] }] },
+    ],
+  };
+  const CARD = { type: "gauge", entity: "sensor.temp" };
+
+  function dashSetup(over: any = {}) {
+    const { server, tools } = fakeServer();
+    const config = over.config ?? JSON.parse(JSON.stringify(CLASSIC_CONFIG));
+    const ws = {
+      send: vi.fn(async (type: string) => {
+        if (type === "lovelace/dashboards/list") return over.dashboards ?? [];
+        if (type === "lovelace/config") return over.configSequence ? over.configSequence.shift() : config;
+        if (type === "lovelace/config/save") return null;
+        return {};
+      }),
+    };
+    const ctx = fakeCtx({ cfg: { allowConfigWrite: true }, ws, client: "writer" });
+    registerConfigWriteTools(server, ctx);
+    return { tools, ws };
+  }
+
+  it("appends to a classic view by index with a view diff, then saves on confirmation", async () => {
+    const { tools, ws } = dashSetup();
+    const first = await callTool(tools, "ha_add_dashboard_card", { dashboard: "lovelace", view: 0, card: CARD });
+    expect(first.data.confirmation_required).toBe(true);
+    expect(first.data.diff).toContain("+ ");
+    expect(first.data.diff).toContain("gauge");
+    const res = await callTool(tools, "ha_add_dashboard_card", {
+      dashboard: "lovelace",
+      view: 0,
+      card: CARD,
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.data.updated).toContain("view 0");
+    expect(res.data.previous_view_yaml).toContain("weather-forecast");
+    const save = (ws.send as any).mock.calls.find((c: any[]) => c[0] === "lovelace/config/save");
+    expect(save[1].url_path).toBeNull();
+    expect(save[1].config.views[0].cards).toHaveLength(2);
+    expect(save[1].config.views[1]).toEqual(CLASSIC_CONFIG.views[1]); // untouched view preserved
+  });
+
+  it("appends into the last grid of a sections view targeted by title", async () => {
+    const { tools, ws } = dashSetup();
+    const first = await callTool(tools, "ha_add_dashboard_card", { dashboard: "lovelace", view: "salon", card: CARD });
+    await callTool(tools, "ha_add_dashboard_card", {
+      dashboard: "lovelace",
+      view: "salon",
+      card: CARD,
+      confirm_token: first.data.confirm_token,
+    });
+    const save = (ws.send as any).mock.calls.find((c: any[]) => c[0] === "lovelace/config/save");
+    expect(save[1].config.views[1].sections[0].cards).toHaveLength(2);
+  });
+
+  it("refuses YAML-managed dashboards and unknown views", async () => {
+    const { tools } = dashSetup({ dashboards: [{ url_path: "wall", title: "Wall", mode: "yaml" }] });
+    const yaml = await callTool(tools, "ha_add_dashboard_card", { dashboard: "wall", view: 0, card: CARD });
+    expect(yaml.isError).toBe(true);
+    expect(yaml.text).toContain("YAML-managed");
+    const nope = await callTool(tools, "ha_add_dashboard_card", { dashboard: "lovelace", view: "garage", card: CARD });
+    expect(nope.isError).toBe(true);
+    expect(nope.text).toContain("view not found");
+  });
+
+  it("invalidates the token when the dashboard changed between the passes", async () => {
+    const changed = JSON.parse(JSON.stringify(CLASSIC_CONFIG));
+    changed.views[0].cards.push({ type: "markdown", content: "edited in the UI" });
+    const { tools, ws } = dashSetup({ configSequence: [JSON.parse(JSON.stringify(CLASSIC_CONFIG)), changed] });
+    const first = await callTool(tools, "ha_add_dashboard_card", { dashboard: "lovelace", view: 0, card: CARD });
+    const res = await callTool(tools, "ha_add_dashboard_card", {
+      dashboard: "lovelace",
+      view: 0,
+      card: CARD,
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("mismatch");
+    expect((ws.send as any).mock.calls.some((c: any[]) => c[0] === "lovelace/config/save")).toBe(false);
   });
 });
 

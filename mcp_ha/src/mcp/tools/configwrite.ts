@@ -306,6 +306,134 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
   }
 
   server.registerTool(
+    "ha_add_dashboard_card",
+    {
+      title: "Add a dashboard card",
+      description:
+        "Inserts ONE card into a Lovelace dashboard view (draft it with the propose-dashboard-card " +
+        "prompt first). Two-step: the first call returns a before/after diff of the VIEW plus a " +
+        "confirm_token; show it to the user, then call again with the token. Classic and sections " +
+        "layouts are both handled; YAML-managed dashboards are refused. Find targets with " +
+        "ha_list_dashboards.",
+      inputSchema: {
+        dashboard: z.string().describe("url_path from ha_list_dashboards; 'lovelace' for the default"),
+        view: z.union([z.number().int().min(0), z.string()]).describe("View index, or its path/title"),
+        card: z.record(z.string(), z.unknown()).describe("The card config (type, entities...)"),
+        dry_run: z.boolean().optional().describe("true: return the diff preview only"),
+        confirm_token: z.string().optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    safe("ha_add_dashboard_card", async ({ dashboard, view, card, dry_run, confirm_token }) => {
+      const urlPath = dashboard === "lovelace" || dashboard === "" ? null : dashboard;
+      // YAML-managed dashboards are not editable through this API; refuse
+      // upfront when the listing knows it (the default dashboard's mode is
+      // only known at save time: its error is relayed).
+      try {
+        const list: any[] = ((await ctx.ws.send("lovelace/dashboards/list", {})) as any[]) ?? [];
+        const entry = list.find((d) => d.url_path === urlPath);
+        if (entry && entry.mode !== "storage") {
+          throw new Error(`dashboard ${dashboard} is YAML-managed: edit its YAML file directly`);
+        }
+      } catch (e) {
+        if (e instanceof Error && e.message.includes("YAML-managed")) throw e;
+        // listing unavailable: proceed, the save will tell
+      }
+
+      const config: any = await ctx.ws.send("lovelace/config", { url_path: urlPath });
+      const views: any[] = config?.views ?? [];
+      const idx =
+        typeof view === "number"
+          ? view
+          : views.findIndex(
+              (v) =>
+                String(v?.path ?? "").toLowerCase() === view.toLowerCase() ||
+                String(v?.title ?? "").toLowerCase() === view.toLowerCase()
+            );
+      const target = views[idx];
+      if (!target) {
+        throw new Error(
+          `view not found: ${view}. Views: ${views.map((v, i) => `${i}: ${v?.title ?? v?.path ?? "untitled"}`).join(", ") || "none"}`
+        );
+      }
+
+      const beforeViewYaml = stringify(target);
+      // Both layouts (#129): classic views carry cards[], modern ones carry
+      // sections[] of grids. Insert at the end of the last grid, or open one.
+      const newView = JSON.parse(JSON.stringify(target)) as Record<string, any>;
+      if (newView.type === "sections" || Array.isArray(newView.sections)) {
+        newView.sections = Array.isArray(newView.sections) ? newView.sections : [];
+        let last = newView.sections[newView.sections.length - 1];
+        if (!last || !Array.isArray(last.cards)) {
+          last = { type: "grid", cards: [] };
+          newView.sections.push(last);
+        }
+        last.cards.push(card);
+      } else {
+        newView.cards = [...(Array.isArray(newView.cards) ? newView.cards : []), card];
+      }
+      const afterViewYaml = stringify(newView);
+      const diff = unifiedDiff(beforeViewYaml, afterViewYaml);
+      // The whole-dashboard hash inside the fingerprint is the concurrent
+      // edit guard, same pattern as ha_update_automation (#108).
+      const baseHash = createHash("sha256").update(JSON.stringify(config)).digest("hex");
+      const hash = ConfirmationStore.fingerprint({
+        domain: "_config",
+        service: "ha_add_dashboard_card",
+        data: { dashboard, view: idx, card, base: baseHash },
+      });
+      const label = `${dashboard} (view ${idx}${target.title ? `: ${target.title}` : ""})`;
+
+      if (dry_run) {
+        audit({ client: client(), tool: "ha_add_dashboard_card", target: label, allowed: true, dry_run: true });
+        return { dry_run: true, would_update: label, diff };
+      }
+      if (!confirm_token) {
+        const answer = ctx.elicit
+          ? await ctx.elicit(`About to add a card to ${label}. Review the view change:\n\n${diff}\nConfirm?`)
+          : null;
+        if (answer === false) {
+          audit({ client: client(), tool: "ha_add_dashboard_card", target: label, allowed: false, reason: "declined by the user (elicitation)" });
+          throw new Error("card insertion declined by the user");
+        }
+        if (answer === null) {
+          const token = ctx.confirmations.issue(hash);
+          audit({ client: client(), tool: "ha_add_dashboard_card", target: label, allowed: false, reason: "confirmation_required" });
+          return {
+            confirmation_required: true,
+            confirm_token: token,
+            expires_in_seconds: 120,
+            would_update: label,
+            diff,
+            note: "Show this view diff to the user and get their approval, then call again with the SAME arguments plus confirm_token.",
+          };
+        }
+        audit({ client: client(), tool: "ha_add_dashboard_card", target: label, allowed: true, confirmed_via: "elicitation" });
+      } else {
+        const verdict = ctx.confirmations.consume(confirm_token, hash);
+        if (verdict !== "ok") {
+          audit({ client: client(), tool: "ha_add_dashboard_card", target: label, allowed: false, reason: `confirm_token ${verdict}` });
+          throw new Error(
+            `confirm_token ${verdict}: ` +
+              (verdict === "mismatch"
+                ? "the dashboard changed since the confirmation (or the arguments differ); review and restart."
+                : "request a fresh confirmation and try again.")
+          );
+        }
+      }
+
+      const newConfig = { ...config, views: views.map((v, i) => (i === idx ? newView : v)) };
+      await ctx.ws.send("lovelace/config/save", { url_path: urlPath, config: newConfig });
+      audit({ client: client(), tool: "ha_add_dashboard_card", target: label, allowed: true, before: baseHash.slice(0, 12) });
+      return {
+        updated: label,
+        previous_view_yaml: beforeViewYaml,
+        note: "Keep previous_view_yaml if you may want to revert this view; the add-on does not store it.",
+      };
+    })
+  );
+
+  server.registerTool(
     "ha_create_from_blueprint",
     {
       title: "Create from a blueprint",
