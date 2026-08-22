@@ -16,6 +16,27 @@ export interface IngressOptions {
   usage?: UsageTracker;
   /** Audit file location, injectable for tests (#126). */
   auditPath?: string;
+  /** Add-on icon location, injectable for tests (#136 follow-up). */
+  iconPath?: string;
+}
+
+/**
+ * The add-on icon, inlined as a data URI (3.4 KB PNG): keeps the page a
+ * single response with no extra route and no network dependency. Cached per
+ * path; null when unreadable, the header then falls back to the >_ mark.
+ */
+const iconCache = new Map<string, string | null>();
+async function loadIcon(path: string): Promise<string | null> {
+  const cached = iconCache.get(path);
+  if (cached !== undefined) return cached;
+  let uri: string | null = null;
+  try {
+    uri = `data:image/png;base64,${(await readFile(path)).toString("base64")}`;
+  } catch {
+    uri = null;
+  }
+  iconCache.set(path, uri);
+  return uri;
 }
 
 function fmtUptime(ms: number): string {
@@ -105,6 +126,8 @@ export function createIngressHandler(
   opts: IngressOptions = {}
 ): (req: IncomingMessage, res: ServerResponse) => void {
   const auditPath = opts.auditPath ?? "/data/audit.log";
+  // Relative to cwd: mcp_ha/ in dev, /app in the image (Dockerfile COPY).
+  const iconPath = opts.iconPath ?? "icon.png";
   return async (req, res) => {
     const { cfg, ws } = ctx;
     const downFor = ws.disconnectedForMs();
@@ -119,6 +142,10 @@ export function createIngressHandler(
 
     const snap = opts.usage?.snapshot();
     const audit = await readAuditTail(auditPath);
+    const icon = await loadIcon(iconPath);
+    const logoHtml = icon
+      ? `<img src="${icon}" alt="" width="40" height="40" style="border-radius:9px;display:block">`
+      : `<div style="width:40px;height:40px;border-radius:9px;background:#060d06;display:flex;align-items:center;justify-content:center;border:1px solid #1f2a1f"><span style="${MONO};font-size:20px;color:#33ff66;line-height:1">&gt;_</span></div>`;
     const mcpUrl = `http://${detectHaHost(req)}:9583/mcp`;
 
     // --- Overview -------------------------------------------------------
@@ -226,7 +253,8 @@ ${safetyRow("allow / deny patterns", `<span style="font-size:12px;${MONO};color:
 <title>MCP Home Assistant</title>
 <style>
 body{--bg:#0d1117;--card:#161b22;--border:#21262d;--row-border:#1c2128;--btn-border:#30363d;--muted:#8b949e;--text:#e6edf3;--faint:#484f58;--code:#79c0ff;--link:#58a6ff;--accent:#33ff66;--ok:#3fb950;--ok-glow:#3fb95088;--ok-bg:#0f1f14;--ok-border:#1f4429;--warn:#d29922;--warn-bg:#2d2308;--warn-border:#4d3d0e;--err:#f85149;margin:0;background:var(--bg);font-family:'IBM Plex Sans',-apple-system,system-ui,sans-serif;color:var(--text)}
-@media (prefers-color-scheme: light){body{--bg:#f6f8fa;--card:#ffffff;--border:#d0d7de;--row-border:#eaeef2;--btn-border:#afb8c1;--muted:#57606a;--text:#1f2328;--faint:#8c959f;--code:#0550ae;--link:#0969da;--accent:#1a7f37;--ok:#1a7f37;--ok-glow:rgba(26,127,55,.35);--ok-bg:#dafbe1;--ok-border:#aceebb;--warn:#9a6700;--warn-bg:#fff8c5;--warn-border:#d4a72c;--err:#cf222e}}
+body[data-theme="light"]{--bg:#f6f8fa;--card:#ffffff;--border:#d0d7de;--row-border:#eaeef2;--btn-border:#afb8c1;--muted:#57606a;--text:#1f2328;--faint:#8c959f;--code:#0550ae;--link:#0969da;--accent:#1a7f37;--ok:#1a7f37;--ok-glow:rgba(26,127,55,.35);--ok-bg:#dafbe1;--ok-border:#aceebb;--warn:#9a6700;--warn-bg:#fff8c5;--warn-border:#d4a72c;--err:#cf222e}
+@media (prefers-color-scheme: light){body:not([data-theme="dark"]){--bg:#f6f8fa;--card:#ffffff;--border:#d0d7de;--row-border:#eaeef2;--btn-border:#afb8c1;--muted:#57606a;--text:#1f2328;--faint:#8c959f;--code:#0550ae;--link:#0969da;--accent:#1a7f37;--ok:#1a7f37;--ok-glow:rgba(26,127,55,.35);--ok-bg:#dafbe1;--ok-border:#aceebb;--warn:#9a6700;--warn-bg:#fff8c5;--warn-border:#d4a72c;--err:#cf222e}}
 a{color:var(--link)}
 .btn{font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border:1px solid var(--btn-border);border-radius:6px;background:var(--border);color:var(--text);cursor:pointer}
 .btn:hover{background:var(--btn-border)}
@@ -239,11 +267,12 @@ a{color:var(--link)}
 .fpill:hover{border-color:var(--muted)}
 .fpill.on{border-color:var(--accent);background:var(--ok-bg);color:var(--accent)}
 </style></head><body>
+<script>try{var _t=localStorage.getItem("mcpha-theme");if(_t)document.body.setAttribute("data-theme",_t)}catch(e){}</script>
 <div style="max-width:980px;margin:0 auto;padding:28px 24px 48px">
 <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-<div style="width:40px;height:40px;border-radius:9px;background:#060d06;display:flex;align-items:center;justify-content:center;border:1px solid #1f2a1f"><span style="${MONO};font-size:20px;color:#33ff66;line-height:1">&gt;_</span></div>
+${logoHtml}
 <div style="display:flex;flex-direction:column;gap:1px"><div style="font-size:18px;font-weight:700;letter-spacing:-.01em">MCP Home Assistant</div><div style="font-size:12px;color:var(--muted);${MONO}">v${esc(VERSION)} · uptime ${esc(fmtUptime(Date.now() - startedAt))}</div></div>
-<div style="margin-left:auto;display:flex;align-items:center;gap:10px">${wsBadge}<div style="font-size:11px;color:var(--muted)">auto-refresh 60s</div></div>
+<div style="margin-left:auto;display:flex;align-items:center;gap:10px">${wsBadge}<div style="font-size:11px;color:var(--muted)">auto-refresh 60s</div><button class="btn" id="theme"></button></div>
 </div>
 
 <div style="display:flex;gap:2px;margin-top:24px;border-bottom:1px solid var(--border)">
@@ -292,6 +321,26 @@ ${auditTable}
 (function () {
   var TOKEN = ${JSON.stringify(cfg.apiToken)};
   var MASK = ${JSON.stringify(maskSecret(cfg.apiToken))};
+
+  // Theme cycle dark/light/auto, persisted across the 60s refresh. "auto"
+  // removes the attribute so the prefers-color-scheme media query rules.
+  var THEMES = ["auto", "dark", "light"];
+  function applyTheme(t) {
+    if (t === "auto") document.body.removeAttribute("data-theme");
+    else document.body.setAttribute("data-theme", t);
+    document.getElementById("theme").textContent = "Theme: " + t;
+  }
+  var theme = "auto";
+  try { theme = localStorage.getItem("mcpha-theme") || "auto"; } catch (e) {}
+  applyTheme(theme);
+  document.getElementById("theme").addEventListener("click", function () {
+    theme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+    try {
+      if (theme === "auto") localStorage.removeItem("mcpha-theme");
+      else localStorage.setItem("mcpha-theme", theme);
+    } catch (e) {}
+    applyTheme(theme);
+  });
 
   // Tabs: state lives in location.hash so it survives the 60s refresh.
   var tabs = document.querySelectorAll(".tab");
