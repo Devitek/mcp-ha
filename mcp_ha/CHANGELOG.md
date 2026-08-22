@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.0 - 2026-08-23
+
+- **Ingress page redesign**: the status page becomes a four-tab dashboard (Overview with stat cards, safety badges and top-tool bars; Connect a client with per-client sub-tabs; Tokens with the masked token table and scopes; Write audit with client-side filters All / OK / Refused / Dry run+confirm). Dark theme with a full light variant following the OS. Still one server-rendered response, vanilla JS only, system fonts, no network dependency; the token reveal/copy mechanics, escaping and audit contracts are unchanged. Named tokens are only ever rendered masked.
+
 ## 0.22.1 - 2026-08-23
 
 - `ha_explain_event` now resolves a `context_user_id` to its person entity when one is linked ("by Thomas (person.thomas)" instead of an opaque id), with no extra privileges: person entities carry their user id as an attribute. Hidden persons do not resolve (`filter_reads`), unlinked accounts keep the raw id. Born from a real-world test of #124.
