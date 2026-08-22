@@ -187,7 +187,7 @@ Step-by-step record of recent automation or script runs, the first reflex for "w
 
 ### ha_explain_event
 
-Explains WHY an entity changed: follows Home Assistant's context chain (the immediate actor, what triggered it in turn, the human when there was one), up to 4 hops. Without `at`: the entity's last change. Hidden causes appear as `(hidden entity)` under `filter_reads`. The missing link between the logbook (what) and `ha_get_automation_trace` (how); the answer points to the trace when an automation is in the chain.
+Explains WHY an entity changed: follows Home Assistant's context chain (the immediate actor, what triggered it in turn, the human when there was one, resolved to their person entity when one is linked and visible), up to 4 hops. Without `at`: the entity's last change. Hidden causes appear as `(hidden entity)` under `filter_reads`. The missing link between the logbook (what) and `ha_get_automation_trace` (how); the answer points to the trace when an automation is in the chain.
 
 ### ha_get_health
 

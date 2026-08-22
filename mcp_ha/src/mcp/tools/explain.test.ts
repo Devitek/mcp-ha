@@ -11,6 +11,7 @@ const fixtures = [
   entity("light.hallway", { name: "Hallway", last_changed: AT }),
   entity("automation.night_motion", { name: "Night motion", attributes: { id: "nm-1" } }),
   entity("binary_sensor.hall_motion", { name: "Hall motion" }),
+  entity("person.thomas", { name: "Thomas", state: "home", attributes: { user_id: "abc123" } }),
 ];
 
 function setup(logbookByEntity: Record<string, any[]>, cfgOver: any = {}) {
@@ -48,12 +49,35 @@ describe("ha_explain_event (#124)", () => {
     expect(res.data.note).toContain("ha_get_automation_trace");
   });
 
-  it("names the user when a human acted", async () => {
+  it("resolves the user to their person entity, no admin rights needed (#134)", async () => {
     const { tools } = setup({
       "light.hallway": [{ when: AT, entity_id: "light.hallway", state: "off", context_user_id: "abc123" }],
     });
     const res = await callTool(tools, "ha_explain_event", { entity_id: "light.hallway", at: AT });
-    expect(res.data.chain[0]).toMatchObject({ user_id: "abc123" });
+    expect(res.data.chain[0]).toMatchObject({ user: "Thomas", person: "person.thomas", user_id: "abc123" });
+    expect(res.data.chain[0].user_note).toBeUndefined();
+  });
+
+  it("keeps the raw id when no visible person matches", async () => {
+    const { tools } = setup({
+      "light.hallway": [{ when: AT, entity_id: "light.hallway", state: "off", context_user_id: "service-account-999" }],
+    });
+    const res = await callTool(tools, "ha_explain_event", { entity_id: "light.hallway", at: AT });
+    expect(res.data.chain[0]).toMatchObject({ user_id: "service-account-999" });
+    expect(res.data.chain[0].user).toBeUndefined();
+    expect(res.data.chain[0].user_note).toContain("admin rights");
+  });
+
+  it("does not resolve a person hidden by filter_reads", async () => {
+    const { tools } = setup(
+      {
+        "light.hallway": [{ when: AT, entity_id: "light.hallway", state: "off", context_user_id: "abc123" }],
+      },
+      { filterReads: true, entityDenylist: ["person.*"] }
+    );
+    const res = await callTool(tools, "ha_explain_event", { entity_id: "light.hallway", at: AT });
+    expect(res.data.chain[0].user_id).toBe("abc123");
+    expect(JSON.stringify(res.data)).not.toContain("Thomas");
   });
 
   it("answers honestly when nothing is recorded", async () => {
