@@ -1,6 +1,6 @@
 # Référence des outils
 
-34 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+36 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -125,6 +125,10 @@ Envoie une notification vers un téléphone ou toute cible notify. Sans `target`
 | `title` / `data` | string / object | extras plateforme transmis tels quels |
 | `dry_run` / `confirm_token` | | comme `ha_call_service` |
 
+### ha_announce <Badge type="danger" text="écriture" />
+
+Fait parler la maison (« annonce que le dîner est prêt »). Sans `target` : liste les satellites Assist, les media players et les moteurs TTS. Les satellites utilisent leur `announce` natif ; les media players passent par `tts.speak` (moteur choisi automatiquement ou passé via `engine`). Même chemin gardé que tout appel de service, et plafonné à **3 annonces par minute et par cible** : une voix dans le salon dérange plus qu'une vibration. Messages tronqués à ~500 caractères (c'est de l'audio).
+
 ### ha_create_automation <Badge type="danger" text="écriture config" />
 
 Crée une NOUVELLE automation. Enregistré uniquement quand `allow_config_write` est activé (indépendant d'`allow_write`). Le parcours est volontairement lourd : Home Assistant valide d'abord les blocs, puis la réponse porte le YAML complet et un `confirm_token` ; le client doit montrer le YAML à l'humain et rappeler avec le jeton. Une automation existante (même alias) est refusée : création seule, pas de modification.
@@ -172,6 +176,10 @@ entity_id, nom, running, last_triggered. Paramètres : `limit`, `offset`.
 Le pas à pas des exécutions récentes d'une automation ou d'un script, le premier réflexe du « pourquoi ça s'est déclenché (ou pas) ? ». Sans `run_id` : la liste des exécutions récentes (déclencheur, issue, dernier step, erreur). Avec `run_id` : le chemin ordonné des steps avec les verdicts des conditions et les erreurs. Les variables sont volontairement omises (taille, et elles divulgueraient les états d'autres entités malgré `filter_reads`). Home Assistant ne garde que les dernières exécutions en mémoire, depuis son dernier redémarrage.
 
 ## Diagnostics
+
+### ha_explain_event
+
+Explique POURQUOI une entité a changé : suit la chaîne de contexte de Home Assistant (l'acteur immédiat, ce qui l'a déclenché à son tour, l'humain le cas échéant), jusqu'à 4 sauts. Sans `at` : le dernier changement de l'entité. Les causes masquées apparaissent comme `(hidden entity)` sous `filter_reads`. Le chaînon manquant entre le logbook (quoi) et `ha_get_automation_trace` (comment) ; la réponse renvoie vers la trace quand une automation est dans la chaîne.
 
 ### ha_get_health
 
