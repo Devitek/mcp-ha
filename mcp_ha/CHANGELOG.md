@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.15.0 - 2026-08-22
+
+- **Scene snapshots** (`ha_snapshot_scene`): capture the current state of chosen entities as a scene ("capture the living room mood as Movie night"), volatile by Home Assistant design, replayable with `scene.turn_on`. Entity lists apply, existing scene ids are refused.
+- **System updates and backups**: `ha_get_system` gains `section: "updates"` (pending Core, OS and add-on updates) and `section: "backups"` (last backup age, recent list). If the add-on's deliberately minimal Supervisor role cannot list backups, the answer says so honestly instead of escalating privileges.
+- 32 tools (20 read, 12 guarded write). 245 unit tests.
+
 ## 0.14.0 - 2026-08-22
 
 - **Guarded automation and script modification** (`ha_update_automation`, `ha_update_script`, behind the existing `allow_config_write`): provided blocks replace the current ones wholesale, Home Assistant validates first, and the mandatory confirmation shows a **before/after diff** instead of just the new YAML. The base configuration is part of the confirmation fingerprint, so an automation edited in the UI between the two passes invalidates the token. The success answer returns the previous YAML for manual rollback. Deletion remains unsupported.

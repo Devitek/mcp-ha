@@ -1,6 +1,6 @@
 # Référence des outils
 
-31 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+32 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -109,6 +109,10 @@ Crée un helper : un pur conteneur d'état sans comportement (`input_boolean`, `
 ### ha_delete_helper <Badge type="danger" text="écriture" />
 
 Supprime un helper géré par l'interface, par entity_id. L'id de collection est résolu via le registre d'entités, les helpers renommés sont donc gérés ; les helpers définis en YAML sont refusés avec un message clair. Soumis aux listes d'entités, audité.
+
+### ha_snapshot_scene <Badge type="danger" text="écriture" />
+
+Capture l'état COURANT des entités données en une scène (« capture l'ambiance du salon en Soirée cinéma »), via `scene.create` avec `snapshot_entities`. La scène est **volatile par conception de Home Assistant** (elle vit jusqu'au rechargement des scènes ou un redémarrage) ; rejouez-la avec `scene.turn_on`. Les listes d'entités bornent ce qui est capturable ; un id de scène existant est refusé.
 
 ### ha_send_notification <Badge type="danger" text="écriture" />
 
@@ -219,7 +223,7 @@ Sans `slug` : la liste des add-ons installés. Avec `slug` : le détail d'un add
 
 ### ha_get_system
 
-`section: "config"` : version de HA, nom, fuseau, unités, nombre d'intégrations. `section: "error_log"` : les 100 dernières lignes du journal d'erreurs de HA.
+`section: "config"` : version de HA, nom, fuseau, unités, nombre d'intégrations. `section: "error_log"` : les 100 dernières lignes du journal d'erreurs de HA. `section: "updates"` : mises à jour Core, OS et add-ons en attente. `section: "backups"` : âge de la dernière sauvegarde et sauvegardes récentes (répond honnêtement si le rôle Supervisor minimal ne peut pas les lister).
 
 ## Resources et prompts
 
