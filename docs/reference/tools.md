@@ -1,6 +1,6 @@
 # Tool reference
 
-34 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+36 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -125,6 +125,10 @@ Sends a notification to a phone or any notify target. Without `target`: lists th
 | `title` / `data` | string / object | platform extras passed as-is |
 | `dry_run` / `confirm_token` | | as in `ha_call_service` |
 
+### ha_announce <Badge type="danger" text="write" />
+
+Speaks a message in the house ("announce that dinner is ready"). Without `target`: lists Assist satellites, media players and TTS engines. Satellites use their native `announce`; media players go through `tts.speak` (engine auto-picked or passed via `engine`). Same guarded path as every service call, and capped at **3 announcements per minute per target**: a voice in the living room disturbs more than a vibration. Messages truncated at ~500 chars (it is audio).
+
 ### ha_create_automation <Badge type="danger" text="config write" />
 
 Creates a NEW automation. Only registered when `allow_config_write` is enabled (independent from `allow_write`). The flow is deliberately heavy: Home Assistant validates the blocks first, then the answer carries the complete YAML and a `confirm_token`; the client must show the YAML to the human and call again with the token. Existing automations (same alias) are refused: creation only, no modification.
@@ -172,6 +176,10 @@ entity_id, name, running, last_triggered. Params: `limit`, `offset`.
 Step-by-step record of recent automation or script runs, the first reflex for "why did this fire (or not)?". Without `run_id`: the list of recent runs (trigger, outcome, last step, error). With `run_id`: the ordered step path with condition verdicts and errors. Variables are deliberately omitted (size, and they would leak other entities' states past `filter_reads`). Home Assistant keeps only the last few runs in memory, since its last restart.
 
 ## Diagnostics
+
+### ha_explain_event
+
+Explains WHY an entity changed: follows Home Assistant's context chain (the immediate actor, what triggered it in turn, the human when there was one), up to 4 hops. Without `at`: the entity's last change. Hidden causes appear as `(hidden entity)` under `filter_reads`. The missing link between the logbook (what) and `ha_get_automation_trace` (how); the answer points to the trace when an automation is in the chain.
 
 ### ha_get_health
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0 - 2026-08-22
+
+- **Causality chains** (`ha_explain_event`): "why did this light turn on at 3am?" now has an exact answer. Follows Home Assistant's context records from the entity to its immediate actor (an automation, a user) and to what triggered that in turn, up to 4 hops; points to `ha_get_automation_trace` when an automation is in the chain. Honest "no recorded cause" when the history has nothing.
+- **Voice announcements** (`ha_announce`): "announce that dinner is ready" on Assist satellites (native announce) and media players (via `tts.speak`, engine auto-picked). Guarded path, capped at 3 per minute per target, messages truncated for audio.
+- 36 tools (23 read, 13 guarded write). 272 unit tests.
+
 ## 0.19.0 - 2026-08-22
 
 - **Audit viewer on the ingress page**: the last 50 write-audit entries, newest first, rendered behind your Home Assistant session. The #91 contract is untouched: MCP clients can never read or clear the audit; SSH remains the full-history path.

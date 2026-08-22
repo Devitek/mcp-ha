@@ -4,6 +4,7 @@ import type { ToolContext } from "../../context.js";
 import { safe, trunc } from "../helpers.js";
 import { guardedServiceCall } from "../writeflow.js";
 import { audit } from "../../logger.js";
+import { TargetRateLimiter } from "../../rate.js";
 
 /**
  * Outbound notifications (#116). Doable through ha_call_service since v0.2,
@@ -14,26 +15,13 @@ import { audit } from "../../logger.js";
 /**
  * A notification physically disturbs someone (ring, watch buzz): a looping
  * assistant must not hammer. Process-wide fixed cap per target; the audit
- * trail then says who sent what.
+ * trail then says who sent what. Limiter shared with ha_announce (#125).
  */
-const MAX_PER_MINUTE = 6;
-const sentAt = new Map<string, number[]>();
+const limiter = new TargetRateLimiter(6);
 
 /** Test hook. */
 export function resetNotifyLimiter(): void {
-  sentAt.clear();
-}
-
-function rateLimited(target: string): boolean {
-  const now = Date.now();
-  const recent = (sentAt.get(target) ?? []).filter((t) => now - t < 60_000);
-  if (recent.length >= MAX_PER_MINUTE) {
-    sentAt.set(target, recent);
-    return true;
-  }
-  recent.push(now);
-  sentAt.set(target, recent);
-  return false;
+  limiter.reset();
 }
 
 export function registerNotifyTools(server: McpServer, ctx: ToolContext): void {
@@ -73,15 +61,15 @@ export function registerNotifyTools(server: McpServer, ctx: ToolContext): void {
       const body = trunc(message, 1000);
       const isEntity = target.startsWith("notify.") && (await ctx.catalog.index()).some((e) => e.entity_id === target);
 
-      if (!dry_run && rateLimited(target)) {
+      if (!dry_run && !limiter.allow(target)) {
         audit({
           client: ctx.client ?? "default",
           tool: "ha_send_notification",
           target,
           allowed: false,
-          reason: `rate limited (${MAX_PER_MINUTE}/min per target)`,
+          reason: `rate limited (${limiter.limit}/min per target)`,
         });
-        throw new Error(`rate limited: at most ${MAX_PER_MINUTE} notifications per minute per target. Wait before retrying.`);
+        throw new Error(`rate limited: at most ${limiter.limit} notifications per minute per target. Wait before retrying.`);
       }
 
       if (isEntity) {
