@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.13.0 - 2026-08-22
+
+- **Outbound notifications** (`ha_send_notification`): "tell me when the wash is done". Lists the real targets when called without one, routes legacy `notify.*` services and modern notify entities automatically, flows through the same guarded write path as every service call, and is capped at 6 notifications per minute per target because a notification physically disturbs someone.
+- 29 tools (20 read, 9 guarded write). 233 unit tests.
+
 ## 0.12.0 - 2026-08-22
 
 - **Automation traces** (`ha_get_automation_trace`): the step-by-step record of recent automation and script runs, straight from Home Assistant's trace store. Which trigger fired, how each condition evaluated, which action failed. Variables are deliberately omitted (size and privacy). The `diagnose-automation` prompt now starts there.

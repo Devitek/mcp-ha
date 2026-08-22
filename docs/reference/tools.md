@@ -1,6 +1,6 @@
 # Tool reference
 
-28 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+29 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -109,6 +109,17 @@ Creates a helper: a pure state container with no behaviour (`input_boolean`, `in
 ### ha_delete_helper <Badge type="danger" text="write" />
 
 Deletes a UI-managed helper by entity_id. The collection id is resolved through the entity registry, so renamed helpers are handled; YAML-defined helpers are refused with a clear message. Subject to the entity allow/deny lists, audited.
+
+### ha_send_notification <Badge type="danger" text="write" />
+
+Sends a notification to a phone or any notify target. Without `target`: lists the available targets (legacy `notify.*` services and modern notify entities); the right call is routed automatically. Goes through the same guarded path as `ha_call_service` (denylist, audit, dry_run) and is capped at **6 notifications per minute per target**: a notification physically disturbs someone, a looping assistant must not hammer.
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `message` | string, required | truncated beyond ~1000 chars |
+| `target` | string | e.g. `mobile_app_pixel` or `notify.telephone`; omit to list |
+| `title` / `data` | string / object | platform extras passed as-is |
+| `dry_run` / `confirm_token` | | as in `ha_call_service` |
 
 ### ha_create_automation <Badge type="danger" text="config write" />
 
