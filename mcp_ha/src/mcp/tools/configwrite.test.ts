@@ -53,7 +53,7 @@ describe("config write registration (#94 tier 3)", () => {
   it("is independent from allow_write", () => {
     const { server, tools } = fakeServer();
     registerConfigWriteTools(server, fakeCtx({ cfg: { allowConfigWrite: true, allowWrite: false } }));
-    expect([...tools.keys()].sort()).toEqual(["ha_create_automation", "ha_create_script"]);
+    expect([...tools.keys()].sort()).toEqual(["ha_create_automation", "ha_create_script", "ha_update_automation", "ha_update_script"]);
   });
 });
 
@@ -135,6 +135,112 @@ describe("ha_create_automation", () => {
     expect(res.isError).toBe(true);
     expect(res.text).toContain("already exists");
     expect(ws.send).not.toHaveBeenCalled();
+  });
+});
+
+describe("ha_update_automation / ha_update_script (#108)", () => {
+  const CURRENT = {
+    alias: "Night heating",
+    mode: "single",
+    triggers: [{ trigger: "time", at: "22:00:00" }],
+    actions: [{ action: "climate.set_temperature", data: { temperature: 17 } }],
+  };
+  const AUTOMATION_ENTITY = entity("automation.night_heating", {
+    name: "Night heating",
+    attributes: { id: "night-42" },
+  });
+
+  function updateSetup(over: any = {}) {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => ({ triggers: { valid: true }, actions: { valid: true } })) };
+    const coreGet = over.coreGet ?? vi.fn(async () => CURRENT);
+    const corePost = vi.fn(async () => ({ result: "ok" }));
+    const ctx = fakeCtx({
+      cfg: { allowConfigWrite: true },
+      ws,
+      http: { coreGet, corePost },
+      catalog: { index: async () => [AUTOMATION_ENTITY, entity("script.movie", { name: "Movie" })] },
+      client: "writer",
+      ...over.ctx,
+    });
+    registerConfigWriteTools(server, ctx);
+    return { tools, ws, coreGet, corePost };
+  }
+
+  it("returns a before/after diff and requires confirmation, then posts the merged config", async () => {
+    const { tools, coreGet, corePost } = updateSetup();
+    const first = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.night_heating",
+      actions: [{ action: "climate.set_temperature", data: { temperature: 16 } }],
+    });
+    expect(coreGet).toHaveBeenCalledWith("/config/automation/config/night-42");
+    expect(first.data.confirmation_required).toBe(true);
+    expect(first.data.diff).toContain("- ");
+    expect(first.data.diff).toContain("+ ");
+    expect(first.data.diff).toContain("16");
+    const res = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.night_heating",
+      actions: [{ action: "climate.set_temperature", data: { temperature: 16 } }],
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.data.updated).toBe("automation.night_heating");
+    expect(res.data.previous_yaml).toContain("17");
+    const [path, payload] = corePost.mock.calls[0] as any;
+    expect(path).toBe("/config/automation/config/night-42");
+    // wholesale replacement of actions, untouched blocks preserved
+    expect(payload.actions[0].data.temperature).toBe(16);
+    expect(payload.triggers).toEqual(CURRENT.triggers);
+    expect(payload.alias).toBe("Night heating");
+  });
+
+  it("refuses the token when the config changed between the passes (concurrent edit)", async () => {
+    let reads = 0;
+    const coreGet = vi.fn(async () => (++reads === 1 ? CURRENT : { ...CURRENT, alias: "Edited in the UI" }));
+    const { tools, corePost } = updateSetup({ coreGet });
+    const first = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.night_heating",
+      mode: "restart",
+    });
+    const res = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.night_heating",
+      mode: "restart",
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("mismatch");
+    expect(corePost).not.toHaveBeenCalled();
+  });
+
+  it("requires at least one field and refuses YAML-managed targets", async () => {
+    const yamlEntity = entity("automation.from_yaml", { attributes: {} });
+    const { tools } = updateSetup({ ctx: { catalog: { index: async () => [AUTOMATION_ENTITY, yamlEntity] } } });
+    const empty = await callTool(tools, "ha_update_automation", { entity_id: "automation.night_heating" });
+    expect(empty.isError).toBe(true);
+    expect(empty.text).toContain("nothing to change");
+    const yaml = await callTool(tools, "ha_update_automation", { entity_id: "automation.from_yaml", mode: "restart" });
+    expect(yaml.isError).toBe(true);
+    expect(yaml.text).toContain("YAML-defined");
+  });
+
+  it("updates a script through its object id and supports dry_run", async () => {
+    const coreGet = vi.fn(async () => ({ alias: "Movie", sequence: [{ action: "light.turn_off" }] }));
+    const { tools, corePost } = updateSetup({ coreGet });
+    const res = await callTool(tools, "ha_update_script", {
+      entity_id: "script.movie",
+      sequence: [{ action: "light.turn_off" }, { action: "media_player.turn_on" }],
+      dry_run: true,
+    });
+    expect(coreGet).toHaveBeenCalledWith("/config/script/config/movie");
+    expect(res.data.dry_run).toBe(true);
+    expect(res.data.diff).toContain("media_player.turn_on");
+    expect(corePost).not.toHaveBeenCalled();
+  });
+
+  it("executes directly when elicitation confirms", async () => {
+    const { tools, corePost } = updateSetup({ ctx: { elicit: async () => true } });
+    const res = await callTool(tools, "ha_update_automation", { entity_id: "automation.night_heating", mode: "queued" });
+    expect(res.data.updated).toBe("automation.night_heating");
+    expect(corePost).toHaveBeenCalledOnce();
   });
 });
 
