@@ -239,6 +239,8 @@ Evaluates a Jinja2 template server-side and returns the rendering. Read only, ve
 
 Since v0.3 every tool response also carries `structuredContent` (the same JSON as the text, typed for clients that support it), and the server exposes:
 
+Since 0.18.0, entity-shaped arguments support **MCP completions** (`completion/complete`): a client that implements them offers the real ids of your instance while typing, for the `automation` argument of `diagnose-automation` and the `entity_id` of `ha://entity/{entity_id}`. Same visibility rules as every read (`filter_reads` applies); client support varies.
+
 **Resources** (`application/json`, for clients that pin context without tool calls):
 
 | URI | Content |
