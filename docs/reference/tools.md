@@ -1,6 +1,6 @@
 # Tool reference
 
-26 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+28 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -148,6 +148,16 @@ State plus, for UI-created automations, the full configuration (triggers, condit
 
 entity_id, name, running, last_triggered. Params: `limit`, `offset`.
 
+### ha_get_automation_trace
+
+Step-by-step record of recent automation or script runs, the first reflex for "why did this fire (or not)?". Without `run_id`: the list of recent runs (trigger, outcome, last step, error). With `run_id`: the ordered step path with condition verdicts and errors. Variables are deliberately omitted (size, and they would leak other entities' states past `filter_reads`). Home Assistant keeps only the last few runs in memory, since its last restart.
+
+## Diagnostics
+
+### ha_get_health
+
+One-call health report: Home Assistant's own **Repairs** issues, entities `unavailable`/`unknown` with age, low batteries (`battery_threshold`, default 20 %), enabled automations that have not fired for a while (`stale_days`, default 30), entities without an area. Sections are capped with total counts, and qualified rather than judged: a seasonal sensor is not a defect. Pair it with the `health-report` prompt.
+
 ## History
 
 ### ha_get_history
@@ -214,5 +224,6 @@ Since v0.3 every tool response also carries `structuredContent` (the same JSON a
 |------|-----------|--------------|
 | `diagnose-automation` | `automation` (entity_id) | step-by-step investigation of why an automation did not run |
 | `energy-report` | `hours` (optional) | consumption summary built on long-term statistics |
+| `health-report` | none | guided instance health check built on ha_get_health |
 | `propose-automation` | `goal` | drafts a paste-ready automation YAML from verified entities, writes nothing |
 | `propose-script` | `goal` | drafts a paste-ready script YAML from verified entities, writes nothing |

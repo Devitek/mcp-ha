@@ -55,7 +55,7 @@ describe("ingress status page (v0.3 #79, onboarding #92)", () => {
     const html = await r.text();
     expect(r.status).toBe(200);
     expect(html).toContain("MCP Home Assistant");
-    expect(html).toContain("23 (17 read + 6 write)");
+    expect(html).toContain("25 (19 read + 6 write)");
     expect(html).toContain("lock");
     // The three ready-to-copy blocks, with the token as a placeholder only.
     expect(html).toContain("claude mcp add --transport http home-assistant");

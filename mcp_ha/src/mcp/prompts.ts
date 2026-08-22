@@ -23,9 +23,37 @@ export function registerPrompts(server: McpServer): void {
             text:
               `Diagnose the Home Assistant automation "${automation}". Proceed step by step:\n` +
               `1. ha_get_automation on "${automation}": is it enabled? When did it last trigger? Read its triggers, conditions and actions.\n` +
+              `1b. ha_get_automation_trace on "${automation}": the recent runs and, for the most relevant one, the step-by-step detail (condition verdicts, errors). This often answers the question directly.\n` +
               `2. ha_get_logbook filtered on "${automation}" over the relevant window: did it fire, and what happened around it?\n` +
               "3. For each entity referenced by its triggers and conditions, check the current state (ha_get_entity) and the recent history (ha_get_history) to see whether the trigger condition was ever met.\n" +
               "4. Conclude: state clearly whether the automation is disabled, never triggered, triggered but blocked by a condition, or failed in its actions, and what to change.",
+          },
+        },
+      ],
+    })
+  );
+
+  server.registerPrompt(
+    "health-report",
+    {
+      title: "Instance health report",
+      description: "Guided reading of ha_get_health: prioritize, explain, and propose remediations.",
+      argsSchema: {},
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text:
+              "Run a health check of my Home Assistant instance. Proceed step by step:\n" +
+              "1. Call ha_get_health.\n" +
+              "2. Start with the repairs section: these are Home Assistant's own diagnostics, treat 'error' severity first.\n" +
+              "3. Then the long-unavailable entities: for the oldest ones, check the device (ha_get_entity, ha_list_devices) and suggest causes (battery dead, integration down, device removed).\n" +
+              "4. List the low batteries worth replacing soon, worst first.\n" +
+              "5. For enabled automations that have not fired in a long time, use ha_get_automation_trace to see whether they ever ran and why not; some may be seasonal, say so instead of flagging them.\n" +
+              "6. Conclude with a short prioritized action list; do not execute anything without asking.",
           },
         },
       ],
