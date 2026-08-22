@@ -64,3 +64,50 @@ describe("ha_get_system", () => {
     expect(res.data.log.endsWith("line 299")).toBe(true);
   });
 });
+
+describe("ha_get_system: updates and backups (#111)", () => {
+  it("summarizes pending core, OS and add-on updates", async () => {
+    const { server, tools } = fakeServer();
+    const supervisorGet = vi.fn(async (path: string) => {
+      if (path === "/core/info") return { version: "2026.8.1", version_latest: "2026.8.2", update_available: true };
+      if (path === "/os/info") return { version: "16.1", version_latest: "16.1", update_available: false };
+      return { addons: [
+        { slug: "mcp_ha", version: "0.14.0", version_latest: "0.15.0", update_available: true },
+        { slug: "ssh", version: "9.0", version_latest: "9.0", update_available: false },
+      ] };
+    });
+    registerSystemTools(server, fakeCtx({ http: { supervisorGet } }));
+    const res = await callTool(tools, "ha_get_system", { section: "updates" });
+    expect(res.data.core).toEqual({ version: "2026.8.1", latest: "2026.8.2", update_available: true });
+    expect(res.data.os.update_available).toBe(false);
+    expect(res.data.addons).toMatchObject({ total: 2, updates_pending: 1 });
+    expect(res.data.addons.pending[0].slug).toBe("mcp_ha");
+  });
+
+  it("lists backups newest first with the age of the last one", async () => {
+    const { server, tools } = fakeServer();
+    const supervisorGet = vi.fn(async () => ({
+      backups: [
+        { slug: "a1", name: "old", date: "2026-08-01T02:00:00Z", type: "full", size: 512 },
+        { slug: "b2", name: "fresh", date: "2026-08-21T02:00:00Z", type: "partial", size: 128 },
+      ],
+    }));
+    registerSystemTools(server, fakeCtx({ http: { supervisorGet } }));
+    const res = await callTool(tools, "ha_get_system", { section: "backups" });
+    expect(res.data.last_backup.name).toBe("fresh");
+    expect(res.data.last_backup.age_days).toBeGreaterThanOrEqual(0);
+    expect(res.data.recent.map((b: any) => b.slug)).toEqual(["b2", "a1"]);
+  });
+
+  it("degrades honestly when the minimal role cannot list backups", async () => {
+    const { server, tools } = fakeServer();
+    const supervisorGet = vi.fn(async () => {
+      throw new Error("HTTP 403: forbidden");
+    });
+    registerSystemTools(server, fakeCtx({ http: { supervisorGet } }));
+    const res = await callTool(tools, "ha_get_system", { section: "backups" });
+    expect(res.isError).toBe(false);
+    expect(res.data.available).toBe(false);
+    expect(res.data.note).toContain("minimal");
+  });
+});

@@ -22,12 +22,13 @@ This Home Assistant add-on exposes an [MCP](https://modelcontextprotocol.io) (Mo
 | History | state changes, long-term statistics, logbook |
 | Helpers | create and delete input_*, counters, timers (opt-in) |
 | Notifications | send to phones and notify targets (opt-in, rate capped) |
+| Scenes | snapshot the current mood as a scene (opt-in, volatile) |
 | Calendar and to-do | events over a window, list items |
 | Cameras | still snapshots as images (opt-in) |
 | Add-ons | list and details (read) |
 | System | Jinja template rendering, HA config, error log |
 
-29 tools (20 read, 9 guarded write), designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
+32 tools (20 read, 12 guarded write), designed to save the LLM context window: compact, paginated and capped responses, with notes that steer the assistant towards more precise queries.
 
 ## Why not the official HA MCP integration?
 

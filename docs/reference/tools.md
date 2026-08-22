@@ -1,6 +1,6 @@
 # Tool reference
 
-31 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+32 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -109,6 +109,10 @@ Creates a helper: a pure state container with no behaviour (`input_boolean`, `in
 ### ha_delete_helper <Badge type="danger" text="write" />
 
 Deletes a UI-managed helper by entity_id. The collection id is resolved through the entity registry, so renamed helpers are handled; YAML-defined helpers are refused with a clear message. Subject to the entity allow/deny lists, audited.
+
+### ha_snapshot_scene <Badge type="danger" text="write" />
+
+Captures the CURRENT state of the given entities as a scene ("capture the living room mood as Movie night"), via `scene.create` with `snapshot_entities`. The scene is **volatile by Home Assistant design** (it lives until the scenes reload or a restart); replay it with `scene.turn_on`. Entity lists bound what is capturable; an existing scene id is refused.
 
 ### ha_send_notification <Badge type="danger" text="write" />
 
@@ -219,7 +223,7 @@ Evaluates a Jinja2 template server-side and returns the rendering. Read only, ve
 
 ### ha_get_system
 
-`section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: last 100 lines of the HA error log.
+`section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: last 100 lines of the HA error log. `section: "updates"`: pending Core, OS and add-on updates. `section: "backups"`: last backup age and recent backups (answers honestly if the minimal Supervisor role cannot list them).
 
 ## Resources and prompts
 
