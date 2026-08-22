@@ -34,7 +34,11 @@ Trust model: Cloudflare terminates TLS and sees your traffic (including the bear
 
 ## What about built-in OAuth?
 
-Native OAuth 2.1 (so the web connectors authenticate directly against the add-on, no tunnel auth layer) is on the roadmap ([issue #84](https://github.com/Devitek/mcp-ha/issues/84)) but not shipped: it is a large, security-sensitive addition, and a properly configured tunnel already covers the remote-access need well. If you have a use case a tunnel cannot serve, say so on the issue.
+Evaluated and deliberately not implemented ([issue #84](https://github.com/Devitek/mcp-ha/issues/84)). The short version:
+
+- The add-on does not terminate TLS: OAuth flows over plain HTTP would be worse than the current bearer, not better. Any TLS story would come from a tunnel or reverse proxy, which already carry their own strong authentication (Tailscale identity, Cloudflare Access).
+- A spec-complete MCP authorization server (dynamic client registration, PKCE, consent UI, token issuance and rotation) is a large security-sensitive surface to maintain inside a single-user LAN add-on, for a need the tunnel plus [named scoped tokens](/guide/configuration#named-tokens) already cover.
+- It gets reconsidered when a major MCP client requires OAuth and refuses static bearers, or if the add-on ever terminates TLS itself. If you hit such a case, say so on the issue.
 
 ## Whichever option you pick
 

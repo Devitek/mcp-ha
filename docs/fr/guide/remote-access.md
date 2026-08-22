@@ -34,7 +34,11 @@ Modèle de confiance : Cloudflare termine le TLS et voit votre trafic (jeton bea
 
 ## Et l'OAuth intégré ?
 
-L'OAuth 2.1 natif (pour que les connecteurs web s'authentifient directement contre l'add-on, sans couche d'auth du tunnel) est à la feuille de route ([issue #84](https://github.com/Devitek/mcp-ha/issues/84)) mais pas livré : c'est un ajout lourd et sensible côté sécurité, et un tunnel bien configuré couvre déjà bien le besoin d'accès distant. Si vous avez un cas qu'un tunnel ne peut pas servir, dites-le sur l'issue.
+Évalué et volontairement non implémenté ([issue #84](https://github.com/Devitek/mcp-ha/issues/84)). En résumé :
+
+- L'add-on ne termine pas le TLS : des flux OAuth sur du HTTP en clair seraient pires que le bearer actuel, pas meilleurs. Toute couche TLS viendrait d'un tunnel ou d'un reverse proxy, qui portent déjà leur propre authentification forte (identité Tailscale, Cloudflare Access).
+- Un serveur d'autorisation MCP complet (enregistrement dynamique des clients, PKCE, écran de consentement, émission et rotation de jetons) est une grosse surface sensible à maintenir dans un add-on LAN mono-utilisateur, pour un besoin que le tunnel plus les [jetons nommés à portées](/fr/guide/configuration#jetons-nommes) couvrent déjà.
+- On réévalue quand un client MCP majeur exigera OAuth en refusant les bearers statiques, ou si l'add-on termine un jour le TLS lui-même. Si vous rencontrez ce cas, dites-le sur l'issue.
 
 ## Quelle que soit l'option
 
