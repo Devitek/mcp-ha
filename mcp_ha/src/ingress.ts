@@ -1,7 +1,43 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { readFile } from "node:fs/promises";
 import { VERSION } from "./config.js";
 import { maskSecret } from "./safety.js";
 import type { ToolContext } from "./context.js";
+import type { UsageTracker } from "./usage.js";
+
+/** How many audit lines the page shows; SSH remains the full-history path. */
+const AUDIT_DISPLAY_LINES = 50;
+
+export interface IngressOptions {
+  /** Usage counters shared with the MCP handler (#128). */
+  usage?: UsageTracker;
+  /** Audit file location, injectable for tests (#126). */
+  auditPath?: string;
+}
+
+/**
+ * Last audit lines for the page (#126). The #91 contract is untouched: no
+ * MCP tool reads or clears the audit; this renders it to the HUMAN behind
+ * the HA session, the same trust boundary as the Configuration tab.
+ */
+async function readAuditTail(path: string): Promise<Array<Record<string, unknown>> | null> {
+  try {
+    const lines = (await readFile(path, "utf8")).trim().split("\n");
+    return lines
+      .slice(-AUDIT_DISPLAY_LINES)
+      .map((l) => {
+        try {
+          return JSON.parse(l) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      })
+      .filter((x): x is Record<string, unknown> => x !== null)
+      .reverse();
+  } catch {
+    return null; // dev mode or nothing written yet
+  }
+}
 
 /** Ingress listens here inside the container; never published on the LAN. */
 export const INGRESS_PORT = 9584;
@@ -43,9 +79,11 @@ function detectHaHost(req: IncomingMessage): string {
  */
 export function createIngressHandler(
   ctx: ToolContext,
-  startedAt: number = Date.now()
+  startedAt: number = Date.now(),
+  opts: IngressOptions = {}
 ): (req: IncomingMessage, res: ServerResponse) => void {
-  return (req, res) => {
+  const auditPath = opts.auditPath ?? "/data/audit.log";
+  return async (req, res) => {
     const { cfg, ws } = ctx;
     const downFor = ws.disconnectedForMs();
     const wsBadge = ws.connected
@@ -103,6 +141,40 @@ export function createIngressHandler(
       )
       .join("\n");
 
+    // Usage counters (#128): what the assistant has been doing since start.
+    const snap = opts.usage?.snapshot();
+    const usageHtml = !snap
+      ? ""
+      : snap.total === 0
+        ? `<h2>Usage since start</h2><p>No tool call yet.</p>`
+        : `<h2>Usage since start</h2>
+<table><tr><td>Total tool calls</td><td>${snap.total}</td></tr>
+${snap.by_client.map((c) => `<tr><td>by "${esc(c.client)}"</td><td>${c.calls}</td></tr>`).join("")}</table>
+<p>${snap.top_tools.map((t) => `${esc(t.tool)} (${t.calls})`).join(", ")}</p>`;
+
+    // Audit tail (#126): human-visible behind the HA session only.
+    const audit = await readAuditTail(auditPath);
+    const auditRow = (a: Record<string, unknown>): string => {
+      const time = String(a.ts ?? "").slice(11, 19) || "?";
+      const target =
+        a.entity_id ?? (a.domain && a.service ? `${a.domain}.${a.service}` : (a.target ? JSON.stringify(a.target) : ""));
+      const status =
+        a.dry_run === true
+          ? "dry run"
+          : a.confirmation_required === true
+            ? "confirmation asked"
+            : a.allowed === true
+              ? '<span class="ok">ok</span>'
+              : `<span class="warn">refused</span> ${esc(a.reason ?? "")}`;
+      return `<tr><td>${esc(time)}</td><td>${esc(a.client ?? "")}</td><td>${esc(a.tool ?? "")}</td><td>${esc(target)}</td><td>${status}</td></tr>`;
+    };
+    const auditHtml =
+      audit === null || audit.length === 0
+        ? `<h2>Recent write audit</h2><p>No audit entries yet. Every write attempt lands here (and in /data/audit.log); MCP clients can never read or clear it.</p>`
+        : `<h2>Recent write audit</h2>
+<table>${audit.map(auditRow).join("")}</table>
+<p>Last ${audit.length} entries, newest first. Full history in /data/audit.log (SSH); MCP clients can never read or clear it.</p>`;
+
     const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -132,6 +204,8 @@ export function createIngressHandler(
 masked on screen; <b>Copy</b> always copies the full working version.
 <button id="reveal"></button></p>
 ${blockHtml}
+${usageHtml}
+${auditHtml}
 <p>This page is only reachable through your authenticated Home Assistant session,
 like the Configuration tab where the token already lives. It refreshes every minute.</p>
 <script>

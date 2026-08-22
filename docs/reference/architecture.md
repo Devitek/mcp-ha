@@ -104,7 +104,7 @@ Areas, devices, entities, floors and labels registries are cached with shared in
 
 ## Status page
 
-`ingress: true` exposes a status and onboarding page in the Home Assistant sidebar (authenticated by the HA session, port internal to the container network): version, uptime, WebSocket state, active options, and ready-to-copy client configs with the API token masked by default (same trust boundary as the Configuration tab; the Supervisor token never appears).
+`ingress: true` exposes a status and onboarding page in the Home Assistant sidebar (authenticated by the HA session, port internal to the container network): version, uptime, WebSocket state, active options, and ready-to-copy client configs with the API token masked by default (same trust boundary as the Configuration tab; the Supervisor token never appears). Since 0.19.0 it also shows usage counters (tool calls per token since start) and the last audit entries, human-visible only: the #91 contract stands, MCP clients can never read the audit.
 
 ## Repository layout
 

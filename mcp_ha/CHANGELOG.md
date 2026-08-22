@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.0 - 2026-08-22
+
+- **Audit viewer on the ingress page**: the last 50 write-audit entries, newest first, rendered behind your Home Assistant session. The #91 contract is untouched: MCP clients can never read or clear the audit; SSH remains the full-history path.
+- **Usage counters on the ingress page**: total tool calls since start, per token and top tools, counted at the HTTP handler so no path can be missed. In memory only; restart resets, the persistent audit covers write history.
+- 261 unit tests.
+
 ## 0.18.0 - 2026-08-22
 
 - **MCP completions** (`completion/complete`): clients that support them autocomplete real entity ids while typing, on the `automation` argument of the `diagnose-automation` prompt and on the `ha://entity/{entity_id}` resource template. Suggestions follow the same visibility rules as every read (`filter_reads` applies), capped at 50.

@@ -104,7 +104,7 @@ Les registres pièces, appareils, entités, étages et labels sont mis en cache 
 
 ## Page de statut
 
-`ingress: true` expose une page de statut et d'onboarding dans la barre latérale de Home Assistant (authentifiée par la session HA, port interne au réseau du conteneur) : version, uptime, état du WebSocket, options actives, et des configs client prêtes à copier avec le jeton API masqué par défaut (même périmètre de confiance que l'onglet Configuration ; le jeton Supervisor n'y apparaît jamais).
+`ingress: true` expose une page de statut et d'onboarding dans la barre latérale de Home Assistant (authentifiée par la session HA, port interne au réseau du conteneur) : version, uptime, état du WebSocket, options actives, et des configs client prêtes à copier avec le jeton API masqué par défaut (même périmètre de confiance que l'onglet Configuration ; le jeton Supervisor n'y apparaît jamais). Depuis la 0.19.0 elle affiche aussi les compteurs d'usage (appels par jeton depuis le démarrage) et les dernières lignes d'audit, visibles par l'humain seulement : le contrat de #91 tient, les clients MCP ne peuvent jamais lire l'audit.
 
 ## Organisation du dépôt
 

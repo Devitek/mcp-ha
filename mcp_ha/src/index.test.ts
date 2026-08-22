@@ -144,6 +144,30 @@ describe("HTTP boundary (audit E1)", () => {
   });
 });
 
+describe("usage counters (#128)", () => {
+  it("counts tools/call at the handler for the authenticated client", async () => {
+    const { UsageTracker } = await import("./usage.js");
+    const usage = new UsageTracker();
+    server = createServer(createHandler(fakeCtx(), { usage }));
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const addr = server.address();
+    if (typeof addr === "string" || addr === null) throw new Error("no port");
+    const base = `http://127.0.0.1:${addr.port}`;
+    const H = { ...ACCEPT, ...AUTH };
+    await fetch(`${base}/mcp`, { method: "POST", headers: H, body: rpc("tools/list") });
+    await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: H,
+      body: rpc("tools/call", { name: "ha_list_areas", arguments: {} }),
+    });
+    const s = usage.snapshot();
+    expect(s.total).toBe(1); // tools/list does not count
+    expect(s.top_tools[0]).toEqual({ tool: "ha_list_areas", calls: 1 });
+    expect(s.by_client[0]).toEqual({ client: "default", calls: 1 });
+  });
+});
+
 describe("MCP completions (#115)", () => {
   const H = { ...ACCEPT, ...AUTH };
   const entities = [
