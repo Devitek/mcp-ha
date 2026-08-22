@@ -9,6 +9,7 @@ function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     apiTokenGenerated: false,
     allowWrite: true,
     allowCamera: false,
+    allowConfigWrite: false,
     filterReads: false,
     entityAllowlist: [],
     entityDenylist: [],

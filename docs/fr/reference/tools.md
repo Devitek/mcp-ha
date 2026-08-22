@@ -1,6 +1,6 @@
 # Référence des outils
 
-24 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+26 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -109,6 +109,30 @@ Crée un helper : un pur conteneur d'état sans comportement (`input_boolean`, `
 ### ha_delete_helper <Badge type="danger" text="écriture" />
 
 Supprime un helper géré par l'interface, par entity_id. L'id de collection est résolu via le registre d'entités, les helpers renommés sont donc gérés ; les helpers définis en YAML sont refusés avec un message clair. Soumis aux listes d'entités, audité.
+
+### ha_create_automation <Badge type="danger" text="écriture config" />
+
+Crée une NOUVELLE automation. Enregistré uniquement quand `allow_config_write` est activé (indépendant d'`allow_write`). Le parcours est volontairement lourd : Home Assistant valide d'abord les blocs, puis la réponse porte le YAML complet et un `confirm_token` ; le client doit montrer le YAML à l'humain et rappeler avec le jeton. Une automation existante (même alias) est refusée : création seule, pas de modification.
+
+| Paramètre | Type | Notes |
+|-----------|------|-------|
+| `alias` | string, requis | nom de l'automation |
+| `description` / `mode` | string / enum | `single` (défaut), `restart`, `queued`, `parallel` |
+| `triggers` | array, requis | syntaxe moderne, ex. `[{"trigger": "state", ...}]` |
+| `conditions` | array | optionnel |
+| `actions` | array, requis | ex. `[{"action": "light.turn_on", ...}]` |
+| `dry_run` / `confirm_token` | | aperçu / jeton de seconde étape |
+
+### ha_create_script <Badge type="danger" text="écriture config" />
+
+Crée un NOUVEAU script, même parcours gardé en deux temps. L'entity_id dérive de l'alias (`script.<slug>`) ; un existant est refusé.
+
+| Paramètre | Type | Notes |
+|-----------|------|-------|
+| `alias` | string, requis | nom du script |
+| `description` / `mode` | | comme ci-dessus |
+| `sequence` | array, requis | séquence d'actions |
+| `dry_run` / `confirm_token` | | aperçu / jeton de seconde étape |
 
 ## Automations et scripts
 

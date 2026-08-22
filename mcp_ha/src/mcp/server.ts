@@ -11,6 +11,7 @@ import { registerSystemTools } from "./tools/system.js";
 import { registerCameraTools } from "./tools/camera.js";
 import { registerCalendarTools } from "./tools/calendar.js";
 import { registerHelperTools } from "./tools/helpers.js";
+import { registerConfigWriteTools } from "./tools/configwrite.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
 
@@ -39,6 +40,7 @@ export function buildServer(ctx: ToolContext): McpServer {
   registerCameraTools(server, ctx);
   registerCalendarTools(server, ctx);
   registerHelperTools(server, ctx);
+  registerConfigWriteTools(server, ctx);
   registerResources(server, ctx);
   registerPrompts(server);
   return server;

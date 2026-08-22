@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.10.0 - 2026-08-22
+
+- **Guarded automation and script creation** (#94 tier 3, new `allow_config_write` option, default off and independent from `allow_write`): `ha_create_automation` and `ha_create_script` let the assistant program NEW behaviour, through the most guarded path in the add-on. Home Assistant validates the blocks first (`validate_config`); the first call answers with the complete YAML and a single-use `confirm_token` bound to the exact payload, to be confirmed after human review; creation only, existing automations (same alias) and scripts (same id) are refused; every step is in the nominative audit trail. See the new "Configuration writes" chapter in SECURITY.md.
+- 26 tools (18 read, 8 guarded write). 205 unit tests.
+
 ## 0.9.0 - 2026-08-21
 
 - **Helpers** (#94 tier 1): `ha_create_helper` and `ha_delete_helper` manage the seven helper types (`input_boolean`, `input_number`, `input_select`, `input_text`, `input_datetime`, `counter`, `timer`). "Create a coffee counter", "a vacation mode boolean": helpers are pure state containers with no behaviour, the mildest possible write. Both tools are behind `allow_write` and the token scope, audited; deletion honours the entity lists, resolves renamed helpers through the registry and refuses YAML-defined ones.

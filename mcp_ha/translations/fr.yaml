@@ -30,6 +30,14 @@ configuration:
       Expose l'outil ha_get_camera_snapshot pour que l'assistant voie une
       image fixe d'une caméra. Indépendant de allow_write. Les caméras
       masquées (filter_reads / entity_denylist) restent exclues.
+  allow_config_write:
+    name: Autoriser la création d'automations et de scripts
+    description: >-
+      Expose ha_create_automation et ha_create_script : l'assistant peut
+      programmer un NOUVEAU comportement dans votre maison. Indépendant
+      d'allow_write. Chaque création est d'abord validée par Home Assistant
+      et exige une confirmation en deux temps montrant le YAML complet. Les
+      automations et scripts existants ne sont jamais modifiés.
   filter_reads:
     name: Filtrer aussi les lectures
     description: >-

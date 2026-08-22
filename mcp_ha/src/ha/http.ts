@@ -140,6 +140,16 @@ export class HaHttp {
     );
   }
 
+  /** JSON POST to the core API (config writes, #94 tier 3). Never retried. */
+  corePost(path: string, body: unknown): Promise<any> {
+    return this.request(
+      this.coreBase() + path,
+      this.coreToken(),
+      { method: "POST", body: JSON.stringify(body) },
+      false
+    );
+  }
+
   private requireSupervisor(): string {
     if (!this.cfg.supervisorToken) {
       throw new Error("Supervisor API is not available outside the add-on environment (dev mode)");

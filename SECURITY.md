@@ -33,6 +33,18 @@ Giving an LLM access to your home automation is not a trivial decision. This doc
 10b. **Ingress status page**: authenticated by the Home Assistant session through the Supervisor proxy, served on a port internal to the container network (never published on the LAN). Since 0.8.0 it carries the client onboarding snippets and therefore the API token, masked by default with an explicit reveal action; this is the same trust boundary as the add-on Configuration tab, which has always shown that token. The Supervisor token never appears there.
 11. **Container hardening**: the Node server runs as a dedicated unprivileged user (privileges dropped after `/data` ownership is fixed) and is confined by a custom AppArmor profile. The service transitions into a tight child profile that denies `/etc/shadow`, writes outside `/data`, and `CAP_DAC_OVERRIDE`, while keeping the s6/bashio init tree working. The profile was validated on a real AppArmor-enforcing host against actual kernel denials (issue #72), after a first over-strict attempt broke container init in 0.1.6.
 
+## Configuration writes (automations and scripts)
+
+Since 0.10.0 the assistant can CREATE automations and scripts (#94 tier 3). This is categorically different from calling a service: a service call acts once, an automation programs standing behaviour into the house. The path is therefore the most guarded one in the add-on:
+
+1. **Dedicated grant.** `allow_config_write` (default `false`) is independent from `allow_write`: enabling service calls never silently enables programming. Read-scoped tokens never see these tools.
+2. **Validation before anything.** The trigger/condition/action blocks are validated by Home Assistant (`validate_config`) before a confirmation is even offered; an invalid config stops there.
+3. **Mandatory two-step confirmation.** Unconditionally, not tied to `confirm_domains`: the first call answers with the complete YAML and a single-use token bound to the exact payload (2 min TTL). The client is instructed to show that YAML to the human and only then confirm. A token never authorizes a different payload.
+4. **Creation only.** An existing automation (same alias) or script (same object id) is refused. Modifying or deleting existing behaviour is deliberately unsupported at this tier; it would be a separate, later decision with its own review.
+5. **Nominative audit.** Every step (preview, confirmation request, refusal, write) lands in the audit trail with the token name, mirrored to `/data/audit.log`.
+
+Residual risk to understand: once `allow_config_write` is on, a confirmed creation can program actions that `service_denylist` would have blocked as direct calls (the automation runs inside Home Assistant, not through the add-on). The YAML review step exists precisely for that reason; read it before confirming.
+
 ## Past advisories
 
 - **Versions 0.1.0 to 0.1.3 printed the API token in full in the add-on log** at every start, and the documentation of the time invited users to read it there. Fixed in 0.1.4 (masked prefix only). If you ever shared logs produced by an affected version, rotate your token (see DOCS.md, "Rotating the API token").

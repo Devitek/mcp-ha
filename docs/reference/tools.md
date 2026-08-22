@@ -1,6 +1,6 @@
 # Tool reference
 
-24 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+26 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -109,6 +109,30 @@ Creates a helper: a pure state container with no behaviour (`input_boolean`, `in
 ### ha_delete_helper <Badge type="danger" text="write" />
 
 Deletes a UI-managed helper by entity_id. The collection id is resolved through the entity registry, so renamed helpers are handled; YAML-defined helpers are refused with a clear message. Subject to the entity allow/deny lists, audited.
+
+### ha_create_automation <Badge type="danger" text="config write" />
+
+Creates a NEW automation. Only registered when `allow_config_write` is enabled (independent from `allow_write`). The flow is deliberately heavy: Home Assistant validates the blocks first, then the answer carries the complete YAML and a `confirm_token`; the client must show the YAML to the human and call again with the token. Existing automations (same alias) are refused: creation only, no modification.
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `alias` | string, required | automation name |
+| `description` / `mode` | string / enum | `single` (default), `restart`, `queued`, `parallel` |
+| `triggers` | array, required | modern syntax, e.g. `[{"trigger": "state", ...}]` |
+| `conditions` | array | optional |
+| `actions` | array, required | e.g. `[{"action": "light.turn_on", ...}]` |
+| `dry_run` / `confirm_token` | | preview / second-step token |
+
+### ha_create_script <Badge type="danger" text="config write" />
+
+Creates a NEW script, same guarded two-step flow. The entity id derives from the alias (`script.<slug>`); an existing one is refused.
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `alias` | string, required | script name |
+| `description` / `mode` | | as above |
+| `sequence` | array, required | action sequence |
+| `dry_run` / `confirm_token` | | preview / second-step token |
 
 ## Automations and scripts
 

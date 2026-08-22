@@ -11,6 +11,7 @@ All options live in the add-on **Configuration** tab. Restart the add-on after c
 | `api_tokens` | `[]` | Extra named tokens with a scope. See [Named tokens](#named-tokens). |
 | `allow_write` | `false` | Exposes the `ha_call_service` tool. Without it the add-on is strictly read only: no write tool is even visible to the client. |
 | `allow_camera` | `false` | Exposes `ha_get_camera_snapshot` (still images from cameras). Independent from `allow_write`; seeing your home is not acting on it, but it gets its own switch. `filter_reads` and `entity_denylist` still apply. |
+| `allow_config_write` | `false` | Exposes `ha_create_automation` and `ha_create_script`: the assistant can program NEW behaviour (validated by HA, mandatory two-step confirmation with the full YAML, creation only). Independent from `allow_write`. See the [security model](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md). |
 | `filter_reads` | `false` | Also applies `entity_denylist` to reads: denied entities disappear from listings, details, history and logbook. |
 | `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes. When non-empty, writes are deny-by-default. |
 | `entity_denylist` | `[]` | Glob patterns of entities always refused for writes. Wins over the allowlist. |

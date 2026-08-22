@@ -42,6 +42,7 @@ function makeClient(port: number): HaWsClient {
     apiTokenGenerated: false,
     allowWrite: false,
     allowCamera: false,
+    allowConfigWrite: false,
     filterReads: false,
     entityAllowlist: [],
     entityDenylist: [],

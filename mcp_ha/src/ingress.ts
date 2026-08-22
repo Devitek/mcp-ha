@@ -54,7 +54,7 @@ export function createIngressHandler(
     // 15 core read tools + 2 calendar/todo, plus camera and the write tools
     // depending on the options.
     const readTools = 17 + (cfg.allowCamera ? 1 : 0);
-    const writeTools = cfg.allowWrite ? 6 : 0;
+    const writeTools = (cfg.allowWrite ? 6 : 0) + (cfg.allowConfigWrite ? 2 : 0);
     const toolBreakdown = `${readTools + writeTools} (${readTools} read${writeTools ? ` + ${writeTools} write` : ""})`;
     const rows: Array<[string, string]> = [
       ["Version", esc(VERSION)],
@@ -63,6 +63,7 @@ export function createIngressHandler(
       ["MCP tools", toolBreakdown],
       ["MCP resources / prompts", "3 / 4"],
       ["allow_write", cfg.allowWrite ? '<span class="warn">enabled</span>' : "disabled"],
+      ["allow_config_write", cfg.allowConfigWrite ? '<span class="warn">enabled</span>' : "disabled"],
       ["filter_reads", cfg.filterReads ? "enabled" : "disabled"],
       ["Confirmation domains", esc(cfg.confirmDomains.join(", ") || "none")],
       ["Entity allowlist / denylist", `${cfg.entityAllowlist.length} / ${cfg.entityDenylist.length} patterns`],
