@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.18.0 - 2026-08-22
+
+- **MCP completions** (`completion/complete`): clients that support them autocomplete real entity ids while typing, on the `automation` argument of the `diagnose-automation` prompt and on the `ha://entity/{entity_id}` resource template. Suggestions follow the same visibility rules as every read (`filter_reads` applies), capped at 50.
+
 ## 0.17.0 - 2026-08-22
 
 - **Dashboard card proposals** (`propose-dashboard-card` prompt): the assistant drafts a complete, paste-ready Lovelace card YAML for a stated goal, picking the card type from the real data (gauge with observed thresholds, history-graph, tiles for a room, thermostat...) and using verified entity ids and units. Nothing is written to Home Assistant: paste it in your dashboard's Manual card. 6 prompts.

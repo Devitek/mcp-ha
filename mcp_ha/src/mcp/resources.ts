@@ -21,7 +21,21 @@ export function registerResources(server: McpServer, ctx: ToolContext): void {
 
   server.registerResource(
     "entity",
-    new ResourceTemplate("ha://entity/{entity_id}", { list: undefined }),
+    new ResourceTemplate("ha://entity/{entity_id}", {
+      list: undefined,
+      // Completion (#115): clients discover real entity ids while typing,
+      // same visibility rules as every read.
+      complete: {
+        entity_id: async (value: string) => {
+          const q = String(value ?? "").toLowerCase();
+          return (await ctx.catalog.index())
+            .filter((e) => entityReadVisible(ctx.cfg, e.entity_id))
+            .map((e) => e.entity_id)
+            .filter((id) => id.toLowerCase().includes(q))
+            .slice(0, 50);
+        },
+      },
+    }),
     {
       title: "Entity state",
       description:

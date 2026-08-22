@@ -1,18 +1,41 @@
 import { z } from "zod";
+import { completable } from "@modelcontextprotocol/sdk/server/completable.js";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolContext } from "../context.js";
+import { entityReadVisible } from "../safety.js";
+
+/** Completion cap per the MCP spec spirit: suggestions, not a dump (#115). */
+const MAX_COMPLETIONS = 50;
 
 /**
  * Reusable prompt recipes (v0.3, #79): they encode proven tool workflows so
  * any client can run them without rediscovering the right call order.
- * Prompt arguments are strings per the MCP specification.
+ * Prompt arguments are strings per the MCP specification. Entity-shaped
+ * arguments are completable (#115): clients that support
+ * completion/complete offer the real ids of the instance while typing,
+ * under the same visibility rules as every read.
  */
-export function registerPrompts(server: McpServer): void {
+export function registerPrompts(server: McpServer, ctx: ToolContext): void {
+  const completeEntities = (domain: string) => async (value: string): Promise<string[]> => {
+    const q = value.toLowerCase();
+    return (await ctx.catalog.index())
+      .filter((e) => e.domain === domain && entityReadVisible(ctx.cfg, e.entity_id))
+      .map((e) => e.entity_id)
+      .filter((id) => id.toLowerCase().includes(q))
+      .slice(0, MAX_COMPLETIONS);
+  };
+
   server.registerPrompt(
     "diagnose-automation",
     {
       title: "Diagnose an automation",
       description: "Investigates why an automation did not run (or ran unexpectedly).",
-      argsSchema: { automation: z.string().describe("Automation entity_id, e.g. automation.night_heating") },
+      argsSchema: {
+        automation: completable(
+          z.string().describe("Automation entity_id, e.g. automation.night_heating"),
+          completeEntities("automation")
+        ),
+      },
     },
     ({ automation }) => ({
       messages: [

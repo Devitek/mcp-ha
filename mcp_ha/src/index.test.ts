@@ -144,6 +144,49 @@ describe("HTTP boundary (audit E1)", () => {
   });
 });
 
+describe("MCP completions (#115)", () => {
+  const H = { ...ACCEPT, ...AUTH };
+  const entities = [
+    { entity_id: "automation.night_heating", name: "Night heating", domain: "automation", state: "on", area: null, floor: null, device_id: null, last_changed: "", hidden: false, category: null, aliases: [], labels: [], attributes: {} },
+    { entity_id: "automation.morning", name: "Morning", domain: "automation", state: "on", area: null, floor: null, device_id: null, last_changed: "", hidden: false, category: null, aliases: [], labels: [], attributes: {} },
+    { entity_id: "sensor.temp", name: "Temp", domain: "sensor", state: "21", area: null, floor: null, device_id: null, last_changed: "", hidden: false, category: null, aliases: [], labels: [], attributes: {} },
+  ];
+
+  it("completes prompt arguments with real automation ids", async () => {
+    const base = await startServer(fakeCtx({ catalog: { index: vi.fn(async () => entities) } }));
+    const r = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: H,
+      body: rpc("completion/complete", {
+        ref: { type: "ref/prompt", name: "diagnose-automation" },
+        argument: { name: "automation", value: "night" },
+      }),
+    });
+    const values = ((await r.json()) as any).result.completion.values;
+    expect(values).toEqual(["automation.night_heating"]);
+  });
+
+  it("completes the ha://entity template under filter_reads rules", async () => {
+    const base = await startServer(
+      fakeCtx({
+        cfg: { filterReads: true, entityDenylist: ["sensor.*"] },
+        catalog: { index: vi.fn(async () => entities) },
+      })
+    );
+    const r = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: H,
+      body: rpc("completion/complete", {
+        ref: { type: "ref/resource", uri: "ha://entity/{entity_id}" },
+        argument: { name: "entity_id", value: "" },
+      }),
+    });
+    const values = ((await r.json()) as any).result.completion.values;
+    expect(values).toContain("automation.morning");
+    expect(values).not.toContain("sensor.temp");
+  });
+});
+
 describe("MCP sessions (#90)", () => {
   const S_AUTH = { ...ACCEPT, ...AUTH };
   /** Session responses are SSE: pull the JSON out of the data lines. */

@@ -239,6 +239,8 @@ Sans `slug` : la liste des add-ons installés. Avec `slug` : le détail d'un add
 
 Depuis la v0.3, chaque réponse d'outil porte aussi `structuredContent` (le même JSON que le texte, typé pour les clients qui le gèrent), et le serveur expose :
 
+Depuis la 0.18.0, les arguments de forme entité supportent les **complétions MCP** (`completion/complete`) : un client qui les implémente propose les vrais identifiants de votre instance pendant la frappe, pour l'argument `automation` de `diagnose-automation` et l'`entity_id` de `ha://entity/{entity_id}`. Mêmes règles de visibilité que toute lecture (`filter_reads` s'applique) ; le support côté clients varie.
+
 **Resources** (`application/json`, pour les clients qui épinglent du contexte sans appel d'outil) :
 
 | URI | Contenu |

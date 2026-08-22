@@ -78,6 +78,6 @@ export function buildServer(ctx: ToolContext): McpServer {
   registerEnergyTools(server, ctx);
   registerPresenceTools(server, ctx);
   registerResources(server, ctx);
-  registerPrompts(server);
+  registerPrompts(server, ctx);
   return server;
 }
