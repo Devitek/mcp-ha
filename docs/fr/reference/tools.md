@@ -1,6 +1,6 @@
 # Référence des outils
 
-26 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+28 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -148,6 +148,16 @@ L'état plus, pour les automations créées via l'interface, la configuration co
 
 entity_id, nom, running, last_triggered. Paramètres : `limit`, `offset`.
 
+### ha_get_automation_trace
+
+Le pas à pas des exécutions récentes d'une automation ou d'un script, le premier réflexe du « pourquoi ça s'est déclenché (ou pas) ? ». Sans `run_id` : la liste des exécutions récentes (déclencheur, issue, dernier step, erreur). Avec `run_id` : le chemin ordonné des steps avec les verdicts des conditions et les erreurs. Les variables sont volontairement omises (taille, et elles divulgueraient les états d'autres entités malgré `filter_reads`). Home Assistant ne garde que les dernières exécutions en mémoire, depuis son dernier redémarrage.
+
+## Diagnostics
+
+### ha_get_health
+
+Le bilan de santé en un appel : les problèmes du système **Réparations** de Home Assistant, les entités `unavailable`/`unknown` avec leur ancienneté, les batteries faibles (`battery_threshold`, défaut 20 %), les automations actives qui ne se déclenchent plus (`stale_days`, défaut 30), les entités sans pièce. Sections plafonnées avec les comptes totaux, qualifiées plutôt que jugées : un capteur saisonnier n'est pas un défaut. À utiliser avec le prompt `health-report`.
+
 ## Historique
 
 ### ha_get_history
@@ -214,5 +224,6 @@ Depuis la v0.3, chaque réponse d'outil porte aussi `structuredContent` (le mêm
 |-----|-----------|----------------|
 | `diagnose-automation` | `automation` (entity_id) | enquête pas à pas sur une automation qui n'a pas tourné |
 | `energy-report` | `hours` (optionnel) | bilan de consommation bâti sur les statistiques long terme |
+| `health-report` | aucun | bilan de santé guidé bâti sur ha_get_health |
 | `propose-automation` | `goal` | rédige un YAML d'automation prêt à coller depuis des entités vérifiées, n'écrit rien |
 | `propose-script` | `goal` | rédige un YAML de script prêt à coller depuis des entités vérifiées, n'écrit rien |

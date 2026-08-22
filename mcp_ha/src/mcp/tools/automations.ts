@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../context.js";
-import { listEnvelope, safe } from "../helpers.js";
+import { listEnvelope, safe, trunc } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
 import { log } from "../../logger.js";
 
@@ -77,6 +77,96 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
         log.warning(`Could not fetch the automation config for ${entity_id}: ${msg}`);
         return { ...base, note: "Configuration not readable right now (Home Assistant API error); the state above is still accurate." };
       }
+    })
+  );
+
+  server.registerTool(
+    "ha_get_automation_trace",
+    {
+      title: "Automation execution trace",
+      description:
+        "Step-by-step record of recent automation or script runs: which trigger fired, how each " +
+        "condition evaluated, which actions ran, and any error. Without run_id: the list of recent " +
+        "runs. With run_id: the detailed step path of that run. The first reflex to answer " +
+        "'why did this fire (or not)?'.",
+      inputSchema: {
+        entity_id: z.string().describe("automation.* or script.* entity"),
+        run_id: z.string().optional().describe("A run from the list, for the detailed steps"),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    safe("ha_get_automation_trace", async ({ entity_id, run_id }) => {
+      if (!entityReadVisible(ctx.cfg, entity_id)) {
+        throw new Error(`entity ${entity_id} is not accessible (filter_reads)`);
+      }
+      const domain = entity_id.split(".")[0] ?? "";
+      if (domain !== "automation" && domain !== "script") {
+        throw new Error(`expected an automation.* or script.* entity_id, got: ${entity_id}`);
+      }
+      // trace/* wants the config item id, not the entity_id: for automations
+      // it is the `id` attribute, for scripts the object id after the dot.
+      let itemId: string;
+      if (domain === "automation") {
+        const e = (await ctx.catalog.index()).find((x) => x.entity_id === entity_id);
+        if (!e) throw new Error(`unknown automation: ${entity_id}`);
+        const cfgId = e.attributes.id;
+        if (typeof cfgId !== "string" || !cfgId) {
+          throw new Error("this automation has no configuration id (YAML-defined without id:): traces are not addressable");
+        }
+        itemId = cfgId;
+      } else {
+        itemId = entity_id.slice("script.".length);
+      }
+
+      if (!run_id) {
+        const raw: any[] = (await ctx.ws.send("trace/list", { domain, item_id: itemId })) ?? [];
+        const runs = raw.map((r) => ({
+          run_id: String(r.run_id ?? ""),
+          start: r.timestamp?.start ?? null,
+          finish: r.timestamp?.finish ?? null,
+          state: r.state ?? null,
+          ...(r.script_execution ? { result: r.script_execution } : {}),
+          ...(r.trigger ? { trigger: trunc(String(r.trigger), 200) } : {}),
+          ...(r.last_step ? { last_step: r.last_step } : {}),
+          ...(r.error ? { error: trunc(String(r.error), 300) } : {}),
+        }));
+        return {
+          entity_id,
+          runs,
+          total: runs.length,
+          note:
+            runs.length > 0
+              ? "Home Assistant keeps only the last few runs in memory. Pass run_id for the step-by-step detail."
+              : "No stored run: it did not fire since the last Home Assistant restart.",
+        };
+      }
+
+      const detail: any = await ctx.ws.send("trace/get", { domain, item_id: itemId, run_id });
+      // detail.trace maps step paths (trigger/0, condition/0, action/1...) to
+      // arrays of executions. Flatten, order by time, and DROP the variables:
+      // they embed other entities' states (filter_reads bypass) and weigh a
+      // lot; the path, verdicts and errors carry the diagnosis.
+      const steps: Array<Record<string, unknown>> = [];
+      for (const [path, entries] of Object.entries((detail?.trace ?? {}) as Record<string, any[]>)) {
+        for (const s of entries ?? []) {
+          steps.push({
+            path,
+            t: s?.timestamp ?? null,
+            ...(s?.result !== undefined ? { result: s.result } : {}),
+            ...(s?.error ? { error: trunc(String(s.error), 300) } : {}),
+          });
+        }
+      }
+      steps.sort((a, b) => String(a.t ?? "").localeCompare(String(b.t ?? "")));
+      return {
+        entity_id,
+        run_id,
+        state: detail?.state ?? null,
+        ...(detail?.script_execution ? { result: detail.script_execution } : {}),
+        ...(detail?.error ? { error: trunc(String(detail.error), 300) } : {}),
+        steps,
+        note: "Variables are omitted on purpose (size and privacy); condition results carry the verdicts.",
+      };
     })
   );
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0 - 2026-08-22
+
+- **Automation traces** (`ha_get_automation_trace`): the step-by-step record of recent automation and script runs, straight from Home Assistant's trace store. Which trigger fired, how each condition evaluated, which action failed. Variables are deliberately omitted (size and privacy). The `diagnose-automation` prompt now starts there.
+- **Health report** (`ha_get_health` + `health-report` prompt): Home Assistant's own Repairs issues, long-unavailable entities, low batteries, enabled automations that stopped firing, entities without an area. Capped sections, qualified signals.
+- 28 tools (20 read, 8 guarded write), 5 prompts. 226 unit tests.
+
 ## 0.11.0 - 2026-08-22
 
 - **Optional MCP sessions** (#90, new `enable_sessions` option, default off): an `initialize` opens a long-lived session (SSE streams) while stateless clients keep working unchanged. Sessions are bound to the token that opened them, capped at 16 with a 30-minute idle timeout, and unlock:

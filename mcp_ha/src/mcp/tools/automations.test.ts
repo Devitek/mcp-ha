@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
+// trace tests (#106) share this file with the other automation tools.
 import { registerAutomationTools } from "./automations.js";
 import { setLogLevel } from "../../logger.js";
 import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
@@ -86,5 +87,76 @@ describe("ha_get_automation", () => {
     expect(res.isError).toBe(false);
     expect(res.data.note).toContain("not readable right now");
     expect(res.data.note).not.toContain("YAML");
+  });
+});
+
+describe("ha_get_automation_trace (#106)", () => {
+  function traceSetup(wsSend: (type: string, payload: any) => Promise<any>, cfgOver: any = {}) {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(wsSend) };
+    registerAutomationTools(server, fakeCtx({ cfg: cfgOver, catalog: { index: async () => fixtures }, ws }));
+    return { tools, ws };
+  }
+
+  it("lists recent runs, resolving the automation config id from the attributes", async () => {
+    const { tools, ws } = traceSetup(async () => [
+      {
+        run_id: "r1",
+        timestamp: { start: "2026-08-22T06:00:00Z", finish: "2026-08-22T06:00:01Z" },
+        state: "stopped",
+        script_execution: "finished",
+        trigger: "state of binary_sensor.hall_motion",
+        last_step: "action/0",
+      },
+    ]);
+    const res = await callTool(tools, "ha_get_automation_trace", { entity_id: "automation.morning" });
+    expect(ws.send).toHaveBeenCalledWith("trace/list", { domain: "automation", item_id: "morning-123" });
+    expect(res.data.runs[0]).toMatchObject({ run_id: "r1", result: "finished", trigger: expect.stringContaining("hall_motion") });
+  });
+
+  it("uses the object id for scripts and explains empty run lists", async () => {
+    const { tools, ws } = traceSetup(async () => []);
+    const res = await callTool(tools, "ha_get_automation_trace", { entity_id: "script.wake_up" });
+    expect(ws.send).toHaveBeenCalledWith("trace/list", { domain: "script", item_id: "wake_up" });
+    expect(res.data.note).toContain("did not fire");
+  });
+
+  it("returns ordered steps with condition verdicts and drops the variables", async () => {
+    const { tools } = traceSetup(async (type: string) =>
+      type === "trace/get"
+        ? {
+            state: "stopped",
+            script_execution: "aborted",
+            trace: {
+              "condition/0": [
+                { timestamp: "2026-08-22T06:00:00.500Z", result: { result: false }, changed_variables: { huge: "x".repeat(5000) } },
+              ],
+              "trigger/0": [{ timestamp: "2026-08-22T06:00:00.100Z", changed_variables: { trigger: {} } }],
+            },
+          }
+        : []
+    );
+    const res = await callTool(tools, "ha_get_automation_trace", { entity_id: "automation.morning", run_id: "r1" });
+    expect(res.data.steps.map((s: any) => s.path)).toEqual(["trigger/0", "condition/0"]); // time-ordered
+    expect(res.data.steps[1].result).toEqual({ result: false });
+    expect(JSON.stringify(res.data)).not.toContain("changed_variables");
+    expect(res.data.result).toBe("aborted");
+  });
+
+  it("refuses YAML automations without a config id and non-automation domains", async () => {
+    const { tools } = traceSetup(async () => []);
+    const yaml = await callTool(tools, "ha_get_automation_trace", { entity_id: "automation.yaml_one" });
+    expect(yaml.isError).toBe(true);
+    expect(yaml.text).toContain("no configuration id");
+    const light = await callTool(tools, "ha_get_automation_trace", { entity_id: "light.kitchen" });
+    expect(light.isError).toBe(true);
+  });
+
+  it("respects filter_reads", async () => {
+    const { tools, ws } = traceSetup(async () => [], { filterReads: true, entityDenylist: ["automation.*"] });
+    const res = await callTool(tools, "ha_get_automation_trace", { entity_id: "automation.morning" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("filter_reads");
+    expect(ws.send).not.toHaveBeenCalled();
   });
 });
