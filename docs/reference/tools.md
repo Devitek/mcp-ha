@@ -1,6 +1,6 @@
 # Tool reference
 
-42 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+43 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -188,6 +188,10 @@ Step-by-step record of recent automation or script runs, the first reflex for "w
 ### ha_explain_event
 
 Explains WHY an entity changed: follows Home Assistant's context chain (the immediate actor, what triggered it in turn, the human when there was one, resolved to their person entity when one is linked and visible), up to 4 hops. Without `at`: the entity's last change. Hidden causes appear as `(hidden entity)` under `filter_reads`. The missing link between the logbook (what) and `ha_get_automation_trace` (how); the answer points to the trace when an automation is in the chain.
+
+### ha_get_self_test
+
+Diagnoses the ADD-ON itself, not the house: WebSocket and REST connectivity with latencies, live state map status, Supervisor availability, and an overall ok / degraded / broken verdict. Contains no data from your home, by design: paste its output into a support issue.
 
 ### ha_get_health
 

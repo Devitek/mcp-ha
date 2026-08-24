@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.27.0 - 2026-08-24
+
+- **Add-on self test** (`ha_get_self_test`): `ha_get_health` looks at the house, this looks at the add-on. WebSocket and REST connectivity with latencies, live state map status, Supervisor availability, and an ok / degraded / broken verdict with its reason. Contains no data from your home, by design: paste its output into a support issue. Every probe is bounded at 3 seconds, a diagnostic must never hang.
+- 43 tools (27 read, 16 guarded write). 306 unit tests.
+
 ## 0.26.0 - 2026-08-24
 
 - **Watch a whole room** (`ha://area/{area_id}` resource): the compact live state of an area (entity counts per domain, notable active entities), and in session mode it is subscribable: one notification when anything visible changes in the room, same one-per-second throttle as entity subscriptions. Hidden entities neither appear nor trigger notifications. Area ids autocomplete.

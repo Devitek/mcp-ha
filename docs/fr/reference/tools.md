@@ -1,6 +1,6 @@
 # Référence des outils
 
-42 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+43 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -188,6 +188,10 @@ Le pas à pas des exécutions récentes d'une automation ou d'un script, le prem
 ### ha_explain_event
 
 Explique POURQUOI une entité a changé : suit la chaîne de contexte de Home Assistant (l'acteur immédiat, ce qui l'a déclenché à son tour, l'humain le cas échéant, résolu vers son entité person quand elle est liée et visible), jusqu'à 4 sauts. Sans `at` : le dernier changement de l'entité. Les causes masquées apparaissent comme `(hidden entity)` sous `filter_reads`. Le chaînon manquant entre le logbook (quoi) et `ha_get_automation_trace` (comment) ; la réponse renvoie vers la trace quand une automation est dans la chaîne.
+
+### ha_get_self_test
+
+Diagnostique l'ADD-ON lui-même, pas la maison : connectivité WebSocket et REST avec latences, état de la carte d'états vivante, disponibilité du Supervisor, et un verdict global ok / degraded / broken. Aucune donnée de votre maison dans la réponse, par conception : collez sa sortie dans une issue de support.
 
 ### ha_get_health
 
