@@ -80,20 +80,20 @@ describe("ingress dashboard (#136)", () => {
 
   it("computes the tool breakdown from the enabled options", async () => {
     const readOnly = await (await fetch(`${await serve(createIngressHandler(ctx({ allowWrite: false })))}/`)).text();
-    expect(readOnly).toContain(">24<");
-    expect(readOnly).toContain("24 read</div>"); // no write suffix in the stat card
+    expect(readOnly).toContain(">25<");
+    expect(readOnly).toContain("25 read</div>"); // no write suffix in the stat card
     server?.close();
     const partial = await (await fetch(`${await serve(createIngressHandler(ctx()))}/`)).text();
-    expect(partial).toContain(">33<");
-    expect(partial).toContain("24 read");
-    expect(partial).toContain("9 write");
+    expect(partial).toContain(">35<");
+    expect(partial).toContain("25 read");
+    expect(partial).toContain("10 write");
     server?.close();
     const full = await (
       await fetch(`${await serve(createIngressHandler(ctx({ allowCamera: true, allowConfigWrite: true })))}/`)
     ).text();
-    expect(full).toContain(">40<");
-    expect(full).toContain("25 read");
-    expect(full).toContain("15 write");
+    expect(full).toContain(">42<");
+    expect(full).toContain("26 read");
+    expect(full).toContain("16 write");
   });
 
   it("renders named tokens masked with their scope, never in clear (#85)", async () => {

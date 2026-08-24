@@ -57,6 +57,33 @@ export function registerPrompts(server: McpServer, ctx: ToolContext): void {
   );
 
   server.registerPrompt(
+    "daily-briefing",
+    {
+      title: "Daily briefing",
+      description: "The morning ritual: who is home, the day's agenda, weather, yesterday's energy, urgent issues.",
+      argsSchema: {},
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text:
+              "Brief me on the house. Proceed step by step, then synthesize:\n" +
+              "1. ha_get_presence: who is home right now.\n" +
+              "2. ha_get_calendar on the visible calendars, today's window: the day's events.\n" +
+              "3. ha_get_forecast (daily) on the main weather entity: today's weather in one line.\n" +
+              "4. ha_get_energy with period day and compare true: yesterday's consumption versus the day before, only mention it if the delta is notable.\n" +
+              "5. ha_get_health: report ONLY the urgent items (repairs with error severity, batteries under 15 percent); skip the rest.\n" +
+              "6. Synthesize a briefing of about ten lines, prioritized and in natural language. Do not execute anything; you may offer at most ONE action (for example an announcement) and wait for my answer.",
+          },
+        },
+      ],
+    })
+  );
+
+  server.registerPrompt(
     "health-report",
     {
       title: "Instance health report",

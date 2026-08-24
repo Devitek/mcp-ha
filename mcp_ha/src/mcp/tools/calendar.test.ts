@@ -45,6 +45,44 @@ describe("ha_get_todo_list (#87)", () => {
     expect(res.data.items).toEqual([{ entity_id: "todo.shopping", name: "Shopping" }]);
   });
 
+  it("manages list items through the guarded path (#141)", async () => {
+    const { server, tools } = fakeServer();
+    const send = vi.fn(async () => ({ context: {} }));
+    registerCalendarTools(server, fakeCtx({ cfg: { allowWrite: true }, ws: { send } }));
+    const add = await callTool(tools, "ha_manage_todo", { entity_id: "todo.shopping", action: "add", item: "Lait" });
+    expect(add.data.success).toBe(true);
+    expect(send).toHaveBeenCalledWith(
+      "call_service",
+      expect.objectContaining({ domain: "todo", service: "add_item", target: { entity_id: "todo.shopping" }, service_data: { item: "Lait" } })
+    );
+    await callTool(tools, "ha_manage_todo", { entity_id: "todo.shopping", action: "complete", item: "Lait" });
+    expect(send).toHaveBeenLastCalledWith(
+      "call_service",
+      expect.objectContaining({ service: "update_item", service_data: { item: "Lait", status: "completed" } })
+    );
+    await callTool(tools, "ha_manage_todo", { entity_id: "todo.shopping", action: "rename", item: "Lait", new_name: "Lait entier" });
+    expect(send).toHaveBeenLastCalledWith(
+      "call_service",
+      expect.objectContaining({ service: "update_item", service_data: { item: "Lait", rename: "Lait entier" } })
+    );
+    await callTool(tools, "ha_manage_todo", { entity_id: "todo.shopping", action: "remove", item: "Lait entier" });
+    expect(send).toHaveBeenLastCalledWith("call_service", expect.objectContaining({ service: "remove_item" }));
+  });
+
+  it("requires new_name for rename and is absent without allow_write (#141)", async () => {
+    const { server, tools } = fakeServer();
+    registerCalendarTools(server, fakeCtx({ cfg: { allowWrite: true }, ws: { send: vi.fn() } }));
+    const res = await callTool(tools, "ha_manage_todo", { entity_id: "todo.shopping", action: "rename", item: "Lait" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("new_name");
+    const wrongDomain = await callTool(tools, "ha_manage_todo", { entity_id: "light.kitchen", action: "add", item: "x" });
+    expect(wrongDomain.isError).toBe(true);
+    const readonly = fakeServer();
+    registerCalendarTools(readonly.server, fakeCtx({ cfg: { allowWrite: false } }));
+    expect(readonly.tools.has("ha_manage_todo")).toBe(false);
+    expect(readonly.tools.has("ha_get_todo_list")).toBe(true);
+  });
+
   it("reads items via todo.get_items with return_response", async () => {
     const { server, tools } = fakeServer();
     const send = vi.fn(async () => ({ response: { "todo.shopping": { items: [{ summary: "Milk", status: "needs_action" }] } } }));

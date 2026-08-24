@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.0 - 2026-08-24
+
+- **Weather forecasts** (`ha_get_forecast`): "will it rain tomorrow?" finally has its tool. Hourly, daily and twice_daily forecasts straight from `weather.get_forecasts` (the read-by-service mechanic), projected compactly with units, closing the gap left when HA 2024.3 removed forecasts from the entity attributes.
+- **To-do list management** (`ha_manage_todo`): "add milk to the shopping list". Add, complete, uncheck, remove or rename items, through the same guarded write path as every service call.
+- **Daily briefing** (`daily-briefing` prompt): the morning ritual composing presence, today's agenda, the weather, yesterday's energy and only the urgent health items, in about ten prioritized lines, executing nothing.
+- 42 tools (26 read, 16 guarded write), 7 prompts. 301 unit tests.
+
 ## 0.24.1 - 2026-08-23
 
 - **Fix** (#146, caught in real-world use by the mandatory diff review, nothing was broken): `ha_update_automation` now removes the legacy twin key (`trigger`/`condition`/`action`) when the matching modern block is provided. Before, the modern key was added NEXT TO the legacy one and Home Assistant refuses such documents ("Cannot specify both 'trigger' and 'triggers'"). Legacy-to-modern syntax migrations now work through the tool; untouched pairs keep their legacy key.
