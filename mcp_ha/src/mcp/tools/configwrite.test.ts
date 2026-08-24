@@ -223,6 +223,69 @@ describe("ha_add_dashboard_card (#129)", () => {
   });
 });
 
+describe("legacy twin keys (#146)", () => {
+  const LEGACY = {
+    alias: "Sapin matin",
+    trigger: [{ platform: "time", at: "input_datetime.sapin_morning_on" }],
+    condition: [],
+    action: [{ service: "switch.turn_on", entity_id: "switch.sapin" }],
+    mode: "single",
+  };
+  const ENTITY = entity("automation.sapin", { name: "Sapin matin", attributes: { id: "sapin-1" } });
+
+  function legacySetup(config: any = LEGACY) {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => ({ triggers: { valid: true }, actions: { valid: true } })) };
+    const coreGet = vi.fn(async () => JSON.parse(JSON.stringify(config)));
+    const corePost = vi.fn(async () => ({ result: "ok" }));
+    registerConfigWriteTools(
+      server,
+      fakeCtx({ cfg: { allowConfigWrite: true }, ws, http: { coreGet, corePost }, catalog: { index: async () => [ENTITY] }, client: "writer" })
+    );
+    return { tools, corePost };
+  }
+
+  it("a modern block replaces its legacy twin instead of sitting next to it", async () => {
+    const { tools, corePost } = legacySetup();
+    const modern = {
+      triggers: [{ trigger: "time", at: "input_datetime.sapin_morning_on" }],
+      conditions: [],
+      actions: [{ action: "switch.turn_on", target: { entity_id: "switch.sapin" } }],
+    };
+    const first = await callTool(tools, "ha_update_automation", { entity_id: "automation.sapin", ...modern });
+    expect(first.data.diff).toContain("- trigger:");
+    expect(first.data.diff).toContain("+ triggers:");
+    const res = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.sapin",
+      ...modern,
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.data.updated).toBe("automation.sapin");
+    const [, payload] = corePost.mock.calls[0] as any;
+    expect(payload.triggers).toEqual(modern.triggers);
+    expect(payload.trigger).toBeUndefined();
+    expect(payload.condition).toBeUndefined();
+    expect(payload.action).toBeUndefined();
+    expect(payload.alias).toBe("Sapin matin");
+  });
+
+  it("a partial patch leaves the other legacy blocks untouched", async () => {
+    const { tools, corePost } = legacySetup();
+    const patch = { actions: [{ action: "switch.turn_off", target: { entity_id: "switch.sapin" } }] };
+    const first = await callTool(tools, "ha_update_automation", { entity_id: "automation.sapin", ...patch });
+    await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.sapin",
+      ...patch,
+      confirm_token: first.data.confirm_token,
+    });
+    const [, payload] = corePost.mock.calls[0] as any;
+    expect(payload.action).toBeUndefined(); // replaced twin removed
+    expect(payload.actions).toEqual(patch.actions);
+    expect(payload.trigger).toEqual(LEGACY.trigger); // untouched pair keeps legacy
+    expect(payload.condition).toEqual(LEGACY.condition);
+  });
+});
+
 describe("blueprint-based updates (#139)", () => {
   const BP_CONFIG = {
     alias: "Telecommande salon",

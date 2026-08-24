@@ -275,6 +275,19 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
       throw new Error(`inputs only applies to blueprint-based ${req.kind}s; ${req.entityId} has raw blocks, update those instead`);
     }
     const final: Record<string, unknown> = { ...before, ...patch };
+    // Legacy twin keys (#146): stored configs may use the old singular keys
+    // (trigger/condition/action). A provided modern block must REPLACE its
+    // legacy twin, not sit next to it: HA refuses "both 'trigger' and
+    // 'triggers'". This also makes legacy-to-modern migrations possible
+    // through the tool. Untouched pairs keep their legacy key: mixing
+    // syntaxes across DIFFERENT pairs is valid for HA.
+    for (const [modern, legacy] of [
+      ["triggers", "trigger"],
+      ["conditions", "condition"],
+      ["actions", "action"],
+    ] as const) {
+      if (modern in patch) delete final[legacy];
+    }
     if (isBlueprint && req.blueprintInputs) {
       await checkBlueprintInputs(req.kind, blueprint.path, req.blueprintInputs);
       final.use_blueprint = { ...blueprint, input: req.blueprintInputs };

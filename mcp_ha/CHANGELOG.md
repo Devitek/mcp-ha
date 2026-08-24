@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.1 - 2026-08-23
+
+- **Fix** (#146, caught in real-world use by the mandatory diff review, nothing was broken): `ha_update_automation` now removes the legacy twin key (`trigger`/`condition`/`action`) when the matching modern block is provided. Before, the modern key was added NEXT TO the legacy one and Home Assistant refuses such documents ("Cannot specify both 'trigger' and 'triggers'"). Legacy-to-modern syntax migrations now work through the tool; untouched pairs keep their legacy key.
+
 ## 0.24.0 - 2026-08-23
 
 - **Blueprint automations can now be updated** (#139, found through real-world use): `ha_update_automation` and `ha_update_script` gain an `inputs` parameter that replaces the whole `use_blueprint` input set, checked against the installed blueprint (required inputs present, unknown ones refused). Raw trigger/condition/action blocks are refused on blueprint-based targets with a clear message instead of producing an invalid config after confirmation; alias, description and mode keep working on both kinds.
