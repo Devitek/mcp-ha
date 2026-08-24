@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.0 - 2026-08-24
+
+- **Watch a whole room** (`ha://area/{area_id}` resource): the compact live state of an area (entity counts per domain, notable active entities), and in session mode it is subscribable: one notification when anything visible changes in the room, same one-per-second throttle as entity subscriptions. Hidden entities neither appear nor trigger notifications. Area ids autocomplete.
+- 4 resources. 302 unit tests.
+
 ## 0.25.0 - 2026-08-24
 
 - **Weather forecasts** (`ha_get_forecast`): "will it rain tomorrow?" finally has its tool. Hourly, daily and twice_daily forecasts straight from `weather.get_forecasts` (the read-by-service mechanic), projected compactly with units, closing the gap left when HA 2024.3 removed forecasts from the entity attributes.

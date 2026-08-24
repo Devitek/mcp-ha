@@ -65,7 +65,7 @@ The server implements MCP over **Streamable HTTP**. By default it is stateless: 
 
 With `enable_sessions` (#90), an `initialize` without a session id opens a **long-lived session** (`mcp-session-id` header, SSE streams). Sessions unlock what one-shot requests structurally cannot do:
 
-- **Entity subscriptions**: subscribe to `ha://entity/{entity_id}` and receive `notifications/resources/updated` when it changes, fed by the live state map (at most one notification per second per entity; the client re-reads the resource).
+- **Entity subscriptions**: subscribe to `ha://entity/{entity_id}` and receive `notifications/resources/updated` when it changes, fed by the live state map (at most one notification per second per entity; the client re-reads the resource). Since 0.26.0, `ha://area/{area_id}` is subscribable too: one notification when anything visible in the room changes, same throttle.
 - **In-protocol confirmations (elicitation)**: when the client supports it, sensitive-domain calls and config writes ask the human directly through `elicitation/create` instead of round-tripping a `confirm_token` through the model. The token flow remains the universal fallback.
 
 Stateless requests keep working unchanged alongside sessions.

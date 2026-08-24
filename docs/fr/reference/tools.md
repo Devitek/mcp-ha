@@ -292,6 +292,7 @@ Depuis la 0.18.0, les arguments de forme entité supportent les **complétions M
 | `ha://areas` | toutes les pièces avec leur nombre d'entités |
 | `ha://services` | les domaines de services avec leur nombre de services |
 | `ha://config` | configuration compacte de l'instance (version, nom, fuseau, unités) |
+| `ha://area/{area_id}` | état compact d'une pièce (comptes par domaine, entités actives notables) ; abonnable en mode sessions |
 
 **Prompts** (parcours guidés) :
 

@@ -65,7 +65,7 @@ Le serveur implémente MCP en **Streamable HTTP**. Par défaut il est stateless 
 
 Avec `enable_sessions` (#90), un `initialize` sans identifiant de session ouvre une **session longue** (en-tête `mcp-session-id`, flux SSE). Les sessions débloquent ce que le one-shot interdit structurellement :
 
-- **Abonnements aux entités** : abonnez-vous à `ha://entity/{entity_id}` et recevez `notifications/resources/updated` quand elle change, alimenté par la carte d'états vivante (au plus une notification par seconde et par entité ; le client relit la resource).
+- **Abonnements aux entités** : abonnez-vous à `ha://entity/{entity_id}` et recevez `notifications/resources/updated` quand elle change, alimenté par la carte d'états vivante (au plus une notification par seconde et par entité ; le client relit la resource). Depuis la 0.26.0, `ha://area/{area_id}` est abonnable aussi : une notification quand quelque chose de visible bouge dans la pièce, même throttle.
 - **Confirmations dans le protocole (elicitation)** : quand le client le gère, les appels sur domaines sensibles et les écritures de config interrogent l'humain directement via `elicitation/create` au lieu de faire transiter un `confirm_token` par le modèle. Le flux à jeton reste le repli universel.
 
 Les requêtes stateless continuent de fonctionner telles quelles à côté des sessions.
