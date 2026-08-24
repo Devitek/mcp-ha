@@ -223,6 +223,110 @@ describe("ha_add_dashboard_card (#129)", () => {
   });
 });
 
+describe("blueprint-based updates (#139)", () => {
+  const BP_CONFIG = {
+    alias: "Telecommande salon",
+    use_blueprint: {
+      path: "homeassistant/remote.yaml",
+      input: { remote: "sensor.remote_salon", light_target: { entity_id: "light.salon" } },
+    },
+  };
+  const BP_META = {
+    "homeassistant/remote.yaml": {
+      metadata: {
+        name: "Remote control",
+        input: { remote: { selector: { entity: {} } }, light_target: { selector: { target: {} } }, dim_step: { default: 10 } },
+      },
+    },
+  };
+
+  function bpUpdateSetup(over: any = {}) {
+    const { server, tools } = fakeServer();
+    const ws = {
+      send: vi.fn(async (type: string) =>
+        type === "blueprint/list" ? BP_META : { triggers: { valid: true }, actions: { valid: true } }
+      ),
+    };
+    const coreGet = vi.fn(async () => JSON.parse(JSON.stringify(over.config ?? BP_CONFIG)));
+    const corePost = vi.fn(async () => ({ result: "ok" }));
+    const ctx = fakeCtx({
+      cfg: { allowConfigWrite: true },
+      ws,
+      http: { coreGet, corePost },
+      catalog: { index: async () => [entity("automation.telecommande", { name: "Telecommande salon", attributes: { id: "tc-1" } })] },
+      client: "writer",
+    });
+    registerConfigWriteTools(server, ctx);
+    return { tools, ws, corePost };
+  }
+
+  it("updates the blueprint inputs wholesale through the guarded flow", async () => {
+    const { tools, ws, corePost } = bpUpdateSetup();
+    const newInputs = { remote: "sensor.remote_salon", light_target: { entity_id: "light.cuisine" }, dim_step: 20 };
+    const first = await callTool(tools, "ha_update_automation", { entity_id: "automation.telecommande", inputs: newInputs });
+    expect(first.data.confirmation_required).toBe(true);
+    expect(first.data.diff).toContain("light.cuisine");
+    // no validate_config for blueprint payloads
+    expect(ws.send).not.toHaveBeenCalledWith("validate_config", expect.anything());
+    const res = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.telecommande",
+      inputs: newInputs,
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.data.updated).toBe("automation.telecommande");
+    const [, payload] = corePost.mock.calls[0] as any;
+    expect(payload.use_blueprint).toEqual({ path: "homeassistant/remote.yaml", input: newInputs });
+    expect(payload.alias).toBe("Telecommande salon");
+  });
+
+  it("refuses raw blocks on a blueprint automation, with a clear message", async () => {
+    const { tools, corePost } = bpUpdateSetup();
+    const res = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.telecommande",
+      actions: [{ action: "light.turn_on" }],
+    });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("blueprint-based");
+    expect(res.text).toContain("inputs");
+    expect(corePost).not.toHaveBeenCalled();
+  });
+
+  it("still allows renaming or changing the mode of a blueprint automation", async () => {
+    const { tools, corePost } = bpUpdateSetup();
+    const first = await callTool(tools, "ha_update_automation", { entity_id: "automation.telecommande", alias: "TC salon v2" });
+    const res = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.telecommande",
+      alias: "TC salon v2",
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.data.updated).toBe("automation.telecommande");
+    const [, payload] = corePost.mock.calls[0] as any;
+    expect(payload.alias).toBe("TC salon v2");
+    expect(payload.use_blueprint).toEqual(BP_CONFIG.use_blueprint); // untouched
+  });
+
+  it("refuses inputs on a classic automation and validates them against the blueprint", async () => {
+    const classic = { alias: "Classic", triggers: [{ trigger: "time" }], actions: [{ action: "light.turn_on" }] };
+    const { tools: t1 } = bpUpdateSetup({ config: classic });
+    const wrong = await callTool(t1, "ha_update_automation", { entity_id: "automation.telecommande", inputs: { a: 1 } });
+    expect(wrong.isError).toBe(true);
+    expect(wrong.text).toContain("only applies to blueprint-based");
+    const { tools: t2 } = bpUpdateSetup();
+    const missing = await callTool(t2, "ha_update_automation", {
+      entity_id: "automation.telecommande",
+      inputs: { remote: "sensor.remote_salon" },
+    });
+    expect(missing.isError).toBe(true);
+    expect(missing.text).toContain("light_target");
+    const unknown = await callTool(t2, "ha_update_automation", {
+      entity_id: "automation.telecommande",
+      inputs: { remote: "x", light_target: {}, typo: 1 },
+    });
+    expect(unknown.isError).toBe(true);
+    expect(unknown.text).toContain("typo");
+  });
+});
+
 describe("ha_create_from_blueprint (#127)", () => {
   const BP_LIST = {
     "homeassistant/motion_light.yaml": {

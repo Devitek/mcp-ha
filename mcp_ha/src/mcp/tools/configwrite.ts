@@ -205,8 +205,27 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
     kind: "automation" | "script";
     entityId: string;
     patch: Record<string, unknown>;
+    /** Replaces use_blueprint.input wholesale, blueprint targets only (#139). */
+    blueprintInputs?: Record<string, unknown> | undefined;
     dry_run?: boolean | undefined;
     confirm_token?: string | undefined;
+  }
+
+  /** Required/unknown input checks against the installed blueprint (#127/#139). */
+  async function checkBlueprintInputs(kind: "automation" | "script", path: unknown, inputs: Record<string, unknown>): Promise<void> {
+    const list: Record<string, any> = ((await ctx.ws.send("blueprint/list", { domain: kind })) as Record<string, any>) ?? {};
+    const bp = list[String(path)];
+    if (!bp) throw new Error(`blueprint ${String(path)} is not installed (anymore); its automations can only be edited in the UI`);
+    const declared: Record<string, any> = bp?.metadata?.input ?? {};
+    const missing = Object.entries(declared)
+      .filter(([, def]) => !("default" in ((def ?? {}) as object)))
+      .map(([name]) => name)
+      .filter((name) => !(name in inputs));
+    if (missing.length > 0) throw new Error(`missing required blueprint inputs: ${missing.join(", ")} (inputs replaces the whole set)`);
+    const unknown = Object.keys(inputs).filter((k) => !(k in declared));
+    if (unknown.length > 0) {
+      throw new Error(`unknown blueprint inputs: ${unknown.join(", ")} (this blueprint declares: ${Object.keys(declared).join(", ")})`);
+    }
   }
 
   async function currentConfig(kind: "automation" | "script", entityId: string): Promise<{ config: Record<string, unknown>; path: string }> {
@@ -236,11 +255,30 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
   async function guardedUpdate(req: UpdateRequest): Promise<unknown> {
     const patch: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(req.patch)) if (v !== undefined) patch[k] = v;
-    if (Object.keys(patch).length === 0) {
-      throw new Error("nothing to change: provide at least one field (alias, description, mode, triggers, conditions, actions/sequence)");
+    if (Object.keys(patch).length === 0 && !req.blueprintInputs) {
+      throw new Error(
+        "nothing to change: provide at least one field (alias, description, mode, triggers, conditions, actions/sequence, or inputs for a blueprint automation)"
+      );
     }
     const { config: before, path } = await currentConfig(req.kind, req.entityId);
+    // Blueprint-based configs have no raw blocks (#139): their behaviour is
+    // edited through use_blueprint.input, never through triggers/actions.
+    const blueprint = (before as { use_blueprint?: { path?: unknown; input?: unknown } }).use_blueprint;
+    const isBlueprint = typeof blueprint === "object" && blueprint !== null;
+    const blockKeys = ["triggers", "conditions", "actions", "sequence"].filter((k) => k in patch);
+    if (isBlueprint && blockKeys.length > 0) {
+      throw new Error(
+        `${req.entityId} is blueprint-based (${String(blueprint.path)}): update its inputs (or alias, description, mode), not raw ${blockKeys.join("/")} blocks`
+      );
+    }
+    if (!isBlueprint && req.blueprintInputs) {
+      throw new Error(`inputs only applies to blueprint-based ${req.kind}s; ${req.entityId} has raw blocks, update those instead`);
+    }
     const final: Record<string, unknown> = { ...before, ...patch };
+    if (isBlueprint && req.blueprintInputs) {
+      await checkBlueprintInputs(req.kind, blueprint.path, req.blueprintInputs);
+      final.use_blueprint = { ...blueprint, input: req.blueprintInputs };
+    }
     const beforeYaml = stringify(before);
     const afterYaml = stringify(final);
     const diff = unifiedDiff(beforeYaml, afterYaml);
@@ -260,7 +298,10 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
     }
 
     if (!req.confirm_token) {
-      await validateBlocks(req.kind, final);
+      // Blueprint payloads have no blocks for validate_config; the inputs
+      // were checked against the blueprint metadata above and HA validates
+      // the values at write time.
+      if (!isBlueprint) await validateBlocks(req.kind, final);
       const answer = ctx.elicit
         ? await ctx.elicit(`About to update ${req.entityId}. Review the change:\n\n${diff}\nConfirm the update?`)
         : null;
@@ -499,9 +540,10 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
       title: "Update an automation",
       description:
         "Updates an EXISTING UI-managed automation. Provided blocks replace the current ones wholesale " +
-        "(a provided actions list replaces all actions). Two-step: the first call validates and returns a " +
-        "before/after diff plus a confirm_token; show the diff to the user, then call again with the token. " +
-        "The success answer carries the previous YAML for manual rollback.",
+        "(a provided actions list replaces all actions). For blueprint-based automations, pass inputs " +
+        "(replaces the whole use_blueprint input set) instead of raw blocks. Two-step: the first call " +
+        "validates and returns a before/after diff plus a confirm_token; show the diff to the user, then " +
+        "call again with the token. The success answer carries the previous YAML for manual rollback.",
       inputSchema: {
         entity_id: z.string().describe("E.g. automation.night_heating"),
         alias: z.string().optional(),
@@ -510,18 +552,20 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
         triggers: freeObjects.min(1).optional(),
         conditions: freeObjects.optional(),
         actions: freeObjects.min(1).optional(),
+        inputs: z.record(z.string(), z.unknown()).optional().describe("Blueprint automations only: replaces use_blueprint.input wholesale"),
         dry_run: z.boolean().optional().describe("true: return the diff preview only"),
         confirm_token: z.string().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
-    safe("ha_update_automation", async ({ entity_id, alias, description, mode, triggers, conditions, actions, dry_run, confirm_token }) => {
+    safe("ha_update_automation", async ({ entity_id, alias, description, mode, triggers, conditions, actions, inputs, dry_run, confirm_token }) => {
       if (!entity_id.startsWith("automation.")) throw new Error(`expected an automation.* entity_id, got: ${entity_id}`);
       return guardedUpdate({
         tool: "ha_update_automation",
         kind: "automation",
         entityId: entity_id,
         patch: { alias, description, mode, triggers, conditions, actions },
+        blueprintInputs: inputs,
         dry_run,
         confirm_token,
       });
@@ -534,25 +578,28 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
       title: "Update a script",
       description:
         "Updates an EXISTING UI-managed script, same guarded two-step flow as ha_update_automation " +
-        "(wholesale block replacement, before/after diff, previous YAML returned for rollback).",
+        "(wholesale block replacement, blueprint inputs supported, before/after diff, previous YAML " +
+        "returned for rollback).",
       inputSchema: {
         entity_id: z.string().describe("E.g. script.movie_night"),
         alias: z.string().optional(),
         description: z.string().optional(),
         mode: z.enum(["single", "restart", "queued", "parallel"]).optional(),
         sequence: freeObjects.min(1).optional(),
+        inputs: z.record(z.string(), z.unknown()).optional().describe("Blueprint scripts only: replaces use_blueprint.input wholesale"),
         dry_run: z.boolean().optional(),
         confirm_token: z.string().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
-    safe("ha_update_script", async ({ entity_id, alias, description, mode, sequence, dry_run, confirm_token }) => {
+    safe("ha_update_script", async ({ entity_id, alias, description, mode, sequence, inputs, dry_run, confirm_token }) => {
       if (!entity_id.startsWith("script.")) throw new Error(`expected a script.* entity_id, got: ${entity_id}`);
       return guardedUpdate({
         tool: "ha_update_script",
         kind: "script",
         entityId: entity_id,
         patch: { alias, description, mode, sequence },
+        blueprintInputs: inputs,
         dry_run,
         confirm_token,
       });
