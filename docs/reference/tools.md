@@ -292,6 +292,7 @@ Since 0.18.0, entity-shaped arguments support **MCP completions** (`completion/c
 | `ha://areas` | all areas with their entity counts |
 | `ha://services` | service domains with their service counts |
 | `ha://config` | compact instance configuration (version, name, timezone, units) |
+| `ha://area/{area_id}` | compact live state of one area (counts per domain, notable active entities); subscribable in session mode |
 
 **Prompts** (guided workflows):
 

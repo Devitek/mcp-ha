@@ -332,6 +332,46 @@ describe("MCP sessions (#90)", () => {
     expect(sse(await sub.text()).result).toEqual({});
   });
 
+  it("serves and subscribes the ha://area resource inside a session (#143)", async () => {
+    const areaCatalog = {
+      index: vi.fn(async () => [
+        { entity_id: "light.salon", name: "Salon light", domain: "light", state: "on", area: "Salon", floor: null, device_id: null, last_changed: "", hidden: false, category: null, aliases: [], labels: [], attributes: {} },
+        { entity_id: "sensor.salon_temp", name: "Salon temp", domain: "sensor", state: "21.5", area: "Salon", floor: null, device_id: null, last_changed: "", hidden: false, category: null, aliases: [], labels: [], attributes: {} },
+      ]),
+      registries: vi.fn(async () => ({ at: 0, areas: [{ area_id: "salon", name: "Salon", floor_id: "rdc" }], devices: [], entities: [], floors: [{ floor_id: "rdc", name: "Rez-de-chaussée", level: 0 }], labels: [] })),
+      onEntityChange: vi.fn(() => () => {}),
+    };
+    const base = await startServer(sessionCtx({ catalog: areaCatalog }));
+    const sid = await openSession(base);
+    const H = { ...S_AUTH, "mcp-session-id": sid };
+    const read = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: H,
+      body: rpc("resources/read", { uri: "ha://area/salon" }, 3),
+    });
+    const content = JSON.parse(sse(await read.text()).result.contents[0].text);
+    expect(content).toMatchObject({
+      area_id: "salon",
+      name: "Salon",
+      floor: "Rez-de-chaussée",
+      entity_count: 2,
+      by_domain: { light: 1, sensor: 1 },
+    });
+    expect(content.notable).toEqual([{ entity_id: "light.salon", state: "on" }]);
+    const sub = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: H,
+      body: rpc("resources/subscribe", { uri: "ha://area/salon" }, 4),
+    });
+    expect(sse(await sub.text()).result).toEqual({});
+    const unknown = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: H,
+      body: rpc("resources/subscribe", { uri: "ha://area/garage" }, 5),
+    });
+    expect(sse(await unknown.text()).error.message).toContain("unknown area");
+  });
+
   it("refuses subscribing a filtered entity", async () => {
     const base = await startServer(
       sessionCtx({

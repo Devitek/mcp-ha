@@ -59,6 +59,54 @@ export function registerResources(server: McpServer, ctx: ToolContext): void {
     }
   );
 
+  server.registerResource(
+    "area",
+    new ResourceTemplate("ha://area/{area_id}", {
+      list: undefined,
+      complete: {
+        area_id: async (value: string) => {
+          const q = String(value ?? "").toLowerCase();
+          return (await ctx.catalog.registries()).areas
+            .map((a) => a.area_id)
+            .filter((id) => id.toLowerCase().includes(q))
+            .slice(0, 50);
+        },
+      },
+    }),
+    {
+      title: "Area state",
+      description:
+        "Compact live state of one area: entity counts per domain and the notable active entities. " +
+        "In session mode, subscribe to be notified when anything in the room changes (#143).",
+      mimeType: "application/json",
+    },
+    async (uri, variables) => {
+      const areaId = String(variables.area_id ?? "");
+      const regs = await ctx.catalog.registries();
+      const area = regs.areas.find((a) => a.area_id === areaId);
+      if (!area) throw new Error(`unknown area: ${areaId}. List areas with ha_list_areas.`);
+      const floor = area.floor_id ? (regs.floors.find((f) => f.floor_id === area.floor_id)?.name ?? null) : null;
+      const entities = (await ctx.catalog.index()).filter(
+        (e) => e.area === area.name && entityReadVisible(ctx.cfg, e.entity_id)
+      );
+      const byDomain: Record<string, number> = {};
+      for (const e of entities) byDomain[e.domain] = (byDomain[e.domain] ?? 0) + 1;
+      const ACTIVE = new Set(["on", "open", "playing", "heat", "cool", "heat_cool", "unlocked"]);
+      const notable = entities
+        .filter((e) => ACTIVE.has(e.state))
+        .slice(0, 10)
+        .map((e) => ({ entity_id: e.entity_id, state: e.state }));
+      return json(uri.href, {
+        area_id: areaId,
+        name: area.name,
+        ...(floor ? { floor } : {}),
+        entity_count: entities.length,
+        by_domain: byDomain,
+        notable,
+      });
+    }
+  );
+
   if (ctx.sessionMode) registerEntitySubscriptions(server, ctx);
 
   server.registerResource(
@@ -131,33 +179,69 @@ function registerEntitySubscriptions(server: McpServer, ctx: ToolContext): void 
   const MAX_SUBSCRIPTIONS = 50;
   const subscribed = new Set<string>();
   const lastNotified = new Map<string, number>();
+  // Area subscriptions (#143): the state_changed listener is SYNCHRONOUS,
+  // so entity-to-area resolution comes from a precomputed map, refreshed
+  // asynchronously on each area subscribe and lazily (60 s) on events. A
+  // just-moved entity may miss or over-fire one notification: accepted.
+  let entityToArea = new Map<string, string>();
+  let areaSubs = 0;
+  let lastMapBuild = 0;
+  const buildAreaMap = async (): Promise<void> => {
+    lastMapBuild = Date.now();
+    const [index, regs] = await Promise.all([ctx.catalog.index(), ctx.catalog.registries()]);
+    const nameToId = new Map(regs.areas.map((a) => [a.name, a.area_id]));
+    entityToArea = new Map(
+      index.filter((e) => e.area !== null).map((e) => [e.entity_id, nameToId.get(e.area as string) ?? ""])
+    );
+  };
 
   server.server.registerCapabilities({ resources: { subscribe: true } });
   server.server.setRequestHandler(SubscribeRequestSchema, async (req) => {
     const uri = req.params.uri;
     const entityId = uri.match(/^ha:\/\/entity\/(.+)$/)?.[1];
-    if (!entityId) throw new Error(`only ha://entity/{entity_id} resources are subscribable, got: ${uri}`);
-    if (!entityReadVisible(ctx.cfg, entityId)) throw new Error(`entity ${entityId} is not accessible (filter_reads)`);
+    const areaId = uri.match(/^ha:\/\/area\/(.+)$/)?.[1];
+    if (!entityId && !areaId) {
+      throw new Error(`only ha://entity/{entity_id} and ha://area/{area_id} resources are subscribable, got: ${uri}`);
+    }
+    if (entityId && !entityReadVisible(ctx.cfg, entityId)) {
+      throw new Error(`entity ${entityId} is not accessible (filter_reads)`);
+    }
+    if (areaId) {
+      const regs = await ctx.catalog.registries();
+      if (!regs.areas.some((a) => a.area_id === areaId)) throw new Error(`unknown area: ${areaId}`);
+      await buildAreaMap();
+    }
     if (subscribed.size >= MAX_SUBSCRIPTIONS && !subscribed.has(uri)) {
       throw new Error(`subscription cap reached (${MAX_SUBSCRIPTIONS}); unsubscribe something first`);
     }
+    if (areaId && !subscribed.has(uri)) areaSubs++;
     subscribed.add(uri);
     return {};
   });
   server.server.setRequestHandler(UnsubscribeRequestSchema, async (req) => {
-    subscribed.delete(req.params.uri);
+    if (subscribed.delete(req.params.uri) && req.params.uri.startsWith("ha://area/")) areaSubs--;
     return {};
   });
 
-  const detach = ctx.catalog.onEntityChange((entityId) => {
-    const uri = `ha://entity/${entityId}`;
-    if (!subscribed.has(uri)) return;
+  const notify = (uri: string): void => {
     const now = Date.now();
     if (now - (lastNotified.get(uri) ?? 0) < NOTIFY_MIN_INTERVAL_MS) return;
     lastNotified.set(uri, now);
     server.server.sendResourceUpdated({ uri }).catch((e) => {
       log.debug(`resources/updated notification failed: ${e instanceof Error ? e.message : String(e)}`);
     });
+  };
+  const detach = ctx.catalog.onEntityChange((entityId) => {
+    const entityUri = `ha://entity/${entityId}`;
+    if (subscribed.has(entityUri)) notify(entityUri);
+    if (areaSubs > 0) {
+      if (Date.now() - lastMapBuild > 60_000) void buildAreaMap();
+      const areaId = entityToArea.get(entityId);
+      // A hidden entity must not signal its activity through its room.
+      if (areaId && subscribed.has(`ha://area/${areaId}`) && entityReadVisible(ctx.cfg, entityId)) {
+        notify(`ha://area/${areaId}`);
+      }
+    }
   });
   const prevOnClose = server.server.onclose;
   server.server.onclose = () => {
