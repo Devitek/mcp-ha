@@ -159,7 +159,7 @@ Creates a NEW automation (or script) from an installed blueprint: the behaviour 
 
 ### ha_update_automation / ha_update_script <Badge type="danger" text="config write" />
 
-Update an EXISTING UI-managed automation or script. Provided blocks replace the current ones wholesale (a provided `actions` list replaces all actions); untouched blocks are preserved. The confirmation shows a **before/after diff**, and the base configuration is fingerprinted: if it changes between the two passes (simultaneous UI edit), the token is refused and the flow restarts. The success answer carries the full previous YAML for manual rollback. YAML-defined targets are refused; deletion does not exist.
+Update an EXISTING UI-managed automation or script. Provided blocks replace the current ones wholesale (a provided `actions` list replaces all actions); untouched blocks are preserved. Blueprint-based targets take `inputs` instead (replaces the whole `use_blueprint` input set, checked against the installed blueprint); raw blocks are refused on them with a clear message, and alias/description/mode work on both kinds. The confirmation shows a **before/after diff**, and the base configuration is fingerprinted: if it changes between the two passes (simultaneous UI edit), the token is refused and the flow restarts. The success answer carries the full previous YAML for manual rollback. YAML-defined targets are refused; deletion does not exist.
 
 ## Automations and scripts
 

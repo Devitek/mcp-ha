@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.0 - 2026-08-23
+
+- **Blueprint automations can now be updated** (#139, found through real-world use): `ha_update_automation` and `ha_update_script` gain an `inputs` parameter that replaces the whole `use_blueprint` input set, checked against the installed blueprint (required inputs present, unknown ones refused). Raw trigger/condition/action blocks are refused on blueprint-based targets with a clear message instead of producing an invalid config after confirmation; alias, description and mode keep working on both kinds.
+
 ## 0.23.1 - 2026-08-23
 
 - Ingress dashboard: a **theme switcher** (dark / light / auto, persisted, "auto" follows the OS) and the **real add-on icon** in the header (inlined as a data URI, no extra route, `>_` fallback when unavailable).
