@@ -14,6 +14,7 @@ import { registerWeatherTools } from "./tools/weather.js";
 import { registerHelperTools } from "./tools/helpers.js";
 import { registerConfigWriteTools } from "./tools/configwrite.js";
 import { registerHealthTools } from "./tools/health.js";
+import { registerSelfTestTools } from "./tools/selftest.js";
 import { registerNotifyTools } from "./tools/notify.js";
 import { registerSceneTools } from "./tools/scenes.js";
 import { registerAnnounceTools } from "./tools/announce.js";
@@ -79,6 +80,7 @@ export function buildServer(ctx: ToolContext): McpServer {
   registerHelperTools(server, ctx);
   registerConfigWriteTools(server, ctx);
   registerHealthTools(server, ctx);
+  registerSelfTestTools(server, ctx);
   registerNotifyTools(server, ctx);
   registerSceneTools(server, ctx);
   registerAnnounceTools(server, ctx);

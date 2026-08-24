@@ -40,6 +40,11 @@ export class Catalog {
 
   constructor(private ws: HaWsClient) {}
 
+  /** Whether states are served from the live map or the TTL fallback (#144). */
+  get liveActive(): boolean {
+    return this.live !== null;
+  }
+
   /** Drops every cache; wired to the WS reconnection (audit B5/C9). */
   invalidate(): void {
     this.regCache = null;

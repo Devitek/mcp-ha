@@ -95,6 +95,8 @@ The full threat model is in the repository's [SECURITY.md](https://github.com/De
 
 ## Troubleshooting
 
+When asking for help in an issue, paste the output of the `ha_get_self_test` tool: it diagnoses the add-on itself (connectivity, latencies, live map) and contains no data from your home.
+
 - **Lost token**: it is visible in the add-on Configuration tab (option `api_token`) and kept in `/data/token`; the log never shows it in full. If the option looks empty, restart the add-on: the write-back is retried at every start. To force a new token, clear the option and delete the file, then restart.
 - **401 Unauthorized**: check the `Authorization: Bearer ...` header on the client side, without stray spaces.
 - **Tools answer "WebSocket is not connected"**: check the log, the add-on reconnects continuously. A Home Assistant restart causes a short outage, reconnection is automatic.

@@ -137,7 +137,7 @@ export function createIngressHandler(
 
     // Tool counts: core read tools plus camera and the write families
     // depending on the options (kept in sync with buildServer).
-    const readTools = 25 + (cfg.allowCamera ? 1 : 0);
+    const readTools = 26 + (cfg.allowCamera ? 1 : 0);
     const writeTools = (cfg.allowWrite ? 10 : 0) + (cfg.allowConfigWrite ? 6 : 0);
 
     const snap = opts.usage?.snapshot();

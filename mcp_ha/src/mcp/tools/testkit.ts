@@ -74,6 +74,7 @@ export function fakeCtx(partial: any = {}): ToolContext {
       index: vi.fn(async () => []),
       registries: vi.fn(async () => ({ at: 0, areas: [], devices: [], entities: [], floors: [], labels: [] })),
       states: vi.fn(async () => []),
+      liveActive: true,
       onEntityChange: vi.fn(() => () => {}),
       invalidate: vi.fn(),
       ...(partial.catalog ?? {}),
