@@ -1,6 +1,6 @@
 # Tool reference
 
-40 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+42 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -227,6 +227,12 @@ Energy totals from the **configured energy dashboard** (`energy/get_prefs` names
 
 Who is home, in which zone, since when, plus a compact timeline of zone changes over the window (`hours`, default 24, max 168) and the zones with their occupant counts. **Zone names only, never coordinates**: latitude, longitude and tracker sources are never read, by design. `filter_reads` hides persons like any entity; if you hand out read tokens to third parties, denylisting `person.*` is the intended control.
 
+## Weather
+
+### ha_get_forecast
+
+Without `entity_id`: lists the weather entities with their current condition. With `entity_id`: the forecast ("will it rain tomorrow?") via `weather.get_forecasts`, `type` among `hourly` (capped at 48 entries), `daily` (default, 14) and `twice_daily` where the provider supports it (its error is relayed otherwise). Units come from the weather entity attributes. Current conditions live on the entity itself (`ha_get_entity`).
+
 ## Calendar and to-do
 
 ### ha_get_calendar
@@ -236,6 +242,18 @@ Without `entity_id`: lists the calendar entities. With `entity_id`: events over 
 ### ha_get_todo_list
 
 Without `entity_id`: lists the to-do entities. With `entity_id`: the items on that list (optional `status` filter). Read only, via `todo.get_items`.
+
+### ha_manage_todo <Badge type="danger" text="write" />
+
+Adds, completes, unchecks, removes or renames an item ("add milk to the shopping list"). Items are referenced by their text, as Home Assistant does. Same guarded path as every service call (denylist, audit, dry_run).
+
+| Param | Type | Notes |
+|-------|------|-------|
+| `entity_id` | string, required | a `todo.*` list |
+| `action` | enum, required | `add`, `complete`, `uncomplete`, `remove`, `rename` |
+| `item` | string, required | the item text |
+| `new_name` | string | rename only |
+| `dry_run` / `confirm_token` | | as in `ha_call_service` |
 
 ## Cameras
 
@@ -285,3 +303,4 @@ Since 0.18.0, entity-shaped arguments support **MCP completions** (`completion/c
 | `propose-automation` | `goal` | drafts a paste-ready automation YAML from verified entities, writes nothing |
 | `propose-dashboard-card` | `goal` | drafts a paste-ready Lovelace card YAML from verified entities, writes nothing |
 | `propose-script` | `goal` | drafts a paste-ready script YAML from verified entities, writes nothing |
+| `daily-briefing` | none | the morning ritual: presence, agenda, weather, energy, urgent issues |

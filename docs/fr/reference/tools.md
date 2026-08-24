@@ -1,6 +1,6 @@
 # Référence des outils
 
-40 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+42 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -227,6 +227,12 @@ Les totaux d'énergie du **dashboard énergie configuré** (`energy/get_prefs` n
 
 Qui est à la maison, dans quelle zone, depuis quand, plus une timeline compacte des changements de zone sur la fenêtre (`hours`, défaut 24, max 168) et les zones avec leur nombre d'occupants. **Noms de zones uniquement, jamais de coordonnées** : latitude, longitude et sources de trackers ne sont jamais lues, par conception. `filter_reads` masque les personnes comme toute entité ; si vous confiez des jetons read à des tiers, denylister `person.*` est le contrôle prévu.
 
+## Météo
+
+### ha_get_forecast
+
+Sans `entity_id` : liste les entités weather avec leur condition actuelle. Avec `entity_id` : les prévisions (« il pleut demain ? ») via `weather.get_forecasts`, `type` parmi `hourly` (plafonné à 48 entrées), `daily` (défaut, 14) et `twice_daily` quand le fournisseur le supporte (son erreur est relayée sinon). Les unités viennent des attributs de l'entité weather. Les conditions actuelles vivent sur l'entité elle-même (`ha_get_entity`).
+
 ## Calendrier et todo
 
 ### ha_get_calendar
@@ -236,6 +242,18 @@ Sans `entity_id` : liste les entités calendrier. Avec `entity_id` : les événe
 ### ha_get_todo_list
 
 Sans `entity_id` : liste les entités todo. Avec `entity_id` : les éléments de la liste (filtre `status` optionnel). Lecture seule, via `todo.get_items`.
+
+### ha_manage_todo <Badge type="danger" text="écriture" />
+
+Ajoute, coche, décoche, retire ou renomme un élément (« ajoute le lait à la liste de courses »). Les éléments sont référencés par leur texte, comme le fait Home Assistant. Même chemin gardé que tout appel de service (denylist, audit, dry_run).
+
+| Paramètre | Type | Notes |
+|-----------|------|-------|
+| `entity_id` | string, requis | une liste `todo.*` |
+| `action` | enum, requis | `add`, `complete`, `uncomplete`, `remove`, `rename` |
+| `item` | string, requis | le texte de l'élément |
+| `new_name` | string | rename uniquement |
+| `dry_run` / `confirm_token` | | comme `ha_call_service` |
 
 ## Caméras
 
@@ -285,3 +303,4 @@ Depuis la 0.18.0, les arguments de forme entité supportent les **complétions M
 | `propose-automation` | `goal` | rédige un YAML d'automation prêt à coller depuis des entités vérifiées, n'écrit rien |
 | `propose-dashboard-card` | `goal` | rédige un YAML de carte Lovelace prêt à coller depuis des entités vérifiées, n'écrit rien |
 | `propose-script` | `goal` | rédige un YAML de script prêt à coller depuis des entités vérifiées, n'écrit rien |
+| `daily-briefing` | aucun | le rituel du matin : présence, agenda, météo, énergie, urgences |

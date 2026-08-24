@@ -139,7 +139,7 @@ describe("HTTP boundary (audit E1)", () => {
       body: rpc("tools/list", undefined, 2),
     });
     const tools = ((await list.json()) as any).result.tools.map((t: any) => t.name);
-    expect(tools).toHaveLength(24); // all read tools
+    expect(tools).toHaveLength(25); // all read tools
     expect(tools).not.toContain("ha_call_service");
   });
 });
@@ -379,7 +379,7 @@ describe("scoped named tokens (#85)", () => {
     expect(await toolNames(base, "write-token-16chars-x")).toContain("ha_run_script");
     // named read token: allow_write is on, but the scope forbids writes
     const readTools = await toolNames(base, "read-token-16chars-xx");
-    expect(readTools).toHaveLength(24);
+    expect(readTools).toHaveLength(25);
     expect(readTools).not.toContain("ha_call_service");
     expect(readTools).not.toContain("ha_run_script");
   });
@@ -431,7 +431,7 @@ describe("MCP resources, prompts and structuredContent (v0.3 #79)", () => {
     const H = { ...ACCEPT, ...AUTH };
     const list = await fetch(`${base}/mcp`, { method: "POST", headers: H, body: rpc("prompts/list") });
     const names = ((await list.json()) as any).result.prompts.map((p: any) => p.name).sort();
-    expect(names).toEqual(["diagnose-automation", "energy-report", "health-report", "propose-automation", "propose-dashboard-card", "propose-script"]);
+    expect(names).toEqual(["daily-briefing", "diagnose-automation", "energy-report", "health-report", "propose-automation", "propose-dashboard-card", "propose-script"]);
 
     const get = await fetch(`${base}/mcp`, {
       method: "POST",
