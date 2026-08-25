@@ -51,6 +51,67 @@ describe("ha_list_automations / ha_list_scripts", () => {
   });
 });
 
+describe("ha_list_automations include_config (#160)", () => {
+  it("attaches UI configs, gives yaml items config: null, and notes the paging rule", async () => {
+    const coreGet = vi.fn(async (path: string) => ({ alias: "cfg for " + path, triggers: [] }));
+    const { tools } = setup(coreGet);
+    const res = await callTool(tools, "ha_list_automations", { include_config: true });
+    expect(res.data.items[0].config.alias).toContain("morning-123");
+    expect(res.data.items[1].source).toBe("yaml");
+    expect(res.data.items[1].config).toBeNull();
+    expect(coreGet).toHaveBeenCalledTimes(1); // yaml one skipped, no wasted call
+    expect(res.data.note).toContain("include_config");
+  });
+
+  it("caps the page at 10 even when a larger limit is asked", async () => {
+    const many = Array.from({ length: 14 }, (_, i) =>
+      entity(`automation.a${i}`, { name: `A${i}`, attributes: { id: `id-${i}` } })
+    );
+    const { server, tools } = fakeServer();
+    const ctx = fakeCtx({
+      catalog: { index: async () => many },
+      http: { coreGet: vi.fn(async () => ({ alias: "x" })) },
+    });
+    registerAutomationTools(server, ctx);
+    const res = await callTool(tools, "ha_list_automations", { include_config: true, limit: 50 });
+    expect(res.data.returned).toBe(10);
+    expect(res.data.has_more).toBe(true);
+    expect(res.data.next_offset).toBe(10);
+    const plain = await callTool(tools, "ha_list_automations", { limit: 50 });
+    expect(plain.data.returned).toBe(14); // no clamp without include_config
+  });
+
+  it("omits an oversized config per item, keeping the page valid JSON and the others whole", async () => {
+    const coreGet = vi.fn(async (path: string) =>
+      path.includes("morning") ? { alias: "huge", blob: "x".repeat(30_000) } : { alias: "small" }
+    );
+    const many = [
+      entity("automation.morning", { name: "Huge one", attributes: { id: "morning-123" } }),
+      entity("automation.small", { name: "Small one", attributes: { id: "small-1" } }),
+    ];
+    const { server, tools } = fakeServer();
+    const ctx = fakeCtx({ catalog: { index: async () => many }, http: { coreGet } });
+    registerAutomationTools(server, ctx);
+    const res = await callTool(tools, "ha_list_automations", { include_config: true });
+    // callTool already JSON.parses the page: reaching here means it stayed valid
+    expect(res.data.items[0].config).toBeUndefined();
+    expect(res.data.items[0].config_omitted).toContain("ha_get_automation");
+    expect(res.data.items[1].config).toEqual({ alias: "small" });
+  });
+
+  it("turns a per-item fetch failure into a note, not a sunk page (audit B7)", async () => {
+    const coreGet = vi.fn(async () => {
+      throw new Error("HTTP 503: restarting");
+    });
+    const { tools } = setup(coreGet);
+    const res = await callTool(tools, "ha_list_automations", { include_config: true });
+    expect(res.isError).toBe(false);
+    expect(res.data.items[0].config).toBeNull();
+    expect(res.data.items[0].config_note).toContain("not readable");
+    expect(res.data.items[0].config_note).not.toContain("503");
+  });
+});
+
 describe("ha_get_automation", () => {
   it("fetches the UI configuration through the config id attribute", async () => {
     const coreGet = vi.fn(async (path: string) => {

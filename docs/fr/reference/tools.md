@@ -171,6 +171,8 @@ Suppriment une automation ou un script EXISTANT géré par l'interface. L'outil 
 
 entity_id, nom, enabled, last_triggered, et `source` : `ui` pour les automations modifiables via les outils de config, `yaml` pour celles définies dans les fichiers de l'utilisateur (lecture et trace seulement). Paramètres : `limit`, `offset`.
 
+`include_config: true` (#160) attache la configuration complète de chaque automation UI et réduit la page (5 par défaut, 10 max) : la voie paginée pour exporter ou differ un parc sans un appel par automation (66 automations = ~13 pages au lieu de 66 appels). La page reste du JSON valide, toujours : une config trop grosse pour elle est omise **entière** par élément (`config_omitted`, à récupérer avec `ha_get_automation`), jamais tronquée au milieu d'une valeur ; les éléments `yaml` reçoivent `config: null` sans gaspiller d'appel. Position honnête : pour l'amorçage one-shot d'un très gros parc, l'API REST brute reste le meilleur outil ; `include_config` vise les deltas et les parcs moyens.
+
 ### ha_get_automation
 
 L'état plus, pour les automations créées via l'interface, la configuration complète (déclencheurs, conditions, actions). Les automations définies en YAML renvoient leur état avec une note. Cet outil a un plafond de réponse relevé (~64 Ko au lieu du ~15 Ko global, #159) : sa sortie alimente `ha_update_automation`, elle doit donc faire l'aller-retour entière ; aucune valeur n'est tronquée individuellement. Une config qui dépasse même le plafond relevé (média base64 inline) reçoit un message honnête orientant vers l'éditeur de l'interface plutôt que vers des filtres qui n'existent pas ici.
