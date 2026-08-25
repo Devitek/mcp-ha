@@ -81,6 +81,14 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
         log.warning(`Could not fetch the automation config for ${entity_id}: ${msg}`);
         return { ...base, note: "Configuration not readable right now (Home Assistant API error); the state above is still accurate." };
       }
+    }, {
+      // One config is not a fleet dump (#159): the raised cap lets every
+      // reasonable automation round-trip into ha_update_automation intact.
+      // Per-value truncation is deliberately refused: a truncated block fed
+      // back to an update would write a corrupted config.
+      maxBytes: 64_000,
+      truncationNote:
+        "This single configuration exceeds even the raised cap: it carries an unusually large inline payload (such as base64 media in an action). There is nothing to filter here; edit that automation in the Home Assistant UI instead, the config tools cannot round-trip it safely.",
     })
   );
 

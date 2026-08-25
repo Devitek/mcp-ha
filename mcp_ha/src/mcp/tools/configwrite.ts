@@ -258,7 +258,7 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
     for (const [k, v] of Object.entries(req.patch)) if (v !== undefined) patch[k] = v;
     if (Object.keys(patch).length === 0 && !req.blueprintInputs) {
       throw new Error(
-        "nothing to change: provide at least one field (alias, description, mode, triggers, conditions, actions/sequence, or inputs for a blueprint automation)"
+        "nothing to change: provide at least one field (alias, description, mode, triggers, conditions, actions/sequence, variables, max_exceeded, initial_state, trace, or inputs for a blueprint automation)"
       );
     }
     const { config: before, path } = await currentConfig(req.kind, req.entityId);
@@ -276,6 +276,11 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
       throw new Error(`inputs only applies to blueprint-based ${req.kind}s; ${req.entityId} has raw blocks, update those instead`);
     }
     const final: Record<string, unknown> = { ...before, ...patch };
+    // Root-key removal (#158): null explicitly DROPS the key from the
+    // stored config (an empty object writes an empty object; undefined
+    // leaves the key untouched). Only the optional root keys are nullable
+    // in the schemas; the blocks stay non-null.
+    for (const [k, v] of Object.entries(patch)) if (v === null) delete final[k];
     // Legacy twin keys (#146): stored configs may use the old singular keys
     // (trigger/condition/action). A provided modern block must REPLACE its
     // legacy twin, not sit next to it: HA refuses "both 'trigger' and
@@ -660,6 +665,13 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
     })
   );
 
+  // Root-level tuning keys (#158): variables is where non-trivial automation
+  // logic lives; the others tune concurrency reporting, startup state and
+  // tracing. HA validates the values at write time.
+  const variablesSchema = z.record(z.string(), z.unknown());
+  const maxExceededSchema = z.enum(["silent", "critical", "fatal", "error", "warning", "warn", "info", "debug", "notice"]);
+  const traceSchema = z.object({ stored_traces: z.number().int().min(1).max(100) });
+
   server.registerTool(
     "ha_update_automation",
     {
@@ -678,19 +690,23 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
         triggers: freeObjects.min(1).optional(),
         conditions: freeObjects.optional(),
         actions: freeObjects.min(1).optional(),
+        variables: variablesSchema.nullable().optional().describe("Root variables, replaced wholesale; null removes the key"),
+        max_exceeded: maxExceededSchema.nullable().optional().describe("Log level when mode limit is hit; null removes the key"),
+        initial_state: z.boolean().nullable().optional().describe("Forced enabled state at HA start; null removes the key"),
+        trace: traceSchema.nullable().optional().describe("E.g. {stored_traces: 20}; null removes the key"),
         inputs: z.record(z.string(), z.unknown()).optional().describe("Blueprint automations only: replaces use_blueprint.input wholesale"),
         dry_run: z.boolean().optional().describe("true: return the diff preview only"),
         confirm_token: z.string().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
-    safe("ha_update_automation", async ({ entity_id, alias, description, mode, triggers, conditions, actions, inputs, dry_run, confirm_token }) => {
+    safe("ha_update_automation", async ({ entity_id, alias, description, mode, triggers, conditions, actions, variables, max_exceeded, initial_state, trace, inputs, dry_run, confirm_token }) => {
       if (!entity_id.startsWith("automation.")) throw new Error(`expected an automation.* entity_id, got: ${entity_id}`);
       return guardedUpdate({
         tool: "ha_update_automation",
         kind: "automation",
         entityId: entity_id,
-        patch: { alias, description, mode, triggers, conditions, actions },
+        patch: { alias, description, mode, triggers, conditions, actions, variables, max_exceeded, initial_state, trace },
         blueprintInputs: inputs,
         dry_run,
         confirm_token,
@@ -712,19 +728,22 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
         description: z.string().optional(),
         mode: z.enum(["single", "restart", "queued", "parallel"]).optional(),
         sequence: freeObjects.min(1).optional(),
+        variables: variablesSchema.nullable().optional().describe("Root variables, replaced wholesale; null removes the key"),
+        max_exceeded: maxExceededSchema.nullable().optional().describe("Log level when mode limit is hit; null removes the key"),
+        trace: traceSchema.nullable().optional().describe("E.g. {stored_traces: 20}; null removes the key"),
         inputs: z.record(z.string(), z.unknown()).optional().describe("Blueprint scripts only: replaces use_blueprint.input wholesale"),
         dry_run: z.boolean().optional(),
         confirm_token: z.string().optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     },
-    safe("ha_update_script", async ({ entity_id, alias, description, mode, sequence, inputs, dry_run, confirm_token }) => {
+    safe("ha_update_script", async ({ entity_id, alias, description, mode, sequence, variables, max_exceeded, trace, inputs, dry_run, confirm_token }) => {
       if (!entity_id.startsWith("script.")) throw new Error(`expected a script.* entity_id, got: ${entity_id}`);
       return guardedUpdate({
         tool: "ha_update_script",
         kind: "script",
         entityId: entity_id,
-        patch: { alias, description, mode, sequence },
+        patch: { alias, description, mode, sequence, variables, max_exceeded, trace },
         blueprintInputs: inputs,
         dry_run,
         confirm_token,
@@ -748,16 +767,20 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
         triggers: freeObjects.min(1).describe("Trigger list, modern syntax (e.g. [{trigger: 'state', entity_id: '...'}])"),
         conditions: freeObjects.optional(),
         actions: freeObjects.min(1).describe("Action list (e.g. [{action: 'light.turn_on', target: {...}}])"),
+        variables: variablesSchema.optional().describe("Root variables available to all templates (#158)"),
+        max_exceeded: maxExceededSchema.optional().describe("Log level when the mode limit is hit"),
         dry_run: z.boolean().optional().describe("true: return the YAML preview only"),
         confirm_token: z.string().optional().describe("Token from the confirmation_required answer"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    safe("ha_create_automation", async ({ alias, description, mode, triggers, conditions, actions, dry_run, confirm_token }) => {
+    safe("ha_create_automation", async ({ alias, description, mode, triggers, conditions, actions, variables, max_exceeded, dry_run, confirm_token }) => {
       const payload: Record<string, unknown> = {
         alias,
         ...(description ? { description } : {}),
         mode: mode ?? "single",
+        ...(variables ? { variables } : {}),
+        ...(max_exceeded ? { max_exceeded } : {}),
         triggers,
         ...(conditions && conditions.length > 0 ? { conditions } : {}),
         actions,
@@ -787,18 +810,22 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
         description: z.string().optional(),
         mode: z.enum(["single", "restart", "queued", "parallel"]).optional().describe("Default single"),
         sequence: freeObjects.min(1).describe("Action sequence (e.g. [{action: 'light.turn_off', target: {...}}])"),
+        variables: variablesSchema.optional().describe("Root variables available to all templates (#158)"),
+        max_exceeded: maxExceededSchema.optional().describe("Log level when the mode limit is hit"),
         dry_run: z.boolean().optional().describe("true: return the YAML preview only"),
         confirm_token: z.string().optional().describe("Token from the confirmation_required answer"),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
-    safe("ha_create_script", async ({ alias, description, mode, sequence, dry_run, confirm_token }) => {
+    safe("ha_create_script", async ({ alias, description, mode, sequence, variables, max_exceeded, dry_run, confirm_token }) => {
       const objectId = slugify(alias);
       if (!objectId) throw new Error("the alias must contain at least one alphanumeric character");
       const payload: Record<string, unknown> = {
         alias,
         ...(description ? { description } : {}),
         mode: mode ?? "single",
+        ...(variables ? { variables } : {}),
+        ...(max_exceeded ? { max_exceeded } : {}),
         sequence,
       };
       return guardedCreate({

@@ -131,7 +131,7 @@ Speaks a message in the house ("announce that dinner is ready"). Without `target
 
 ### ha_create_automation <Badge type="danger" text="config write" />
 
-Creates a NEW automation. Only registered when `allow_config_write` is enabled (independent from `allow_write`). The flow is deliberately heavy: Home Assistant validates the blocks first, then the answer carries the complete YAML and a `confirm_token`; the client must show the YAML to the human and call again with the token. Existing automations (same alias) are refused: creation only, no modification.
+Creates a NEW automation. Only registered when `allow_config_write` is enabled (independent from `allow_write`). The flow is deliberately heavy: Home Assistant validates the blocks first, then the answer carries the complete YAML and a `confirm_token`; the client must show the YAML to the human and call again with the token. Existing automations (same alias) are refused: creation only, no modification. `variables` and `max_exceeded` are accepted at creation (#158), no need to create then update.
 
 | Param | Type | Notes |
 |-------|------|-------|
@@ -159,7 +159,7 @@ Creates a NEW automation (or script) from an installed blueprint: the behaviour 
 
 ### ha_update_automation / ha_update_script <Badge type="danger" text="config write" />
 
-Update an EXISTING UI-managed automation or script. Provided blocks replace the current ones wholesale (a provided `actions` list replaces all actions); untouched blocks are preserved. Blueprint-based targets take `inputs` instead (replaces the whole `use_blueprint` input set, checked against the installed blueprint); raw blocks are refused on them with a clear message, and alias/description/mode work on both kinds. A provided modern block also removes its legacy twin key (`trigger`/`condition`/`action`) from the stored config, so legacy-to-modern syntax migrations work through the tool. The confirmation shows a **before/after diff**, and the base configuration is fingerprinted: if it changes between the two passes (simultaneous UI edit), the token is refused and the flow restarts. The success answer carries the full previous YAML for manual rollback. YAML-defined targets are refused.
+Update an EXISTING UI-managed automation or script. Provided blocks replace the current ones wholesale (a provided `actions` list replaces all actions); untouched blocks are preserved. Blueprint-based targets take `inputs` instead (replaces the whole `use_blueprint` input set, checked against the installed blueprint); raw blocks are refused on them with a clear message, and alias/description/mode work on both kinds. A provided modern block also removes its legacy twin key (`trigger`/`condition`/`action`) from the stored config, so legacy-to-modern syntax migrations work through the tool. The root tuning keys are covered too (#158): `variables` (where non-trivial automation logic lives), `max_exceeded`, `initial_state` (automations only) and `trace`, each replaced wholesale like the blocks; passing `null` **removes** the key from the stored config (an empty object writes an empty object), which is how leftovers like editor metadata get cleaned up. The confirmation shows a **before/after diff**, and the base configuration is fingerprinted: if it changes between the two passes (simultaneous UI edit), the token is refused and the flow restarts. The success answer carries the full previous YAML for manual rollback. YAML-defined targets are refused.
 
 ### ha_delete_automation / ha_delete_script <Badge type="danger" text="config write" />
 
@@ -173,7 +173,7 @@ entity_id, name, enabled, last_triggered, and `source`: `ui` for automations edi
 
 ### ha_get_automation
 
-State plus, for UI-created automations, the full configuration (triggers, conditions, actions). YAML-defined automations return their state with a note.
+State plus, for UI-created automations, the full configuration (triggers, conditions, actions). YAML-defined automations return their state with a note. This tool has a raised response cap (~64 KB instead of the global ~15 KB, #159): its output feeds `ha_update_automation`, so it must round-trip whole; values are never truncated individually. A config that still exceeds the raised cap (inline base64 media) gets an honest message pointing to the UI editor instead of filters that do not exist here.
 
 ### ha_list_scripts
 

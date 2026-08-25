@@ -39,6 +39,16 @@ describe("jsonResult", () => {
     expect(parsed.note).toContain("Refine");
   });
 
+  it("honours a per-tool cap and truncation note (#159)", () => {
+    const big = { data: "x".repeat(MAX_RESPONSE_BYTES * 2) };
+    const raised = jsonResult(big, { maxBytes: 64_000 });
+    expect((raised.content[0] as { text?: string })?.text).toContain('"data":"xxx');
+    const beyond = jsonResult({ data: "x".repeat(70_000) }, { maxBytes: 64_000, truncationNote: "inline media, use the UI" });
+    const parsed = JSON.parse((beyond.content[0] as { text?: string })?.text ?? "");
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.note).toBe("inline media, use the UI");
+  });
+
   it("measures the cap in real bytes, not UTF-16 units (audit B14)", () => {
     // 6000 emoji = 12000 UTF-16 units but ~24000 UTF-8 bytes: must truncate.
     const emoji = { data: "🏠".repeat(6000) };
