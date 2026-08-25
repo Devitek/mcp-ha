@@ -3,6 +3,7 @@ import type { HaWsClient } from "./ha/ws.js";
 import type { HaHttp } from "./ha/http.js";
 import type { Catalog } from "./ha/catalog.js";
 import type { ConfirmationStore } from "./confirm.js";
+import type { Grants } from "./mcp/registry.js";
 
 /** Shared dependencies injected into every tool registration. */
 export interface ToolContext {
@@ -16,6 +17,11 @@ export interface ToolContext {
    * means "yes" for backward compatibility with the single-token setup.
    */
   canWrite?: boolean;
+  /**
+   * Per-request grants (#165). When absent, buildServer derives them from
+   * the option gates and canWrite; per-token grants arrive with #166/#167.
+   */
+  grants?: Grants;
   /** Per-request: name of the authenticated token, for the audit trail (#85). */
   client?: string;
   /** True when serving a long-lived session (SSE stream available, #90). */

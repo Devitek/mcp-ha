@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
 import { entityWriteAllowed } from "../../safety.js";
@@ -24,9 +24,8 @@ function slugify(name: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
-export function registerSceneTools(server: McpServer, ctx: ToolContext): void {
+export function registerSceneTools(server: ToolRegistrar, ctx: ToolContext): void {
   // Gated by allow_write and by the token scope (#85).
-  if (!ctx.cfg.allowWrite || ctx.canWrite === false) return;
 
   server.registerTool(
     "ha_snapshot_scene",

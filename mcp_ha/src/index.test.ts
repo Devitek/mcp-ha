@@ -400,6 +400,20 @@ describe("scoped named tokens (#85)", () => {
     return ((await r.json()) as any).result.tools.map((t: any) => t.name);
   };
 
+  it("with every gate open, the server registers exactly the central registry (#165)", async () => {
+    const { TOOL_REGISTRY } = await import("./mcp/registry.js");
+    const base = await startServer(
+      fakeCtx({
+        cfg: { allowWrite: true, allowConfigWrite: true, allowCamera: true, apiToken: "test-token-long-enough" },
+      })
+    );
+    const names = (await toolNames(base, "test-token-long-enough")).sort();
+    // Two-way check: a tool added without a registry entry, or a registry
+    // entry without a tool, both fail here. Counts everywhere derive from
+    // the registry, so this is the only exhaustiveness gate needed.
+    expect(names).toEqual(Object.keys(TOOL_REGISTRY).sort());
+  });
+
   it("accepts a named write token and shows the write tools, but a read token does not", async () => {
     const base = await startServer(
       fakeCtx({

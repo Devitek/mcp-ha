@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe, trunc } from "../helpers.js";
 
@@ -8,7 +8,7 @@ import { safe, trunc } from "../helpers.js";
  * with the other config writes (ha_create_from_blueprint, configwrite.ts):
  * filling typed holes in vetted YAML is the safest way to program the house.
  */
-export function registerBlueprintTools(server: McpServer, ctx: ToolContext): void {
+export function registerBlueprintTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_list_blueprints",
     {

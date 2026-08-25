@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { listEnvelope, safe, trunc } from "../helpers.js";
 import { guardedServiceCall } from "../writeflow.js";
@@ -16,7 +16,7 @@ function fieldSummary(fields: Record<string, any> | undefined) {
   }));
 }
 
-export function registerServiceTools(server: McpServer, ctx: ToolContext): void {
+export function registerServiceTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_list_services",
     {
@@ -76,7 +76,6 @@ export function registerServiceTools(server: McpServer, ctx: ToolContext): void 
   // Write tool: only registered when allow_write is enabled AND the
   // authenticated token has the write scope (#85). Invisible otherwise,
   // that is the first layer of defense.
-  if (!ctx.cfg.allowWrite || ctx.canWrite === false) return;
 
   server.registerTool(
     "ha_call_service",

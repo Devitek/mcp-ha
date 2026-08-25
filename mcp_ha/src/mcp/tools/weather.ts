@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
@@ -13,7 +13,7 @@ const MAX_ENTRIES: Record<string, number> = { hourly: 48, daily: 14, twice_daily
  * return_response, the read-by-service mechanic already proven by
  * todo.get_items (#87), safe without allow_write.
  */
-export function registerWeatherTools(server: McpServer, ctx: ToolContext): void {
+export function registerWeatherTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_get_forecast",
     {

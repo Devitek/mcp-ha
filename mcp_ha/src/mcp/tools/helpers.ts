@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
 import { entityWriteAllowed } from "../../safety.js";
@@ -27,9 +27,8 @@ type HelperType = (typeof HELPER_TYPES)[number];
 /** Option keys the WS message wires internally; never forwarded. */
 const RESERVED_KEYS = new Set(["type", "id"]);
 
-export function registerHelperTools(server: McpServer, ctx: ToolContext): void {
+export function registerHelperTools(server: ToolRegistrar, ctx: ToolContext): void {
   // Gated by allow_write and by the token scope (#85).
-  if (!ctx.cfg.allowWrite || ctx.canWrite === false) return;
   const client = (): string => ctx.client ?? "default";
 
   server.registerTool(

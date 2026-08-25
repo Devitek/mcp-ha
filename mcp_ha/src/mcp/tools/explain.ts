@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe, toIso } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
@@ -31,7 +31,7 @@ interface LogEntry {
  * pointing to the immediate cause; following them a few hops yields the
  * human, the automation and the physical trigger.
  */
-export function registerExplainTools(server: McpServer, ctx: ToolContext): void {
+export function registerExplainTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_explain_event",
     {

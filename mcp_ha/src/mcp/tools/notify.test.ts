@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerNotifyTools, resetNotifyLimiter } from "./notify.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
+import { callTool, entity, fakeCtx, fakeServer, gatedBy } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 beforeEach(() => resetNotifyLimiter());
@@ -22,10 +22,10 @@ function setup(over: any = {}) {
 describe("ha_send_notification (#116)", () => {
   it("is absent without allow_write and for read-scoped tokens", () => {
     const a = fakeServer();
-    registerNotifyTools(a.server, fakeCtx({ cfg: { allowWrite: false } }));
+    registerNotifyTools(gatedBy(a.server, { allowWrite: false }), fakeCtx({ cfg: { allowWrite: false } }));
     expect(a.tools.size).toBe(0);
     const b = fakeServer();
-    registerNotifyTools(b.server, fakeCtx({ cfg: { allowWrite: true }, canWrite: false }));
+    registerNotifyTools(gatedBy(b.server, { allowWrite: true }, false), fakeCtx({ cfg: { allowWrite: true }, canWrite: false }));
     expect(b.tools.size).toBe(0);
   });
 

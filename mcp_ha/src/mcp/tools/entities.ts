@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import type { IndexedEntity } from "../../types.js";
 import { listEnvelope, safe, trunc } from "../helpers.js";
@@ -38,7 +38,7 @@ function matchQuery(e: IndexedEntity, query: string): number {
   return score;
 }
 
-export function registerEntityTools(server: McpServer, ctx: ToolContext): void {
+export function registerEntityTools(server: ToolRegistrar, ctx: ToolContext): void {
   const visible = async (): Promise<IndexedEntity[]> =>
     (await ctx.catalog.index()).filter((e) => entityReadVisible(ctx.cfg, e.entity_id));
 

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe, timeWindow, toIso } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
@@ -10,7 +10,7 @@ import { entityReadVisible } from "../../safety.js";
  * longitude and tracker sources are never read; person entities aggregate
  * their trackers already, so device_tracker.* stays out entirely.
  */
-export function registerPresenceTools(server: McpServer, ctx: ToolContext): void {
+export function registerPresenceTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_get_presence",
     {

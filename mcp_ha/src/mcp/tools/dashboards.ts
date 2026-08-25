@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
 
@@ -7,7 +7,7 @@ import { safe } from "../helpers.js";
  * Dashboard listing (#129), read only. The guarded card insertion lives
  * with the other config writes (ha_add_dashboard_card, configwrite.ts).
  */
-export function registerDashboardTools(server: McpServer, ctx: ToolContext): void {
+export function registerDashboardTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_list_dashboards",
     {

@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerConfigWriteTools } from "./configwrite.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
+import { callTool, entity, fakeCtx, fakeServer, gatedBy } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -43,10 +43,10 @@ function setup(over: any = {}) {
 describe("config write registration (#94 tier 3)", () => {
   it("is absent without allow_config_write and for read-scoped tokens", () => {
     const a = fakeServer();
-    registerConfigWriteTools(a.server, fakeCtx({ cfg: { allowConfigWrite: false, allowWrite: true } }));
+    registerConfigWriteTools(gatedBy(a.server, { allowConfigWrite: false, allowWrite: true }), fakeCtx({ cfg: { allowConfigWrite: false, allowWrite: true } }));
     expect(a.tools.size).toBe(0);
     const b = fakeServer();
-    registerConfigWriteTools(b.server, fakeCtx({ cfg: { allowConfigWrite: true }, canWrite: false }));
+    registerConfigWriteTools(gatedBy(b.server, { allowConfigWrite: true }, false), fakeCtx({ cfg: { allowConfigWrite: true }, canWrite: false }));
     expect(b.tools.size).toBe(0);
   });
 

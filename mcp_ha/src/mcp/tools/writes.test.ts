@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registerWriteTools } from "./writes.js";
 import { registerServiceTools } from "./services.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, fakeCtx, fakeServer } from "./testkit.js";
+import { callTool, fakeCtx, fakeServer, gatedBy } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -17,7 +17,7 @@ function setup(cfgOver: any = {}) {
 describe("registration gate", () => {
   it("registers none of the write tools without allow_write", () => {
     const { server, tools } = fakeServer();
-    registerWriteTools(server, fakeCtx({ cfg: { allowWrite: false } }));
+    registerWriteTools(gatedBy(server, { allowWrite: false }), fakeCtx({ cfg: { allowWrite: false } }));
     expect(tools.size).toBe(0);
   });
 

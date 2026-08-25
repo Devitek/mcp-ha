@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
@@ -43,7 +43,7 @@ function collectStats(prefs: any): { buckets: Buckets; devices: Array<{ stat: st
   return { buckets, devices };
 }
 
-export function registerEnergyTools(server: McpServer, ctx: ToolContext): void {
+export function registerEnergyTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_get_energy",
     {

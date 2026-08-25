@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { listEnvelope, safe, timeWindow, trunc } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
@@ -10,7 +10,7 @@ import { guardedServiceCall } from "../writeflow.js";
  * uses todo.get_items with return_response, which only reads, so it is safe
  * to expose without allow_write.
  */
-export function registerCalendarTools(server: McpServer, ctx: ToolContext): void {
+export function registerCalendarTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_get_calendar",
     {
@@ -89,50 +89,48 @@ export function registerCalendarTools(server: McpServer, ctx: ToolContext): void
 
   // Write side of the lists (#141): "add milk to the shopping list". Gated
   // by allow_write and the token scope, single guarded path (lesson B12).
-  if (ctx.cfg.allowWrite && ctx.canWrite !== false) {
-    server.registerTool(
-      "ha_manage_todo",
-      {
-        title: "Manage a to-do list",
-        description:
-          "Adds, completes, unchecks, removes or renames an item on a to-do list ('add milk to the " +
-          "shopping list'). Items are referenced by their text, as Home Assistant does. Find lists and " +
-          "their items with ha_get_todo_list.",
-        inputSchema: {
-          entity_id: z.string().describe("E.g. todo.shopping_list"),
-          action: z.enum(["add", "complete", "uncomplete", "remove", "rename"]),
-          item: z.string().min(1).describe("The item text"),
-          new_name: z.string().optional().describe("New text, rename only"),
-          dry_run: z.boolean().optional(),
-          confirm_token: z.string().optional(),
-        },
-        annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+  server.registerTool(
+    "ha_manage_todo",
+    {
+      title: "Manage a to-do list",
+      description:
+        "Adds, completes, unchecks, removes or renames an item on a to-do list ('add milk to the " +
+        "shopping list'). Items are referenced by their text, as Home Assistant does. Find lists and " +
+        "their items with ha_get_todo_list.",
+      inputSchema: {
+        entity_id: z.string().describe("E.g. todo.shopping_list"),
+        action: z.enum(["add", "complete", "uncomplete", "remove", "rename"]),
+        item: z.string().min(1).describe("The item text"),
+        new_name: z.string().optional().describe("New text, rename only"),
+        dry_run: z.boolean().optional(),
+        confirm_token: z.string().optional(),
       },
-      safe("ha_manage_todo", async ({ entity_id, action, item, new_name, dry_run, confirm_token }) => {
-        if (!entity_id.startsWith("todo.")) throw new Error(`expected a todo.* entity_id, got: ${entity_id}`);
-        if (action === "rename" && !new_name) throw new Error("rename needs new_name");
-        const route: Record<string, { service: string; data: Record<string, unknown> }> = {
-          add: { service: "add_item", data: { item } },
-          complete: { service: "update_item", data: { item, status: "completed" } },
-          uncomplete: { service: "update_item", data: { item, status: "needs_action" } },
-          remove: { service: "remove_item", data: { item } },
-          rename: { service: "update_item", data: { item, rename: new_name } },
-        };
-        const r = route[action]!;
-        const result = await guardedServiceCall(ctx, {
-          tool: "ha_manage_todo",
-          domain: "todo",
-          service: r.service,
-          target: { entity_id },
-          data: r.data,
-          dry_run,
-          confirm_token,
-        });
-        if ((result as { success?: boolean }).success) {
-          return { ...result, note: "Check the list state with ha_get_todo_list." };
-        }
-        return result;
-      })
-    );
-  }
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    safe("ha_manage_todo", async ({ entity_id, action, item, new_name, dry_run, confirm_token }) => {
+      if (!entity_id.startsWith("todo.")) throw new Error(`expected a todo.* entity_id, got: ${entity_id}`);
+      if (action === "rename" && !new_name) throw new Error("rename needs new_name");
+      const route: Record<string, { service: string; data: Record<string, unknown> }> = {
+        add: { service: "add_item", data: { item } },
+        complete: { service: "update_item", data: { item, status: "completed" } },
+        uncomplete: { service: "update_item", data: { item, status: "needs_action" } },
+        remove: { service: "remove_item", data: { item } },
+        rename: { service: "update_item", data: { item, rename: new_name } },
+      };
+      const r = route[action]!;
+      const result = await guardedServiceCall(ctx, {
+        tool: "ha_manage_todo",
+        domain: "todo",
+        service: r.service,
+        target: { entity_id },
+        data: r.data,
+        dry_run,
+        confirm_token,
+      });
+      if ((result as { success?: boolean }).success) {
+        return { ...result, note: "Check the list state with ha_get_todo_list." };
+      }
+      return result;
+    })
+  );
 }

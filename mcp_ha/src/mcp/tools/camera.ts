@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { errorResult, type ToolResult } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
@@ -14,8 +14,7 @@ const MAX_IMAGE_BYTES = 4_000_000;
  * switch. filter_reads and the entity denylist still apply, and every
  * snapshot is audited (a picture leaving the house is worth a log line).
  */
-export function registerCameraTools(server: McpServer, ctx: ToolContext): void {
-  if (!ctx.cfg.allowCamera) return;
+export function registerCameraTools(server: ToolRegistrar, ctx: ToolContext): void {
 
   server.registerTool(
     "ha_get_camera_snapshot",

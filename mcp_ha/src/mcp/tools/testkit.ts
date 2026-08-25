@@ -6,6 +6,7 @@ import { vi } from "vitest";
 import type { AddonConfig } from "../../config.js";
 import type { ToolContext } from "../../context.js";
 import { ConfirmationStore } from "../../confirm.js";
+import { allows, grantsFromConfig, type ToolRegistrar } from "../registry.js";
 
 export interface RegisteredTool {
   cfg: any;
@@ -20,6 +21,21 @@ export function fakeServer() {
     },
   } as any;
   return { server, tools };
+}
+
+/**
+ * Wraps a fake server with the central gate (#165), the way buildServer
+ * does: for tests asserting which tools EXIST under a given option and
+ * scope combination. Most tests bypass it and register directly.
+ */
+export function gatedBy(server: any, cfg: Partial<AddonConfig>, canWrite?: boolean): ToolRegistrar {
+  const grants = grantsFromConfig(testCfg(cfg), canWrite);
+  return {
+    registerTool: ((name: string, meta: any, handler: any) => {
+      if (!allows(grants, name)) return undefined;
+      return server.registerTool(name, meta, handler);
+    }) as ToolRegistrar["registerTool"],
+  };
 }
 
 export async function callTool(tools: Map<string, RegisteredTool>, name: string, args: any) {

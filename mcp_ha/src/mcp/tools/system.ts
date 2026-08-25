@@ -1,9 +1,9 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe, toIso, trunc } from "../helpers.js";
 
-export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
+export function registerSystemTools(server: ToolRegistrar, ctx: ToolContext): void {
   // A Jinja template can read ANY entity state server-side, which would
   // bypass filter_reads entirely (audit D5): with read filtering enabled the
   // tool is simply not registered, same pattern as allow_write.

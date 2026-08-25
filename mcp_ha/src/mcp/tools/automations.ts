@@ -1,11 +1,11 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { listEnvelope, safe, trunc } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
 import { log } from "../../logger.js";
 
-export function registerAutomationTools(server: McpServer, ctx: ToolContext): void {
+export function registerAutomationTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_list_automations",
     {

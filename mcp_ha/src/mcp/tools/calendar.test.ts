@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registerCalendarTools } from "./calendar.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
+import { callTool, entity, fakeCtx, fakeServer, gatedBy } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -78,7 +78,7 @@ describe("ha_get_todo_list (#87)", () => {
     const wrongDomain = await callTool(tools, "ha_manage_todo", { entity_id: "light.kitchen", action: "add", item: "x" });
     expect(wrongDomain.isError).toBe(true);
     const readonly = fakeServer();
-    registerCalendarTools(readonly.server, fakeCtx({ cfg: { allowWrite: false } }));
+    registerCalendarTools(gatedBy(readonly.server, { allowWrite: false }), fakeCtx({ cfg: { allowWrite: false } }));
     expect(readonly.tools.has("ha_manage_todo")).toBe(false);
     expect(readonly.tools.has("ha_get_todo_list")).toBe(true);
   });

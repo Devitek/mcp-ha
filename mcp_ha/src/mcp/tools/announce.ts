@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe, trunc } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
@@ -19,9 +19,8 @@ export function resetAnnounceLimiter(): void {
   limiter.reset();
 }
 
-export function registerAnnounceTools(server: McpServer, ctx: ToolContext): void {
+export function registerAnnounceTools(server: ToolRegistrar, ctx: ToolContext): void {
   // Gated by allow_write and by the token scope (#85).
-  if (!ctx.cfg.allowWrite || ctx.canWrite === false) return;
 
   server.registerTool(
     "ha_announce",

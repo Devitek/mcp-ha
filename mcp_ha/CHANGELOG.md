@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.31.0 - 2026-08-26
+
+Foundation batch for the fine-grained access rework (epic #164, lot A #165).
+
+- **Internal**: every tool now declares its category and access level (read / write / manage) in a central registry (`src/mcp/registry.ts`); registration gating moved from per-module early returns to one gated registrar in buildServer, and the ingress tool counts derive from the registry. A two-way exhaustiveness test pins the registry to the actually-registered tools, ending the manual count maintenance across code, tests and docs.
+- **Change** (the one behavioural deviation, documented in #165): access levels are strictly hierarchical, so `manage` includes `write` within its category. Concretely, `allow_config_write` without `allow_write` now also exposes `ha_run_script`, `ha_trigger_automation` and `ha_set_automation`. The old separation was illusory: whoever can rewrite an automation's config can make it do anything.
+- No new tool, no option change: 45 tools (27 read, 18 guarded write).
+
 ## 0.30.0 - 2026-08-26
 
 Bulk-read batch, closing the field feedback stream started in 0.28.0 (#160).
