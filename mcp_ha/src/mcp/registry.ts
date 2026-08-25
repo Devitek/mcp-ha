@@ -149,6 +149,37 @@ export function grantsFromConfig(cfg: AddonConfig, canWrite?: boolean | undefine
   };
 }
 
+/**
+ * The epic #164 ceiling: a stored token can never exceed the option gates.
+ * Applied per request, so closing a gate instantly degrades every token.
+ */
+export function capGrants(requested: Partial<Grants>, cfg: AddonConfig): Grants {
+  const ceiling = grantsFromConfig(cfg, true);
+  const out = {} as Grants;
+  for (const c of CATEGORIES) {
+    const asked = LEVELS.indexOf(requested[c] ?? "none");
+    out[c] = LEVELS[Math.min(asked < 0 ? 0 : asked, LEVELS.indexOf(ceiling[c]))] as Level;
+  }
+  return out;
+}
+
+/** Everything, before capping: what a legacy write-scope token meant. */
+export function fullGrants(): Grants {
+  const out = {} as Grants;
+  for (const c of CATEGORIES) {
+    const levels = new Set(Object.values(TOOL_REGISTRY).filter((e) => e.category === c).map((e) => e.level));
+    out[c] = levels.has("manage") ? "manage" : levels.has("write") ? "write" : "read";
+  }
+  return out;
+}
+
+/** Read everywhere, before capping: what a legacy read-scope token meant. */
+export function readOnlyGrants(): Grants {
+  const out = {} as Grants;
+  for (const c of CATEGORIES) out[c] = "read";
+  return out;
+}
+
 /** Tool counts for these grants, the ingress breakdown derives from this. */
 export function toolCounts(grants: Grants): { read: number; write: number; total: number } {
   let read = 0;

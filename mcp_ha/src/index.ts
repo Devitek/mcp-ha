@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { effectiveTokens, loadConfig, VERSION, type AddonConfig, type ApiToken } from "./config.js";
-import { enableAuditFile, getLogLevel, log } from "./logger.js";
+import { audit, enableAuditFile, getLogLevel, log } from "./logger.js";
 import { AuthRateLimiter } from "./ratelimit.js";
 import { safeEqual } from "./safety.js";
 import { HaWsClient } from "./ha/ws.js";
@@ -13,6 +13,8 @@ import { ConfirmationStore } from "./confirm.js";
 import { createIngressHandler, INGRESS_PORT } from "./ingress.js";
 import { UsageTracker } from "./usage.js";
 import { buildServer } from "./mcp/server.js";
+import { capGrants, type Grants } from "./mcp/registry.js";
+import { TokenStore } from "./db/store.js";
 import type { ToolContext } from "./context.js";
 
 const MAX_BODY_BYTES = 4_000_000;
@@ -84,6 +86,8 @@ export interface HandlerOptions {
   sessionIdleMs?: number;
   /** Shared usage counters displayed on the ingress page (#128). */
   usage?: UsageTracker;
+  /** Fine-grained token store (#166); absent in bare setups and some tests. */
+  store?: TokenStore;
 }
 
 export function createHandler(
@@ -159,8 +163,24 @@ export function createHandler(
     }
 
     const auth = req.headers.authorization ?? "";
-    const presented = auth.match(/^Bearer\s+(.+)$/i)?.[1];
-    const identity = presented ? authenticate(presented.trim(), tokens) : null;
+    const presented = auth.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+    // Two token populations (#166): the config tokens (primary api_token,
+    // plus any legacy api_tokens not yet imported) matched in constant time,
+    // then the store, looked up by sha256 so timing never correlates with
+    // the secret. Store tokens carry real Grants, capped by the option
+    // gates on every request: closing a gate degrades them instantly.
+    let identity: { name: string; scope: string; grants?: Grants } | null = null;
+    const configIdentity = presented ? authenticate(presented, tokens) : null;
+    if (configIdentity) {
+      identity = { name: configIdentity.name, scope: configIdentity.scope };
+    } else if (presented && opts.store) {
+      const v = await opts.store.verify(presented);
+      if (v && v.denied) {
+        audit({ event: "token_refused", client: v.record.name, reason: v.denied });
+      } else if (v) {
+        identity = { name: v.record.name, scope: "grants", grants: capGrants(v.record.grants, cfg) };
+      }
+    }
     if (!identity) {
       const blocked = limiter.fail(ip);
       log.notice(`Unauthorized MCP request from ${ip}${blocked > 0 ? ` (blocked ${blocked} ms)` : ""}`);
@@ -168,9 +188,13 @@ export function createHandler(
       return;
     }
     limiter.succeed(ip);
-    // Per-request context carries the authenticated identity and its scope:
-    // a read-scoped token never sees the write tools (#85).
-    const reqCtx: ToolContext = { ...ctx, canWrite: identity.scope === "write", client: identity.name };
+    // Per-request context carries the authenticated identity and its reach:
+    // scope for config tokens (#85), capped grants for store tokens (#166).
+    const reqCtx: ToolContext = {
+      ...ctx,
+      client: identity.name,
+      ...(identity.grants ? { grants: identity.grants } : { canWrite: identity.scope === "write" }),
+    };
 
     try {
       // Existing session: route to its transport. Every request must still
@@ -283,7 +307,8 @@ const OPTION_MIGRATIONS: Array<{ key: string; value: unknown }> = [
 export async function reconcileOptions(
   cfg: AddonConfig,
   http: HaHttp,
-  delays: number[] = PERSIST_RETRY_DELAYS_MS
+  delays: number[] = PERSIST_RETRY_DELAYS_MS,
+  extraPatch: Record<string, unknown> = {}
 ): Promise<boolean> {
   if (!http.supervisorAvailable) return false;
   for (let attempt = 0; ; attempt++) {
@@ -294,6 +319,11 @@ export async function reconcileOptions(
       const patch: Record<string, unknown> = {};
       for (const m of OPTION_MIGRATIONS) {
         if (!(m.key in current)) patch[m.key] = m.value;
+      }
+      // Caller-provided rewrites (#166: blanking api_tokens after their
+      // import into the store), skipped once the stored value matches.
+      for (const [k, v] of Object.entries(extraPatch)) {
+        if (JSON.stringify(current[k]) !== JSON.stringify(v)) patch[k] = v;
       }
       const tokenAlreadySet = typeof current.api_token === "string" && current.api_token.trim().length > 0;
       if (cfg.apiTokenGenerated && !tokenAlreadySet) patch.api_token = cfg.apiToken;
@@ -361,12 +391,24 @@ async function main(): Promise<void> {
   ws.connect();
   const http = new HaHttp(cfg);
   const ctx: ToolContext = { cfg, ws, http, catalog, confirmations: new ConfirmationStore() };
-  void reconcileOptions(cfg, http);
+
+  // Fine-grained token store (#166): on-disk in the add-on, in-memory in
+  // dev mode. Legacy api_tokens are imported once (hashed, grants mapped
+  // from their scope) and the clear-text option is then blanked, so no
+  // secret keeps living in the options or the Supervisor backups.
+  const store = await TokenStore.open(existsSync("/data") ? "/data/tokens.db" : ":memory:");
+  if (cfg.apiTokens.length > 0) {
+    const imported = await store.importLegacy(cfg.apiTokens);
+    log.notice(`Token store: ${imported} legacy api_tokens imported (hashed); blanking the clear-text option.`);
+    void reconcileOptions(cfg, http, undefined, { api_tokens: [] });
+  } else {
+    void reconcileOptions(cfg, http);
+  }
 
   // Shared between the MCP handler (which counts) and the ingress page
   // (which displays), #128.
   const usage = new UsageTracker();
-  const httpServer = createServer(createHandler(ctx, { usage }));
+  const httpServer = createServer(createHandler(ctx, { usage, store }));
 
   // Ingress status page (v0.3, #79): the port stays inside the container
   // network (not in config.yaml ports), the Supervisor proxies and

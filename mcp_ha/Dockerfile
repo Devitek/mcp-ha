@@ -31,6 +31,8 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 # Inlined by the ingress page header (data URI, #136 follow-up).
 COPY icon.png ./icon.png
+# Committed drizzle migrations, applied by the token store at boot (#166).
+COPY drizzle ./drizzle
 COPY run.sh /run.sh
 RUN chmod a+x /run.sh
 
