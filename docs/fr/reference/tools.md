@@ -281,7 +281,7 @@ Sans `slug` : la liste des add-ons installés. Avec `slug` : le détail d'un add
 
 ### ha_get_system
 
-`section: "config"` : version de HA, nom, fuseau, unités, nombre d'intégrations. `section: "error_log"` : les 100 dernières lignes du journal d'erreurs de HA. `section: "updates"` : mises à jour Core, OS et add-ons en attente. `section: "backups"` : âge de la dernière sauvegarde et sauvegardes récentes (répond honnêtement si le rôle Supervisor minimal ne peut pas les lister).
+`section: "config"` : version de HA, nom, fuseau, unités, nombre d'intégrations. `section: "error_log"` : erreurs et avertissements récents, structurés, depuis le system log (WS), avec repli REST legacy pour les vieux cores. `section: "updates"` : mises à jour Core, OS et add-ons en attente ; les parties Core et OS exigent un rôle Supervisor supérieur et répondent une note structurée sous le rôle minimal, la partie add-ons marche toujours. `section: "backups"` : âge de la dernière sauvegarde et sauvegardes récentes (note structurée sous le rôle minimal). Aucune section ne fuit jamais d'erreur HTTP brute.
 
 ## Resources et prompts
 

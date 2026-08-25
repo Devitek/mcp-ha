@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27.1 - 2026-08-24
+
+- **Fix** (#153, from an exemplary field bug report): `ha_get_system` no longer leaks raw HTTP errors. `updates` probes each endpoint independently: the add-on part always works under the minimal Supervisor role, the Core and OS parts answer a structured note when denied (they need a higher role, invalidating an assumption of #111). `error_log` moves to the modern `system_log` source (structured errors and warnings, better than the raw file the removed `/api/error_log` endpoint used to serve), with the legacy REST as fallback for old cores and a structured note if neither answers.
+
 ## 0.27.0 - 2026-08-24
 
 - **Add-on self test** (`ha_get_self_test`): `ha_get_health` looks at the house, this looks at the add-on. WebSocket and REST connectivity with latencies, live state map status, Supervisor availability, and an ok / degraded / broken verdict with its reason. Contains no data from your home, by design: paste its output into a support issue. Every probe is bounded at 3 seconds, a diagnostic must never hang.

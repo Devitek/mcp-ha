@@ -53,15 +53,48 @@ describe("ha_get_system", () => {
     });
   });
 
-  it("tails the error log to the last 100 lines", async () => {
+  it("reads recent errors through system_log/list, projected (#153)", async () => {
     const { server, tools } = fakeServer();
+    const ws = {
+      send: vi.fn(async () => [
+        { timestamp: 1755648000.5, level: "ERROR", source: ["components/automation/__init__.py", 42], message: ["Error rendering template", "second part"], count: 3, first_occurred: 1755647000 },
+        { timestamp: 1755648100, level: "WARNING", source: ["helpers/entity.py", 7], message: "single message", count: 1 },
+      ]),
+    };
+    registerSystemTools(server, fakeCtx({ ws }));
+    const res = await callTool(tools, "ha_get_system", { section: "error_log" });
+    expect(ws.send).toHaveBeenCalledWith("system_log/list", {});
+    expect(res.data.entries[0]).toMatchObject({
+      level: "ERROR",
+      source: "components/automation/__init__.py:42",
+      message: "Error rendering template | second part",
+      count: 3,
+    });
+    expect(res.data.entries[0].timestamp).toMatch(/^2025-/);
+    expect(res.data.entries[1].count).toBeUndefined();
+    expect(res.data.total).toBe(2);
+  });
+
+  it("falls back to the legacy REST error log on old cores (#153)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => { throw new Error("unknown command"); }) };
     const coreGetText = vi.fn(async () => Array.from({ length: 300 }, (_, i) => `line ${i}`).join("\n"));
-    registerSystemTools(server, fakeCtx({ http: { coreGetText } }));
+    registerSystemTools(server, fakeCtx({ ws, http: { coreGetText } }));
     const res = await callTool(tools, "ha_get_system", { section: "error_log" });
     expect(res.data.total_lines).toBe(300);
     expect(res.data.showing).toBe(100);
-    expect(res.data.log.startsWith("line 200")).toBe(true);
     expect(res.data.log.endsWith("line 299")).toBe(true);
+  });
+
+  it("answers structured when neither log source is reachable (#153)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => { throw new Error("unknown command"); }) };
+    const coreGetText = vi.fn(async () => { throw new Error("HTTP 404: Not Found"); });
+    registerSystemTools(server, fakeCtx({ ws, http: { coreGetText } }));
+    const res = await callTool(tools, "ha_get_system", { section: "error_log" });
+    expect(res.isError).toBe(false);
+    expect(res.data.available).toBe(false);
+    expect(res.data.note).toContain("Settings > System > Logs");
   });
 });
 
@@ -82,6 +115,21 @@ describe("ha_get_system: updates and backups (#111)", () => {
     expect(res.data.os.update_available).toBe(false);
     expect(res.data.addons).toMatchObject({ total: 2, updates_pending: 1 });
     expect(res.data.addons.pending[0].slug).toBe("mcp_ha");
+  });
+
+  it("answers partially when the minimal role denies core and os info (#153)", async () => {
+    const { server, tools } = fakeServer();
+    const supervisorGet = vi.fn(async (path: string) => {
+      if (path === "/addons") return { addons: [{ slug: "mcp_ha", version: "0.27.0", version_latest: "0.27.1", update_available: true }] };
+      throw new Error("HTTP 403: 403: Forbidden");
+    });
+    registerSystemTools(server, fakeCtx({ http: { supervisorGet } }));
+    const res = await callTool(tools, "ha_get_system", { section: "updates" });
+    expect(res.isError).toBe(false);
+    expect(res.data.core).toMatchObject({ available: false });
+    expect(res.data.core.note).toContain("minimal");
+    expect(res.data.os).toMatchObject({ available: false });
+    expect(res.data.addons).toMatchObject({ total: 1, updates_pending: 1 });
   });
 
   it("lists backups newest first with the age of the last one", async () => {

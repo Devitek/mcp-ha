@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../context.js";
-import { safe, trunc } from "../helpers.js";
+import { safe, toIso, trunc } from "../helpers.js";
 
 export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
   // A Jinja template can read ANY entity state server-side, which would
@@ -36,9 +36,11 @@ export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
       title: "System information",
       description:
         "section 'config': HA version, name, timezone, units, number of integrations. " +
-        "section 'error_log': the last lines of the Home Assistant error log. " +
+        "section 'error_log': recent Home Assistant errors and warnings (structured). " +
         "section 'updates': pending Core, OS and add-on updates. " +
-        "section 'backups': last backup age and recent backups.",
+        "section 'backups': last backup age and recent backups. " +
+        "Parts of 'updates' and 'backups' depend on the Supervisor role; unavailable parts answer " +
+        "a structured note, never a raw HTTP error.",
       inputSchema: {
         section: z.enum(["config", "error_log", "updates", "backups"]).describe("Which section to read"),
       },
@@ -59,21 +61,35 @@ export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
         };
       }
       if (section === "updates") {
-        // Supervisor info endpoints; all readable with the minimal role.
-        const [core, os, addons] = await Promise.all([
-          ctx.http.supervisorGet("/core/info"),
-          ctx.http.supervisorGet("/os/info"),
-          ctx.http.supervisorGet("/addons"),
-        ]);
+        // Independent probes (#153): the minimal Supervisor role serves
+        // /addons but not /core/info or /os/info. A role-denied part must
+        // answer a structured note, never sink the whole section (and never
+        // leak a raw HTTP error, indistinguishable from an outage).
+        const tryGet = async (path: string): Promise<any | null> => {
+          try {
+            return await ctx.http.supervisorGet(path);
+          } catch {
+            return null;
+          }
+        };
+        const [core, os, addons] = await Promise.all([tryGet("/core/info"), tryGet("/os/info"), tryGet("/addons")]);
+        const roleNote =
+          "unavailable with the add-on's deliberately minimal Supervisor role; check Settings > System > Updates";
         const pending = ((addons?.addons as any[]) ?? []).filter((a) => a.update_available);
         return {
-          core: { version: core?.version ?? null, latest: core?.version_latest ?? null, update_available: Boolean(core?.update_available) },
-          os: { version: os?.version ?? null, latest: os?.version_latest ?? null, update_available: Boolean(os?.update_available) },
-          addons: {
-            total: ((addons?.addons as any[]) ?? []).length,
-            updates_pending: pending.length,
-            pending: pending.slice(0, 10).map((a) => ({ slug: a.slug, version: a.version, latest: a.version_latest })),
-          },
+          core: core
+            ? { version: core.version ?? null, latest: core.version_latest ?? null, update_available: Boolean(core.update_available) }
+            : { available: false, note: roleNote },
+          os: os
+            ? { version: os.version ?? null, latest: os.version_latest ?? null, update_available: Boolean(os.update_available) }
+            : { available: false, note: roleNote },
+          addons: addons
+            ? {
+                total: ((addons.addons as any[]) ?? []).length,
+                updates_pending: pending.length,
+                pending: pending.slice(0, 10).map((a) => ({ slug: a.slug, version: a.version, latest: a.version_latest })),
+              }
+            : { available: false, note: roleNote },
         };
       }
       if (section === "backups") {
@@ -104,14 +120,40 @@ export function registerSystemTools(server: McpServer, ctx: ToolContext): void {
           throw e;
         }
       }
-      const text = await ctx.http.coreGetText("/error_log");
-      const lines = text.trimEnd().split("\n");
-      const tail = lines.slice(-100);
-      return {
-        total_lines: lines.length,
-        showing: tail.length,
-        log: tail.join("\n").slice(-10_000),
-      };
+      // error_log (#153): the REST /api/error_log endpoint left recent HA
+      // versions (field report: 404 on 2026.8). The modern source is the
+      // system_log WS command, the Logs panel's own data, and it is better:
+      // structured errors and warnings instead of a raw file. The old REST
+      // stays as the fallback for older cores.
+      try {
+        const raw = await ctx.ws.send("system_log/list", {});
+        if (!Array.isArray(raw)) throw new Error("unexpected system_log payload");
+        const entries: any[] = raw;
+        return {
+          entries: entries.slice(0, 50).map((e) => ({
+            timestamp: toIso(e.timestamp),
+            level: e.level,
+            source: Array.isArray(e.source) ? e.source.join(":") : String(e.source ?? ""),
+            message: trunc(Array.isArray(e.message) ? e.message.join(" | ") : String(e.message ?? ""), 400),
+            ...(e.count > 1 ? { count: e.count, first_occurred: toIso(e.first_occurred) } : {}),
+          })),
+          total: entries.length,
+          note: "Recent errors and warnings from Home Assistant's system log (newest kept by HA).",
+        };
+      } catch {
+        // fall through to the legacy REST endpoint
+      }
+      try {
+        const text = await ctx.http.coreGetText("/error_log");
+        const lines = text.trimEnd().split("\n");
+        const tail = lines.slice(-100);
+        return { total_lines: lines.length, showing: tail.length, log: tail.join("\n").slice(-10_000) };
+      } catch {
+        return {
+          available: false,
+          note: "The error log is not reachable on this Home Assistant (neither system_log/list nor the legacy /api/error_log). Check Settings > System > Logs.",
+        };
+      }
     })
   );
 }

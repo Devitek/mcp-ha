@@ -281,7 +281,7 @@ Evaluates a Jinja2 template server-side and returns the rendering. Read only, ve
 
 ### ha_get_system
 
-`section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: last 100 lines of the HA error log. `section: "updates"`: pending Core, OS and add-on updates. `section: "backups"`: last backup age and recent backups (answers honestly if the minimal Supervisor role cannot list them).
+`section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: recent errors and warnings, structured, from the system log (WS), with a legacy REST fallback for old cores. `section: "updates"`: pending Core, OS and add-on updates; the Core and OS parts need a higher Supervisor role and answer a structured note under the minimal one, while the add-on part always works. `section: "backups"`: last backup age and recent backups (structured note under the minimal role). No section ever leaks a raw HTTP error.
 
 ## Resources and prompts
 
