@@ -150,6 +150,11 @@ export class HaHttp {
     );
   }
 
+  /** DELETE on the core API (config deletion, #155). Never retried. */
+  coreDelete(path: string): Promise<any> {
+    return this.request(this.coreBase() + path, this.coreToken(), { method: "DELETE" }, false);
+  }
+
   private requireSupervisor(): string {
     if (!this.cfg.supervisorToken) {
       throw new Error("Supervisor API is not available outside the add-on environment (dev mode)");

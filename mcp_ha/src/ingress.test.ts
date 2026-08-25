@@ -91,9 +91,9 @@ describe("ingress dashboard (#136)", () => {
     const full = await (
       await fetch(`${await serve(createIngressHandler(ctx({ allowCamera: true, allowConfigWrite: true })))}/`)
     ).text();
-    expect(full).toContain(">43<");
+    expect(full).toContain(">45<");
     expect(full).toContain("27 read");
-    expect(full).toContain("16 write");
+    expect(full).toContain("18 write");
   });
 
   it("renders named tokens masked with their scope, never in clear (#85)", async () => {

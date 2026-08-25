@@ -39,7 +39,7 @@ describe("ConfirmationStore (v0.2, #15)", () => {
     const { s, advance } = store();
     const hash = ConfirmationStore.fingerprint(CALL);
     const token = s.issue(hash);
-    advance(3 * 60_000);
+    advance(6 * 60_000);
     expect(s.consume(token, hash)).toBe("expired");
   });
 

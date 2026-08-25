@@ -11,7 +11,8 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
     {
       title: "List automations",
       description:
-        "All automations: entity_id, name, state (on = enabled), last trigger time. " +
+        "All automations: entity_id, name, state (on = enabled), last trigger time, and source " +
+        "(ui = editable via the config tools, yaml = defined in the user's files, read/trace only). " +
         "For the detailed configuration of one automation use ha_get_automation.",
       inputSchema: {
         limit: z.number().int().min(1).max(200).optional(),
@@ -27,6 +28,9 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
           name: e.name,
           enabled: e.state === "on",
           last_triggered: (e.attributes.last_triggered as string | null) ?? null,
+          // "ui" means editable through the config tools; "yaml" lives in the
+          // user's files and only ha_get_automation_trace works on it (#156).
+          source: typeof e.attributes.id === "string" && e.attributes.id ? "ui" : "yaml",
         }));
       return listEnvelope(all, limit ?? 100, offset ?? 0);
     })

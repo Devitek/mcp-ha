@@ -1,6 +1,6 @@
 # Référence des outils
 
-43 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
+45 outils, préfixés `ha_`. Tous les outils de lecture portent l'annotation `readOnlyHint`. Les réponses sont du JSON compact avec une enveloppe de liste standard :
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -159,13 +159,17 @@ Crée une NOUVELLE automation (ou script) depuis un blueprint installé : le com
 
 ### ha_update_automation / ha_update_script <Badge type="danger" text="écriture config" />
 
-Modifient une automation ou un script EXISTANT géré par l'interface. Les blocs fournis remplacent intégralement les blocs courants (une liste `actions` fournie remplace toutes les actions) ; les blocs non fournis sont conservés. Les cibles basées sur un blueprint prennent `inputs` à la place (remplace intégralement les inputs du `use_blueprint`, vérifiés contre le blueprint installé) ; les blocs bruts y sont refusés avec un message clair, et alias/description/mode marchent sur les deux sortes. Un bloc moderne fourni retire aussi sa clé jumelle legacy (`trigger`/`condition`/`action`) de la config stockée : les migrations de syntaxe legacy vers moderne passent par l'outil. La confirmation montre un **diff avant/après**, et la configuration de base est empreinte : si elle change entre les deux passes (édition simultanée dans l'interface), le jeton est refusé et le parcours recommence. La réponse de succès porte le YAML précédent complet pour un retour arrière manuel. Les cibles définies en YAML sont refusées ; la suppression n'existe pas.
+Modifient une automation ou un script EXISTANT géré par l'interface. Les blocs fournis remplacent intégralement les blocs courants (une liste `actions` fournie remplace toutes les actions) ; les blocs non fournis sont conservés. Les cibles basées sur un blueprint prennent `inputs` à la place (remplace intégralement les inputs du `use_blueprint`, vérifiés contre le blueprint installé) ; les blocs bruts y sont refusés avec un message clair, et alias/description/mode marchent sur les deux sortes. Un bloc moderne fourni retire aussi sa clé jumelle legacy (`trigger`/`condition`/`action`) de la config stockée : les migrations de syntaxe legacy vers moderne passent par l'outil. La confirmation montre un **diff avant/après**, et la configuration de base est empreinte : si elle change entre les deux passes (édition simultanée dans l'interface), le jeton est refusé et le parcours recommence. La réponse de succès porte le YAML précédent complet pour un retour arrière manuel. Les cibles définies en YAML sont refusées.
+
+### ha_delete_automation / ha_delete_script <Badge type="danger" text="écriture config" />
+
+Suppriment une automation ou un script EXISTANT géré par l'interface. L'outil le plus destructif reçoit les ceintures les plus solides : la première réponse porte le **YAML complet** de ce qui va disparaître (pas un diff) plus le `confirm_token` ; le client doit le montrer à l'humain avant de rappeler. La configuration de base est empreinte comme pour une modification : une édition dans l'interface entre les deux passes invalide le jeton. La réponse de succès renvoie `deleted_yaml`, donc `ha_create_automation` / `ha_create_script` peuvent la recréer si la suppression se révèle une erreur ; l'add-on lui-même ne stocke rien. Les éléments définis en YAML sont hors de portée (leur cycle de vie appartient aux fichiers de l'utilisateur), et les listes allow/deny d'entités s'appliquent.
 
 ## Automations et scripts
 
 ### ha_list_automations
 
-entity_id, nom, enabled, last_triggered. Paramètres : `limit`, `offset`.
+entity_id, nom, enabled, last_triggered, et `source` : `ui` pour les automations modifiables via les outils de config, `yaml` pour celles définies dans les fichiers de l'utilisateur (lecture et trace seulement). Paramètres : `limit`, `offset`.
 
 ### ha_get_automation
 

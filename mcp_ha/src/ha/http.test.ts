@@ -99,6 +99,16 @@ describe("HaHttp core", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("never retries a DELETE either (#155: one shot on destruction)", async () => {
+    const fetchMock = mockFetch(503, { error: "starting" });
+    const http = new HaHttp(cfg({ devHaUrl: "http://ha", devHaToken: "d" }));
+    await expect(http.coreDelete("/config/automation/config/x")).rejects.toThrow(/HTTP 503/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as any;
+    expect(url).toBe("http://ha/api/config/automation/config/x");
+    expect(init.method).toBe("DELETE");
+  });
+
   it("turns timeouts into a readable error (audit C1)", async () => {
     const abort = Object.assign(new Error("aborted"), { name: "TimeoutError" });
     const fn = vi.fn(async () => {

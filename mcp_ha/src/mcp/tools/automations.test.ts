@@ -27,7 +27,7 @@ function setup(coreGet?: any) {
 }
 
 describe("ha_list_automations / ha_list_scripts", () => {
-  it("lists automations with their enabled state", async () => {
+  it("lists automations with their enabled state and their source (#156)", async () => {
     const { tools } = setup();
     const res = await callTool(tools, "ha_list_automations", {});
     expect(res.data.total).toBe(2);
@@ -36,7 +36,10 @@ describe("ha_list_automations / ha_list_scripts", () => {
       name: "Morning routine",
       enabled: true,
       last_triggered: "2026-08-20T06:00:00Z",
+      source: "ui",
     });
+    // no attributes.id: defined in the user's YAML files, config tools can't reach it
+    expect(res.data.items[1].source).toBe("yaml");
   });
 
   it("lists scripts with their running state", async () => {

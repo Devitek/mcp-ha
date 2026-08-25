@@ -1,6 +1,6 @@
 import { audit } from "../logger.js";
 import { entityWriteAllowed, needsConfirmation, serviceAllowed } from "../safety.js";
-import { ConfirmationStore } from "../confirm.js";
+import { CONFIRM_TTL_SECONDS, ConfirmationStore } from "../confirm.js";
 import type { ToolContext } from "../context.js";
 
 export interface WriteTarget {
@@ -94,7 +94,7 @@ export async function guardedServiceCall(ctx: ToolContext, req: WriteRequest): P
         return {
           confirmation_required: true,
           confirm_token: token,
-          expires_in_seconds: 120,
+          expires_in_seconds: CONFIRM_TTL_SECONDS,
           would_call: wouldCall,
           note:
             `The ${dom} domain requires an explicit confirmation. Show this preview to the user, ` +

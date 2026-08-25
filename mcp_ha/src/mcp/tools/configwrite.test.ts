@@ -53,7 +53,7 @@ describe("config write registration (#94 tier 3)", () => {
   it("is independent from allow_write", () => {
     const { server, tools } = fakeServer();
     registerConfigWriteTools(server, fakeCtx({ cfg: { allowConfigWrite: true, allowWrite: false } }));
-    expect([...tools.keys()].sort()).toEqual(["ha_add_dashboard_card", "ha_create_automation", "ha_create_from_blueprint", "ha_create_script", "ha_update_automation", "ha_update_script"]);
+    expect([...tools.keys()].sort()).toEqual(["ha_add_dashboard_card", "ha_create_automation", "ha_create_from_blueprint", "ha_create_script", "ha_delete_automation", "ha_delete_script", "ha_update_automation", "ha_update_script"]);
   });
 });
 
@@ -572,6 +572,116 @@ describe("ha_update_automation / ha_update_script (#108)", () => {
     const res = await callTool(tools, "ha_update_automation", { entity_id: "automation.night_heating", mode: "queued" });
     expect(res.data.updated).toBe("automation.night_heating");
     expect(corePost).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ha_delete_automation / ha_delete_script (#155)", () => {
+  const CURRENT = {
+    alias: "Night heating",
+    mode: "single",
+    triggers: [{ trigger: "time", at: "22:00:00" }],
+    actions: [{ action: "climate.set_temperature", data: { temperature: 17 } }],
+  };
+  const AUTOMATION_ENTITY = entity("automation.night_heating", {
+    name: "Night heating",
+    attributes: { id: "night-42" },
+  });
+
+  function deleteSetup(over: any = {}) {
+    const { server, tools } = fakeServer();
+    const coreGet = over.coreGet ?? vi.fn(async () => JSON.parse(JSON.stringify(CURRENT)));
+    const coreDelete = vi.fn(async () => ({ result: "ok" }));
+    const ctx = fakeCtx({
+      cfg: { allowConfigWrite: true },
+      http: { coreGet, coreDelete },
+      catalog: { index: async () => [AUTOMATION_ENTITY, entity("script.movie", { name: "Movie" })] },
+      client: "writer",
+      ...over.ctx,
+    });
+    registerConfigWriteTools(server, ctx);
+    return { tools, coreGet, coreDelete };
+  }
+
+  it("dry_run previews the full YAML without touching anything", async () => {
+    const { tools, coreDelete } = deleteSetup();
+    const res = await callTool(tools, "ha_delete_automation", { entity_id: "automation.night_heating", dry_run: true });
+    expect(res.data.dry_run).toBe(true);
+    expect(res.data.would_delete).toBe("automation.night_heating");
+    expect(res.data.yaml).toContain("alias: Night heating");
+    expect(coreDelete).not.toHaveBeenCalled();
+  });
+
+  it("first call returns the complete YAML plus a token, second call deletes and returns deleted_yaml", async () => {
+    const { tools, coreDelete } = deleteSetup();
+    const first = await callTool(tools, "ha_delete_automation", { entity_id: "automation.night_heating" });
+    expect(first.data.confirmation_required).toBe(true);
+    expect(first.data.yaml).toContain("climate.set_temperature");
+    expect(first.data.expires_in_seconds).toBe(300);
+    expect(coreDelete).not.toHaveBeenCalled();
+    const res = await callTool(tools, "ha_delete_automation", {
+      entity_id: "automation.night_heating",
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.data.deleted).toBe("automation.night_heating");
+    expect(res.data.deleted_yaml).toContain("alias: Night heating");
+    expect(res.data.note).toContain("ha_create_automation");
+    expect(coreDelete).toHaveBeenCalledWith("/config/automation/config/night-42");
+    expect(auditLines()).toContainEqual(
+      expect.objectContaining({ client: "writer", tool: "ha_delete_automation", allowed: true })
+    );
+  });
+
+  it("refuses the token when the config changed between the passes", async () => {
+    let reads = 0;
+    const coreGet = vi.fn(async () => (++reads === 1 ? CURRENT : { ...CURRENT, alias: "Edited in the UI" }));
+    const { tools, coreDelete } = deleteSetup({ coreGet });
+    const first = await callTool(tools, "ha_delete_automation", { entity_id: "automation.night_heating" });
+    const res = await callTool(tools, "ha_delete_automation", {
+      entity_id: "automation.night_heating",
+      confirm_token: first.data.confirm_token,
+    });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("mismatch");
+    expect(coreDelete).not.toHaveBeenCalled();
+  });
+
+  it("only reaches UI-managed items and checks the domain prefix", async () => {
+    const yamlEntity = entity("automation.from_yaml", { attributes: {} });
+    const { tools, coreDelete } = deleteSetup({ ctx: { catalog: { index: async () => [yamlEntity] } } });
+    const yaml = await callTool(tools, "ha_delete_automation", { entity_id: "automation.from_yaml" });
+    expect(yaml.isError).toBe(true);
+    expect(yaml.text).toContain("YAML-defined");
+    const wrong = await callTool(tools, "ha_delete_automation", { entity_id: "script.movie" });
+    expect(wrong.isError).toBe(true);
+    expect(wrong.text).toContain("automation.*");
+    expect(coreDelete).not.toHaveBeenCalled();
+  });
+
+  it("applies the entity write lists with an audited refusal", async () => {
+    const { tools, coreGet, coreDelete } = deleteSetup({ ctx: { cfg: { allowConfigWrite: true, entityDenylist: ["automation.*"] } } });
+    const res = await callTool(tools, "ha_delete_automation", { entity_id: "automation.night_heating" });
+    expect(res.isError).toBe(true);
+    expect(coreGet).not.toHaveBeenCalled();
+    expect(coreDelete).not.toHaveBeenCalled();
+    expect(auditLines()).toContainEqual(
+      expect.objectContaining({ tool: "ha_delete_automation", allowed: false })
+    );
+  });
+
+  it("deletes a script through its object id, directly when elicitation confirms", async () => {
+    const coreGet = vi.fn(async () => ({ alias: "Movie", sequence: [{ action: "light.turn_off" }] }));
+    const { tools, coreDelete } = deleteSetup({ coreGet, ctx: { elicit: async () => true } });
+    const res = await callTool(tools, "ha_delete_script", { entity_id: "script.movie" });
+    expect(res.data.deleted).toBe("script.movie");
+    expect(coreDelete).toHaveBeenCalledWith("/config/script/config/movie");
+  });
+
+  it("refuses without writing when elicitation declines", async () => {
+    const { tools, coreDelete } = deleteSetup({ ctx: { elicit: async () => false } });
+    const res = await callTool(tools, "ha_delete_automation", { entity_id: "automation.night_heating" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("declined");
+    expect(coreDelete).not.toHaveBeenCalled();
   });
 });
 
