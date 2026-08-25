@@ -13,26 +13,70 @@ export function registerAutomationTools(server: McpServer, ctx: ToolContext): vo
       description:
         "All automations: entity_id, name, state (on = enabled), last trigger time, and source " +
         "(ui = editable via the config tools, yaml = defined in the user's files, read/trace only). " +
-        "For the detailed configuration of one automation use ha_get_automation.",
+        "include_config: true attaches each UI automation's full configuration (page size drops to " +
+        "5, max 10): the paginated way to export or diff a fleet. For one automation use ha_get_automation.",
       inputSchema: {
+        include_config: z.boolean().optional().describe("Attach each UI automation's config; yaml ones get config: null"),
         limit: z.number().int().min(1).max(200).optional(),
         offset: z.number().int().min(0).optional(),
       },
       annotations: { readOnlyHint: true },
     },
-    safe("ha_list_automations", async ({ limit, offset }) => {
-      const all = (await ctx.catalog.index())
-        .filter((e) => e.domain === "automation" && entityReadVisible(ctx.cfg, e.entity_id))
-        .map((e) => ({
-          entity_id: e.entity_id,
-          name: e.name,
-          enabled: e.state === "on",
-          last_triggered: (e.attributes.last_triggered as string | null) ?? null,
-          // "ui" means editable through the config tools; "yaml" lives in the
-          // user's files and only ha_get_automation_trace works on it (#156).
-          source: typeof e.attributes.id === "string" && e.attributes.id ? "ui" : "yaml",
-        }));
-      return listEnvelope(all, limit ?? 100, offset ?? 0);
+    safe("ha_list_automations", async ({ include_config, limit, offset }) => {
+      const entities = (await ctx.catalog.index()).filter(
+        (e) => e.domain === "automation" && entityReadVisible(ctx.cfg, e.entity_id)
+      );
+      const all = entities.map((e) => ({
+        entity_id: e.entity_id,
+        name: e.name,
+        enabled: e.state === "on",
+        last_triggered: (e.attributes.last_triggered as string | null) ?? null,
+        // "ui" means editable through the config tools; "yaml" lives in the
+        // user's files and only ha_get_automation_trace works on it (#156).
+        source: typeof e.attributes.id === "string" && e.attributes.id ? "ui" : "yaml",
+      }));
+      // Bulk read (#160): the configs travel through the agent's context, so
+      // the page shrinks (default 5, max 10) and pagination is the guard.
+      if (!include_config) return listEnvelope(all, limit ?? 100, offset ?? 0);
+      const envelope = listEnvelope(
+        all,
+        Math.min(limit ?? 5, 10),
+        offset ?? 0,
+        "Page size is capped at 10 with include_config. A config too large for the page is omitted per item (config_omitted): fetch it individually with ha_get_automation."
+      );
+      const byId = new Map(entities.map((e) => [e.entity_id, e]));
+      const items = envelope.items as Array<Record<string, unknown>>;
+      await Promise.all(
+        items.map(async (item) => {
+          const cfgId = byId.get(item.entity_id as string)?.attributes.id;
+          if (typeof cfgId !== "string" || !cfgId) {
+            item.config = null; // YAML-defined: skip on purpose, source says why
+            return;
+          }
+          try {
+            item.config = await ctx.http.coreGet(`/config/automation/config/${encodeURIComponent(cfgId)}`);
+          } catch (e) {
+            // Same doctrine as ha_get_automation (audit B7): no raw HTTP
+            // errors in the page, and a fetch failure must not sink it.
+            log.warning(`Bulk config fetch failed for ${item.entity_id}: ${e instanceof Error ? e.message : e}`);
+            item.config = null;
+            item.config_note = "config not readable right now (Home Assistant API error)";
+          }
+        })
+      );
+      // The page must stay VALID JSON: never truncate a config mid-value.
+      // When the page would blow the response cap, drop whole configs,
+      // biggest first, until it fits.
+      const PAGE_BUDGET_BYTES = 14_000;
+      while (Buffer.byteLength(JSON.stringify(envelope), "utf8") > PAGE_BUDGET_BYTES) {
+        const biggest = items
+          .filter((i) => i.config)
+          .sort((a, b) => JSON.stringify(b.config).length - JSON.stringify(a.config).length)[0];
+        if (!biggest) break;
+        delete biggest.config;
+        biggest.config_omitted = "too large for the page, fetch it individually with ha_get_automation";
+      }
+      return envelope;
     })
   );
 

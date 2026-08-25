@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.0 - 2026-08-26
+
+Bulk-read batch, closing the field feedback stream started in 0.28.0 (#160).
+
+- **New**: `ha_list_automations` accepts `include_config: true`, attaching each UI automation's full configuration with a shrunken page (default 5, max 10): the paginated way to export or diff a fleet instead of one call per automation. Guardrails first: the page always stays valid JSON; a config too large for it is omitted whole per item (`config_omitted`, fetch it individually), never truncated mid-value; `yaml` items get `config: null` without wasting a fetch; a per-item fetch failure becomes a note, never a sunk page. For the one-shot bootstrap of a very large fleet, the plain REST API honestly remains the better tool.
+
 ## 0.29.0 - 2026-08-26
 
 Edit-scope batch, same field feedback stream as 0.28.0 (#158, #159).

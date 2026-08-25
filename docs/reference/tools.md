@@ -171,6 +171,8 @@ Delete an EXISTING UI-managed automation or script. The most destructive tool ge
 
 entity_id, name, enabled, last_triggered, and `source`: `ui` for automations editable through the config tools, `yaml` for those defined in the user's files (read and trace only). Params: `limit`, `offset`.
 
+`include_config: true` (#160) attaches each UI automation's full configuration and shrinks the page (default 5, max 10): the paginated way to export or diff a fleet without one call per automation (66 automations = ~13 pages instead of 66 calls). The page stays valid JSON, always: a config too large for it is omitted **whole** per item (`config_omitted`, fetch it with `ha_get_automation`), never truncated mid-value; `yaml` items get `config: null` without wasting a fetch. Honest position: for the one-shot bootstrap of a very large fleet, the plain REST API remains the better tool; `include_config` targets deltas and medium fleets.
+
 ### ha_get_automation
 
 State plus, for UI-created automations, the full configuration (triggers, conditions, actions). YAML-defined automations return their state with a note. This tool has a raised response cap (~64 KB instead of the global ~15 KB, #159): its output feeds `ha_update_automation`, so it must round-trip whole; values are never truncated individually. A config that still exceeds the raised cap (inline base64 media) gets an honest message pointing to the UI editor instead of filters that do not exist here.
