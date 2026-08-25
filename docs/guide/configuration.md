@@ -8,7 +8,7 @@ All options live in the add-on **Configuration** tab. Restart the add-on after c
 |--------|---------|-------------|
 | `log_level` | `info` | Log verbosity: `trace`, `debug`, `info`, `notice`, `warning`, `error`, `fatal`. See [Logging](/reference/logging). |
 | `api_token` | empty | Primary token (full access) expected from MCP clients in the `Authorization: Bearer ...` header. Leave empty to have one generated on first start (it is saved back into this option). |
-| `api_tokens` | `[]` | Extra named tokens with a scope. See [Named tokens](#named-tokens). |
+| `api_tokens` | `[]` | Legacy named tokens with a scope. Since 0.32.0 they are imported (hashed) into the token store at boot and the option is blanked; management moves to the ingress page. See [Named tokens](#named-tokens). |
 | `allow_write` | `false` | Exposes the `ha_call_service` tool. Without it the add-on is strictly read only: no write tool is even visible to the client. |
 | `allow_camera` | `false` | Exposes `ha_get_camera_snapshot` (still images from cameras). Independent from `allow_write`; seeing your home is not acting on it, but it gets its own switch. `filter_reads` and `entity_denylist` still apply. |
 | `allow_config_write` | `false` | Exposes the eight config write tools: creation, modification and deletion of automations and scripts, blueprint instantiation, dashboard cards (HA-validated where possible, mandatory two-step confirmation). Independent from `allow_write`, and since 0.31.0 it also covers the runtime controls of what it manages (run, trigger, enable/disable): whoever can rewrite an automation can make it do anything anyway, so the access levels stopped pretending otherwise (#165). See the [security model](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md). |
@@ -21,7 +21,9 @@ All options live in the add-on **Configuration** tab. Restart the add-on after c
 
 ## Named tokens
 
-The single `api_token` grants full access. To give different clients different rights, add named tokens with a scope:
+The single `api_token` grants full access (it is the bootstrap and recovery token). Since 0.32.0, named tokens are stored **hashed** in a local database: entries added below are imported into it at the next start (with the grants their scope implies) and the clear-text option is blanked. Creating tokens with fine-grained per-category grants happens on the ingress page (#167).
+
+Legacy form, still accepted as an import source:
 
 ```yaml
 api_tokens:

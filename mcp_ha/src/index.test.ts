@@ -45,8 +45,8 @@ function fakeCtx(partial: any = {}) {
 
 let server: Server | null = null;
 
-async function startServer(ctx: any): Promise<string> {
-  server = createServer(createHandler(ctx));
+async function startServer(ctx: any, opts: any = {}): Promise<string> {
+  server = createServer(createHandler(ctx, opts));
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   const addr = server.address();
@@ -399,6 +399,43 @@ describe("scoped named tokens (#85)", () => {
     });
     return ((await r.json()) as any).result.tools.map((t: any) => t.name);
   };
+
+  it("authenticates store tokens with capped grants, refuses revoked ones with an audit line (#166)", async () => {
+    const { TokenStore } = await import("./db/store.js");
+    const store = await TokenStore.open(":memory:");
+    const { token, record } = await store.create({
+      name: "automation-manager",
+      grants: { entities: "read", automations: "manage", scripts: "write", camera: "read" },
+    });
+    const base = await startServer(
+      fakeCtx({
+        // allow_camera stays OFF: the requested camera grant must be capped away.
+        cfg: { allowWrite: true, allowConfigWrite: true, apiToken: "test-token-long-enough" },
+      }),
+      { store }
+    );
+    const names = await toolNames(base, token);
+    expect(names).toContain("ha_get_entity");
+    expect(names).toContain("ha_update_automation");
+    expect(names).toContain("ha_run_script");
+    expect(names).not.toContain("ha_get_camera_snapshot"); // capped by allow_camera=false
+    expect(names).not.toContain("ha_call_service"); // services grant absent: none
+    expect(names).not.toContain("ha_send_notification");
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    await store.revoke(record.id);
+    const denied = await fetch(`${base}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json, text/event-stream", Authorization: `Bearer ${token}` },
+      body: rpc("tools/list"),
+    });
+    expect(denied.status).toBe(401);
+    const auditLine = consoleSpy.mock.calls.map((c) => String(c[0])).find((l) => l.includes("token_refused"));
+    expect(auditLine).toContain("automation-manager");
+    expect(auditLine).toContain("revoked");
+    consoleSpy.mockRestore();
+    store.close();
+  });
 
   it("with every gate open, the server registers exactly the central registry (#165)", async () => {
     const { TOOL_REGISTRY } = await import("./mcp/registry.js");

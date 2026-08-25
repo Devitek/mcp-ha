@@ -8,7 +8,7 @@ Toutes les options se trouvent dans l'onglet **Configuration** de l'add-on. Red�
 |--------|--------|-------------|
 | `log_level` | `info` | Verbosité du journal : `trace`, `debug`, `info`, `notice`, `warning`, `error`, `fatal`. Voir [Journalisation](/fr/reference/logging). |
 | `api_token` | vide | Jeton principal (accès complet) attendu des clients MCP dans l'en-tête `Authorization: Bearer ...`. Laissez vide pour en générer un au premier démarrage (il est reporté dans cette option). |
-| `api_tokens` | `[]` | Jetons nommés supplémentaires avec une portée. Voir [Jetons nommés](#jetons-nommes). |
+| `api_tokens` | `[]` | Jetons nommés legacy avec une portée. Depuis 0.32.0 ils sont importés (hachés) dans le store de jetons au démarrage et l'option est vidée ; la gestion passe sur la page ingress. Voir [Jetons nommés](#jetons-nommes). |
 | `allow_write` | `false` | Expose l'outil `ha_call_service`. Sans lui, l'add-on est strictement en lecture seule : aucun outil d'écriture n'est même visible du client. |
 | `allow_camera` | `false` | Expose `ha_get_camera_snapshot` (images fixes de caméras). Indépendant de `allow_write` ; voir chez soi n'est pas agir chez soi, mais mérite son propre interrupteur. `filter_reads` et `entity_denylist` s'appliquent toujours. |
 | `allow_config_write` | `false` | Expose les huit outils d'écriture de configuration : création, modification et suppression d'automations et de scripts, instanciation de blueprints, cartes de dashboard (validés par HA quand c'est possible, confirmation en deux temps obligatoire). Indépendant d'`allow_write`, et depuis 0.31.0 il couvre aussi les commandes runtime de ce qu'il gère (lancer, déclencher, activer/désactiver) : qui peut réécrire une automation peut de toute façon lui faire faire n'importe quoi, les niveaux d'accès ont cessé de prétendre le contraire (#165). Voir le [modèle de sécurité](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md). |
@@ -21,7 +21,9 @@ Toutes les options se trouvent dans l'onglet **Configuration** de l'add-on. Red�
 
 ## Jetons nommés
 
-L'unique `api_token` donne un accès complet. Pour accorder des droits différents à des clients différents, ajoutez des jetons nommés avec une portée :
+L'unique `api_token` donne un accès complet (c'est le jeton d'amorçage et de secours). Depuis 0.32.0, les jetons nommés sont stockés **hachés** dans une base locale : les entrées ajoutées ci-dessous y sont importées au prochain démarrage (avec les droits que leur portée implique) puis l'option en clair est vidée. La création de jetons à droits fins par catégorie se fait sur la page ingress (#167).
+
+Forme legacy, toujours acceptée comme source d'import :
 
 ```yaml
 api_tokens:
