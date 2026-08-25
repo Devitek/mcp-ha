@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerServiceTools } from "./services.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, fakeCtx, fakeServer } from "./testkit.js";
+import { callTool, fakeCtx, fakeServer, gatedBy } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -31,7 +31,7 @@ function setup(cfgOver: any = {}) {
   const { server, tools } = fakeServer();
   const ws = { send: vi.fn(async (type: string) => (type === "get_services" ? SERVICES_FIXTURE : { context: {} })) };
   const ctx = fakeCtx({ cfg: cfgOver, ws });
-  registerServiceTools(server, ctx);
+  registerServiceTools(gatedBy(server, cfgOver), ctx);
   return { tools, ws };
 }
 

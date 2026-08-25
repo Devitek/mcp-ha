@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { stringify } from "yaml";
 import { createHash } from "node:crypto";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
 import { CONFIRM_TTL_SECONDS, ConfirmationStore } from "../../confirm.js";
@@ -73,10 +73,9 @@ function slugify(alias: string): string {
     .replace(/^_+|_+$/g, "");
 }
 
-export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): void {
+export function registerConfigWriteTools(server: ToolRegistrar, ctx: ToolContext): void {
   // Gated by allow_config_write and by the token scope (#85). Independent
   // from allow_write: service calls and config writes are separate grants.
-  if (!ctx.cfg.allowConfigWrite || ctx.canWrite === false) return;
   const client = (): string => ctx.client ?? "default";
 
   interface CreateRequest {

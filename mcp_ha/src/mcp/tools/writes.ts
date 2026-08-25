@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
 import { guardedServiceCall } from "../writeflow.js";
@@ -10,9 +10,8 @@ import { guardedServiceCall } from "../writeflow.js";
  * through the exact same guarded write path (lists, dry run, two-step
  * confirmation, audit). Only registered when allow_write is enabled.
  */
-export function registerWriteTools(server: McpServer, ctx: ToolContext): void {
+export function registerWriteTools(server: ToolRegistrar, ctx: ToolContext): void {
   // Gated by allow_write and by the token scope (#85).
-  if (!ctx.cfg.allowWrite || ctx.canWrite === false) return;
 
   const requireDomain = (entityId: string, domain: string): void => {
     if (!entityId.startsWith(`${domain}.`)) {

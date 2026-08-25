@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
 import { effectiveTokens, VERSION } from "./config.js";
 import { maskSecret } from "./safety.js";
+import { grantsFromConfig, toolCounts } from "./mcp/registry.js";
 import type { ToolContext } from "./context.js";
 import type { UsageTracker } from "./usage.js";
 
@@ -135,10 +136,9 @@ export function createIngressHandler(
       ? `<div style="display:flex;align-items:center;gap:7px;background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:20px;padding:5px 12px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok-glow)"></span><span style="font-size:12px;font-weight:600;color:var(--ok)">WebSocket connected</span></div>`
       : `<div style="display:flex;align-items:center;gap:7px;background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:20px;padding:5px 12px"><span style="width:8px;height:8px;border-radius:50%;background:var(--err)"></span><span style="font-size:12px;font-weight:600;color:var(--err)">WebSocket down${downFor !== null ? ` for ${esc(fmtUptime(downFor))}` : ""}</span></div>`;
 
-    // Tool counts: core read tools plus camera and the write families
-    // depending on the options (kept in sync with buildServer).
-    const readTools = 26 + (cfg.allowCamera ? 1 : 0);
-    const writeTools = (cfg.allowWrite ? 10 : 0) + (cfg.allowConfigWrite ? 8 : 0);
+    // Tool counts derived from the central registry (#165): the page shows
+    // exactly what buildServer would register for a full-scope token.
+    const { read: readTools, write: writeTools } = toolCounts(grantsFromConfig(cfg, true));
 
     const snap = opts.usage?.snapshot();
     const audit = await readAuditTail(auditPath);

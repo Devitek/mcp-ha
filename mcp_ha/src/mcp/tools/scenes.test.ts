@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registerSceneTools } from "./scenes.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
+import { callTool, entity, fakeCtx, fakeServer, gatedBy } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -18,10 +18,10 @@ function setup(over: any = {}) {
 describe("ha_snapshot_scene (#110)", () => {
   it("is absent without allow_write and for read-scoped tokens", () => {
     const a = fakeServer();
-    registerSceneTools(a.server, fakeCtx({ cfg: { allowWrite: false } }));
+    registerSceneTools(gatedBy(a.server, { allowWrite: false }), fakeCtx({ cfg: { allowWrite: false } }));
     expect(a.tools.size).toBe(0);
     const b = fakeServer();
-    registerSceneTools(b.server, fakeCtx({ cfg: { allowWrite: true }, canWrite: false }));
+    registerSceneTools(gatedBy(b.server, { allowWrite: true }, false), fakeCtx({ cfg: { allowWrite: true }, canWrite: false }));
     expect(b.tools.size).toBe(0);
   });
 

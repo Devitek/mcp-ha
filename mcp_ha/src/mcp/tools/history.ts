@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe, timeWindow, toIso } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
@@ -23,7 +23,7 @@ function downsample<T>(rows: T[], max: number): { rows: T[]; note?: string } {
   };
 }
 
-export function registerHistoryTools(server: McpServer, ctx: ToolContext): void {
+export function registerHistoryTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_get_history",
     {

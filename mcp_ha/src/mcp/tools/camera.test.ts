@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerCameraTools } from "./camera.js";
 import { setLogLevel } from "../../logger.js";
-import { fakeCtx, fakeServer } from "./testkit.js";
+import { fakeCtx, fakeServer, gatedBy } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -23,7 +23,7 @@ const IMG = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]), contentTyp
 describe("ha_get_camera_snapshot (#86)", () => {
   it("is not registered without allow_camera", () => {
     const { server, tools } = fakeServer();
-    registerCameraTools(server, fakeCtx({ cfg: { allowCamera: false } }));
+    registerCameraTools(gatedBy(server, { allowCamera: false }), fakeCtx({ cfg: { allowCamera: false } }));
     expect(tools.size).toBe(0);
   });
 

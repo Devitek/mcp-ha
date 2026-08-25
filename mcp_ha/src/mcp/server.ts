@@ -25,6 +25,7 @@ import { registerEnergyTools } from "./tools/energy.js";
 import { registerPresenceTools } from "./tools/presence.js";
 import { registerResources } from "./resources.js";
 import { registerPrompts } from "./prompts.js";
+import { gatedRegistrar, grantsFromConfig } from "./registry.js";
 
 /**
  * Builds a complete MCP server. Called for every request (stateless mode) or
@@ -67,28 +68,33 @@ export function buildServer(ctx: ToolContext): McpServer {
     };
   }
 
-  registerEntityTools(server, ctx);
-  registerServiceTools(server, ctx);
-  registerWriteTools(server, ctx);
-  registerAutomationTools(server, ctx);
-  registerHistoryTools(server, ctx);
-  registerAddonTools(server, ctx);
-  registerSystemTools(server, ctx);
-  registerCameraTools(server, ctx);
-  registerCalendarTools(server, ctx);
-  registerWeatherTools(server, ctx);
-  registerHelperTools(server, ctx);
-  registerConfigWriteTools(server, ctx);
-  registerHealthTools(server, ctx);
-  registerSelfTestTools(server, ctx);
-  registerNotifyTools(server, ctx);
-  registerSceneTools(server, ctx);
-  registerAnnounceTools(server, ctx);
-  registerExplainTools(server, ctx);
-  registerBlueprintTools(server, ctx);
-  registerDashboardTools(server, ctx);
-  registerEnergyTools(server, ctx);
-  registerPresenceTools(server, ctx);
+  // Central gating (#165): the modules register everything they have; the
+  // registrar filters against the grants. Until per-token grants land
+  // (#166/#167), grants come from the option gates and the token scope.
+  const grants = ctx.grants ?? grantsFromConfig(ctx.cfg, ctx.canWrite);
+  const gated = gatedRegistrar(server, grants);
+  registerEntityTools(gated, ctx);
+  registerServiceTools(gated, ctx);
+  registerWriteTools(gated, ctx);
+  registerAutomationTools(gated, ctx);
+  registerHistoryTools(gated, ctx);
+  registerAddonTools(gated, ctx);
+  registerSystemTools(gated, ctx);
+  registerCameraTools(gated, ctx);
+  registerCalendarTools(gated, ctx);
+  registerWeatherTools(gated, ctx);
+  registerHelperTools(gated, ctx);
+  registerConfigWriteTools(gated, ctx);
+  registerHealthTools(gated, ctx);
+  registerSelfTestTools(gated, ctx);
+  registerNotifyTools(gated, ctx);
+  registerSceneTools(gated, ctx);
+  registerAnnounceTools(gated, ctx);
+  registerExplainTools(gated, ctx);
+  registerBlueprintTools(gated, ctx);
+  registerDashboardTools(gated, ctx);
+  registerEnergyTools(gated, ctx);
+  registerPresenceTools(gated, ctx);
   registerResources(server, ctx);
   registerPrompts(server, ctx);
   return server;

@@ -1,7 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { registerAnnounceTools, resetAnnounceLimiter } from "./announce.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
+import { callTool, entity, fakeCtx, fakeServer, gatedBy } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 beforeEach(() => resetAnnounceLimiter());
@@ -25,10 +25,10 @@ function setup(over: any = {}) {
 describe("ha_announce (#125)", () => {
   it("is absent without allow_write and for read-scoped tokens", () => {
     const a = fakeServer();
-    registerAnnounceTools(a.server, fakeCtx({ cfg: { allowWrite: false } }));
+    registerAnnounceTools(gatedBy(a.server, { allowWrite: false }), fakeCtx({ cfg: { allowWrite: false } }));
     expect(a.tools.size).toBe(0);
     const b = fakeServer();
-    registerAnnounceTools(b.server, fakeCtx({ cfg: { allowWrite: true }, canWrite: false }));
+    registerAnnounceTools(gatedBy(b.server, { allowWrite: true }, false), fakeCtx({ cfg: { allowWrite: true }, canWrite: false }));
     expect(b.tools.size).toBe(0);
   });
 
