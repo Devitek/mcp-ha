@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.29.0 - 2026-08-26
+
+Edit-scope batch, same field feedback stream as 0.28.0 (#158, #159).
+
+- **New**: the update tools cover the root tuning keys (#158): `variables` (where non-trivial automation logic lives), `max_exceeded`, `initial_state` (automations only) and `trace`, each replaced wholesale like the blocks. Passing `null` REMOVES the key from the stored config; an empty object writes an empty object. `ha_create_automation` and `ha_create_script` accept `variables` and `max_exceeded` at creation.
+- **Change**: `ha_get_automation` gets a raised response cap, ~64 KB instead of the global ~15 KB (#159): one config is not a fleet dump, and its output feeds `ha_update_automation`, so it must round-trip whole; per-value truncation is refused by design. Beyond even that cap (inline base64 media), the message now says so honestly and points to the UI editor instead of advising filters the tool does not have.
+
 ## 0.28.0 - 2026-08-26
 
 Lifecycle batch, from field feedback of an assistant managing a 66-automation repo through the MCP (#155, #156, #157).

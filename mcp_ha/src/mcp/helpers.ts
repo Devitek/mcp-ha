@@ -50,19 +50,32 @@ export interface ToolResult {
   isError?: boolean;
 }
 
+/** Per-tool overrides of the response cap and its truncation advice (#159). */
+export interface CapOptions {
+  /** Byte cap replacing MAX_RESPONSE_BYTES for this tool. */
+  maxBytes?: number;
+  /** Truncation note replacing the generic "refine with filters" advice. */
+  truncationNote?: string;
+}
+
 /**
  * Serializes the result as compact JSON, capped at MAX_RESPONSE_BYTES (real
- * bytes, audit B14). The same object also ships as structuredContent
- * (v0.3, #79) so typed clients get JSON without reparsing the text.
+ * bytes, audit B14) unless the tool overrides the cap (#159: a single
+ * automation config is not a fleet dump). The same object also ships as
+ * structuredContent (v0.3, #79) so typed clients get JSON without reparsing
+ * the text.
  */
-export function jsonResult(data: unknown): ToolResult {
+export function jsonResult(data: unknown, opts: CapOptions = {}): ToolResult {
+  const cap = opts.maxBytes ?? MAX_RESPONSE_BYTES;
   let payload = data;
   let text = JSON.stringify(data);
-  if (Buffer.byteLength(text, "utf8") > MAX_RESPONSE_BYTES) {
+  if (Buffer.byteLength(text, "utf8") > cap) {
     payload = {
       truncated: true,
-      note: "Response too large, truncated. Refine with filters (domain, area, search, limit, shorter time window).",
-      preview: trunc(text, MAX_RESPONSE_BYTES),
+      note:
+        opts.truncationNote ??
+        "Response too large, truncated. Refine with filters (domain, area, search, limit, shorter time window).",
+      preview: trunc(text, cap),
     };
     text = JSON.stringify(payload);
   }
@@ -78,13 +91,13 @@ export function errorResult(message: string): ToolResult {
 }
 
 /** Wraps a tool handler: clean errors, never a stack trace to the client. */
-export function safe<A>(name: string, fn: (args: A) => Promise<unknown>): (args: A) => Promise<ToolResult> {
+export function safe<A>(name: string, fn: (args: A) => Promise<unknown>, caps: CapOptions = {}): (args: A) => Promise<ToolResult> {
   return async (args: A) => {
     log.debug(`Tool ${name} called`);
     log.trace(`Tool ${name} arguments: ${trunc(args, 500)}`);
     try {
       const data = await fn(args);
-      return jsonResult(data);
+      return jsonResult(data, caps);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       log.warning(`Tool ${name} failed: ${msg}`);

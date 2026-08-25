@@ -575,6 +575,87 @@ describe("ha_update_automation / ha_update_script (#108)", () => {
   });
 });
 
+describe("root keys and removal by null (#158)", () => {
+  const CURRENT = {
+    alias: "Car load shedding",
+    mode: "single",
+    variables: { threshold: 6500, _cafe_metadata: { ui: true } },
+    max_exceeded: "silent",
+    triggers: [{ trigger: "state", entity_id: "sensor.power" }],
+    actions: [{ action: "switch.turn_off" }],
+  };
+  const ENTITY = entity("automation.car_load", { name: "Car load shedding", attributes: { id: "car-7" } });
+
+  function rootSetup(over: any = {}) {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => ({ triggers: { valid: true }, actions: { valid: true } })) };
+    const coreGet = vi.fn(async () => JSON.parse(JSON.stringify(over.config ?? CURRENT)));
+    const corePost = vi.fn(async () => ({ result: "ok" }));
+    const ctx = fakeCtx({
+      cfg: { allowConfigWrite: true },
+      ws,
+      http: { coreGet, corePost },
+      catalog: { index: async () => [ENTITY, entity("script.movie", { name: "Movie" })] },
+      client: "writer",
+      elicit: async () => true,
+    });
+    registerConfigWriteTools(server, ctx);
+    return { tools, corePost };
+  }
+
+  it("replaces variables wholesale and preserves the untouched keys", async () => {
+    const { tools, corePost } = rootSetup();
+    const res = await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.car_load",
+      variables: { threshold: 7000 },
+    });
+    expect(res.data.updated).toBe("automation.car_load");
+    const [, payload] = corePost.mock.calls[0] as any;
+    expect(payload.variables).toEqual({ threshold: 7000 }); // _cafe_metadata gone: wholesale
+    expect(payload.max_exceeded).toBe("silent");
+    expect(payload.triggers).toEqual(CURRENT.triggers);
+  });
+
+  it("null removes the key from the stored config; an empty object writes an empty object", async () => {
+    const { tools, corePost } = rootSetup();
+    await callTool(tools, "ha_update_automation", {
+      entity_id: "automation.car_load",
+      variables: null,
+      max_exceeded: null,
+      trace: { stored_traces: 20 },
+    });
+    const [, payload] = corePost.mock.calls[0] as any;
+    expect("variables" in payload).toBe(false);
+    expect("max_exceeded" in payload).toBe(false);
+    expect(payload.trace).toEqual({ stored_traces: 20 });
+    await callTool(tools, "ha_update_automation", { entity_id: "automation.car_load", variables: {} });
+    const [, second] = corePost.mock.calls[1] as any;
+    expect(second.variables).toEqual({});
+  });
+
+  it("sets initial_state on automations and variables on scripts", async () => {
+    const { tools, corePost } = rootSetup();
+    await callTool(tools, "ha_update_automation", { entity_id: "automation.car_load", initial_state: false });
+    expect((corePost.mock.calls[0] as any)[1].initial_state).toBe(false);
+    const scriptSetup = rootSetup({ config: { alias: "Movie", sequence: [{ action: "light.turn_off" }] } });
+    await callTool(scriptSetup.tools, "ha_update_script", { entity_id: "script.movie", variables: { scene: "cinema" } });
+    expect((scriptSetup.corePost.mock.calls[0] as any)[1].variables).toEqual({ scene: "cinema" });
+  });
+
+  it("accepts variables and max_exceeded at creation", async () => {
+    const { tools, corePost } = setup({ ctx: { elicit: async () => true } });
+    const res = await callTool(tools, "ha_create_automation", {
+      ...AUTOMATION_ARGS,
+      variables: { delay: 30 },
+      max_exceeded: "warning",
+    });
+    expect(res.data.created).toBeDefined();
+    const [, payload] = corePost.mock.calls[0] as any;
+    expect(payload.variables).toEqual({ delay: 30 });
+    expect(payload.max_exceeded).toBe("warning");
+  });
+});
+
 describe("ha_delete_automation / ha_delete_script (#155)", () => {
   const CURRENT = {
     alias: "Night heating",

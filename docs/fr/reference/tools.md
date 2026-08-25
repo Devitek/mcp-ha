@@ -131,7 +131,7 @@ Fait parler la maison (« annonce que le dîner est prêt »). Sans `target` : l
 
 ### ha_create_automation <Badge type="danger" text="écriture config" />
 
-Crée une NOUVELLE automation. Enregistré uniquement quand `allow_config_write` est activé (indépendant d'`allow_write`). Le parcours est volontairement lourd : Home Assistant valide d'abord les blocs, puis la réponse porte le YAML complet et un `confirm_token` ; le client doit montrer le YAML à l'humain et rappeler avec le jeton. Une automation existante (même alias) est refusée : création seule, pas de modification.
+Crée une NOUVELLE automation. Enregistré uniquement quand `allow_config_write` est activé (indépendant d'`allow_write`). Le parcours est volontairement lourd : Home Assistant valide d'abord les blocs, puis la réponse porte le YAML complet et un `confirm_token` ; le client doit montrer le YAML à l'humain et rappeler avec le jeton. Une automation existante (même alias) est refusée : création seule, pas de modification. `variables` et `max_exceeded` sont acceptés à la création (#158), pas besoin de créer puis modifier.
 
 | Paramètre | Type | Notes |
 |-----------|------|-------|
@@ -159,7 +159,7 @@ Crée une NOUVELLE automation (ou script) depuis un blueprint installé : le com
 
 ### ha_update_automation / ha_update_script <Badge type="danger" text="écriture config" />
 
-Modifient une automation ou un script EXISTANT géré par l'interface. Les blocs fournis remplacent intégralement les blocs courants (une liste `actions` fournie remplace toutes les actions) ; les blocs non fournis sont conservés. Les cibles basées sur un blueprint prennent `inputs` à la place (remplace intégralement les inputs du `use_blueprint`, vérifiés contre le blueprint installé) ; les blocs bruts y sont refusés avec un message clair, et alias/description/mode marchent sur les deux sortes. Un bloc moderne fourni retire aussi sa clé jumelle legacy (`trigger`/`condition`/`action`) de la config stockée : les migrations de syntaxe legacy vers moderne passent par l'outil. La confirmation montre un **diff avant/après**, et la configuration de base est empreinte : si elle change entre les deux passes (édition simultanée dans l'interface), le jeton est refusé et le parcours recommence. La réponse de succès porte le YAML précédent complet pour un retour arrière manuel. Les cibles définies en YAML sont refusées.
+Modifient une automation ou un script EXISTANT géré par l'interface. Les blocs fournis remplacent intégralement les blocs courants (une liste `actions` fournie remplace toutes les actions) ; les blocs non fournis sont conservés. Les cibles basées sur un blueprint prennent `inputs` à la place (remplace intégralement les inputs du `use_blueprint`, vérifiés contre le blueprint installé) ; les blocs bruts y sont refusés avec un message clair, et alias/description/mode marchent sur les deux sortes. Un bloc moderne fourni retire aussi sa clé jumelle legacy (`trigger`/`condition`/`action`) de la config stockée : les migrations de syntaxe legacy vers moderne passent par l'outil. Les clés racine de réglage sont couvertes aussi (#158) : `variables` (là où vit la logique des automations non triviales), `max_exceeded`, `initial_state` (automations seulement) et `trace`, chacune remplacée intégralement comme les blocs ; passer `null` **retire** la clé de la config stockée (un objet vide écrit un objet vide), c'est ainsi qu'on nettoie les restes comme les métadonnées d'éditeur. La confirmation montre un **diff avant/après**, et la configuration de base est empreinte : si elle change entre les deux passes (édition simultanée dans l'interface), le jeton est refusé et le parcours recommence. La réponse de succès porte le YAML précédent complet pour un retour arrière manuel. Les cibles définies en YAML sont refusées.
 
 ### ha_delete_automation / ha_delete_script <Badge type="danger" text="écriture config" />
 
@@ -173,7 +173,7 @@ entity_id, nom, enabled, last_triggered, et `source` : `ui` pour les automations
 
 ### ha_get_automation
 
-L'état plus, pour les automations créées via l'interface, la configuration complète (déclencheurs, conditions, actions). Les automations définies en YAML renvoient leur état avec une note.
+L'état plus, pour les automations créées via l'interface, la configuration complète (déclencheurs, conditions, actions). Les automations définies en YAML renvoient leur état avec une note. Cet outil a un plafond de réponse relevé (~64 Ko au lieu du ~15 Ko global, #159) : sa sortie alimente `ha_update_automation`, elle doit donc faire l'aller-retour entière ; aucune valeur n'est tronquée individuellement. Une config qui dépasse même le plafond relevé (média base64 inline) reçoit un message honnête orientant vers l'éditeur de l'interface plutôt que vers des filtres qui n'existent pas ici.
 
 ### ha_list_scripts
 

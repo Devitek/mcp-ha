@@ -91,6 +91,24 @@ describe("ha_get_automation", () => {
     expect(res.data.note).toContain("not readable right now");
     expect(res.data.note).not.toContain("YAML");
   });
+
+  it("returns a 25 KB config whole under the raised cap (#159, round-trip safe)", async () => {
+    const media = "x".repeat(25_000); // over the 15 KB global cap, a real field case
+    const coreGet = vi.fn(async () => ({ alias: "G4 ring", actions: [{ action: "play_media", media }] }));
+    const { tools } = setup(coreGet);
+    const res = await callTool(tools, "ha_get_automation", { entity_id: "automation.morning" });
+    expect(res.data.truncated).toBeUndefined();
+    expect(res.data.config.actions[0].media).toBe(media);
+  });
+
+  it("beyond the raised cap, says inline payload and points to the UI, not to filters (#159)", async () => {
+    const coreGet = vi.fn(async () => ({ alias: "Huge", actions: [{ media: "x".repeat(70_000) }] }));
+    const { tools } = setup(coreGet);
+    const res = await callTool(tools, "ha_get_automation", { entity_id: "automation.morning" });
+    expect(res.data.truncated).toBe(true);
+    expect(res.data.note).toContain("inline payload");
+    expect(res.data.note).not.toContain("Refine");
+  });
 });
 
 describe("ha_get_automation_trace (#106)", () => {
