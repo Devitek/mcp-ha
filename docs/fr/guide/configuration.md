@@ -58,7 +58,7 @@ Un appel de service doit passer **tous** ces contrôles, dans l'ordre :
 2. Le service n'est pas dans `service_denylist`.
 3. Chaque `entity_id` ciblé passe les listes : autorisé si la liste blanche est vide ou correspond, et si la liste noire ne correspond pas. **La liste noire gagne toujours.**
 4. Dès qu'une restriction d'entités est configurée, le ciblage par `area_id` ou `device_id` est refusé (il contournerait les listes) : ciblez des `entity_id` explicites.
-5. Sur un domaine listé dans `confirm_domains`, l'appel doit porter un `confirm_token` valide obtenu lors d'un premier appel (usage unique, expire après 2 minutes, lié au même appel exact).
+5. Sur un domaine listé dans `confirm_domains`, l'appel doit porter un `confirm_token` valide obtenu lors d'un premier appel (usage unique, expire après 5 minutes, lié au même appel exact).
 
 Ces règles s'appliquent à l'identique aux quatre outils d'écriture (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`) : ils partagent un chemin d'écriture gardé unique. Chaque tentative, acceptée ou refusée, produit une ligne d'audit JSON dans le journal de l'add-on.
 

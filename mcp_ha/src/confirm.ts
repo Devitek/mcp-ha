@@ -1,7 +1,13 @@
 import { createHash, randomBytes } from "node:crypto";
 
-/** A pending confirmation lives this long before expiring. */
-const TTL_MS = 2 * 60_000;
+/**
+ * A pending confirmation lives this long before expiring. 5 minutes (#157):
+ * the doc asks for a real human review of the diff, and the token is single
+ * use and fingerprint-bound, so a longer window widens no actual surface.
+ */
+const TTL_MS = 5 * 60_000;
+/** For the expires_in_seconds fields of confirmation answers. */
+export const CONFIRM_TTL_SECONDS = TTL_MS / 1000;
 /** Hard bound on simultaneous pending confirmations (abuse guard). */
 const MAX_PENDING = 100;
 

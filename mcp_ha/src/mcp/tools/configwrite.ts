@@ -4,8 +4,9 @@ import { createHash } from "node:crypto";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
-import { ConfirmationStore } from "../../confirm.js";
+import { CONFIRM_TTL_SECONDS, ConfirmationStore } from "../../confirm.js";
 import { audit } from "../../logger.js";
+import { entityWriteAllowed } from "../../safety.js";
 
 /**
  * Minimal unified diff (LCS on lines, full context, no hunks): the configs
@@ -163,7 +164,7 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
         return {
           confirmation_required: true,
           confirm_token,
-          expires_in_seconds: 120,
+          expires_in_seconds: CONFIRM_TTL_SECONDS,
           would_create: req.entityId,
           yaml,
           note:
@@ -235,7 +236,7 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
     if (kind === "automation") {
       const cfgId = e.attributes.id;
       if (typeof cfgId !== "string" || !cfgId) {
-        throw new Error("this automation has no configuration id (YAML-defined): modification is only possible for UI-managed ones");
+        throw new Error("this automation has no configuration id (YAML-defined): changes are only possible for UI-managed ones");
       }
       path = `/config/automation/config/${encodeURIComponent(cfgId)}`;
     } else {
@@ -246,7 +247,7 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
       return { config, path };
     } catch (err) {
       if (String(err instanceof Error ? err.message : err).includes("HTTP 404")) {
-        throw new Error(`no stored configuration for ${entityId} (YAML-defined): modification is only possible for UI-managed ones`);
+        throw new Error(`no stored configuration for ${entityId} (YAML-defined): changes are only possible for UI-managed ones`);
       }
       throw err;
     }
@@ -328,7 +329,7 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
         return {
           confirmation_required: true,
           confirm_token,
-          expires_in_seconds: 120,
+          expires_in_seconds: CONFIRM_TTL_SECONDS,
           would_update: req.entityId,
           diff,
           yaml: afterYaml,
@@ -358,6 +359,118 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
       note: "Keep previous_yaml somewhere if you may want to revert; the add-on does not store it.",
     };
   }
+
+  /**
+   * Guarded deletion (#155): the last piece of the lifecycle, deliberately
+   * refused until real-world need proved it (orphaned automations of a
+   * removed device). The maximum-destruction path gets maximum belts: the
+   * first answer carries the COMPLETE YAML of what disappears, the config
+   * hash rides the fingerprint (a change between passes invalidates the
+   * token), and the success answer returns the deleted YAML, which makes
+   * the deletion reversible through ha_create_automation.
+   */
+  async function guardedDelete(req: { tool: string; kind: "automation" | "script"; entityId: string; dry_run?: boolean | undefined; confirm_token?: string | undefined }): Promise<unknown> {
+    const verdict0 = entityWriteAllowed(ctx.cfg, req.entityId);
+    if (!verdict0.allowed) {
+      audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: verdict0.reason });
+      throw new Error(verdict0.reason ?? `entity denied: ${req.entityId}`);
+    }
+    const { config, path } = await currentConfig(req.kind, req.entityId);
+    const yaml = stringify(config);
+    const baseHash = createHash("sha256").update(JSON.stringify(config)).digest("hex");
+    const hash = ConfirmationStore.fingerprint({
+      domain: "_config",
+      service: req.tool,
+      data: { entity_id: req.entityId, base: baseHash },
+    });
+
+    if (req.dry_run) {
+      audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: true, dry_run: true });
+      return { dry_run: true, would_delete: req.entityId, yaml };
+    }
+    if (!req.confirm_token) {
+      const answer = ctx.elicit
+        ? await ctx.elicit(`About to DELETE ${req.entityId}. This is its full configuration:\n\n${yaml}\nConfirm the deletion?`)
+        : null;
+      if (answer === false) {
+        audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: "declined by the user (elicitation)" });
+        throw new Error("deletion declined by the user");
+      }
+      if (answer === null) {
+        const confirm_token = ctx.confirmations.issue(hash);
+        audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: "confirmation_required" });
+        return {
+          confirmation_required: true,
+          confirm_token,
+          expires_in_seconds: CONFIRM_TTL_SECONDS,
+          would_delete: req.entityId,
+          yaml,
+          note:
+            "Deletion is final on the Home Assistant side. Show this YAML to the user, get their explicit approval, then call again with the SAME arguments plus confirm_token.",
+        };
+      }
+      audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: true, confirmed_via: "elicitation", before: baseHash.slice(0, 12) });
+    } else {
+      const verdict = ctx.confirmations.consume(req.confirm_token, hash);
+      if (verdict !== "ok") {
+        audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: `confirm_token ${verdict}` });
+        throw new Error(
+          `confirm_token ${verdict}: ` +
+            (verdict === "mismatch"
+              ? "the configuration changed since the confirmation; review and restart."
+              : "request a fresh confirmation and try again.")
+        );
+      }
+    }
+    await ctx.http.coreDelete(path);
+    audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: true, before: baseHash.slice(0, 12) });
+    return {
+      deleted: req.entityId,
+      deleted_yaml: yaml,
+      note: `Recreate it with ha_create_${req.kind} from deleted_yaml if you change your mind; the add-on does not store it.`,
+    };
+  }
+
+  server.registerTool(
+    "ha_delete_automation",
+    {
+      title: "Delete an automation",
+      description:
+        "DELETES an existing UI-managed automation. Two-step: the first call returns the complete YAML " +
+        "of what will disappear plus a confirm_token; show it to the user, then call again with the " +
+        "token. The deleted YAML is returned on success, so ha_create_automation can undo the deletion.",
+      inputSchema: {
+        entity_id: z.string().describe("E.g. automation.orphaned_doorbell"),
+        dry_run: z.boolean().optional().describe("true: preview the YAML only"),
+        confirm_token: z.string().optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    safe("ha_delete_automation", async ({ entity_id, dry_run, confirm_token }) => {
+      if (!entity_id.startsWith("automation.")) throw new Error(`expected an automation.* entity_id, got: ${entity_id}`);
+      return guardedDelete({ tool: "ha_delete_automation", kind: "automation", entityId: entity_id, dry_run, confirm_token });
+    })
+  );
+
+  server.registerTool(
+    "ha_delete_script",
+    {
+      title: "Delete a script",
+      description:
+        "DELETES an existing UI-managed script, same guarded two-step flow as ha_delete_automation " +
+        "(full YAML shown before confirmation, deleted YAML returned for undo).",
+      inputSchema: {
+        entity_id: z.string().describe("E.g. script.obsolete_routine"),
+        dry_run: z.boolean().optional(),
+        confirm_token: z.string().optional(),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
+    },
+    safe("ha_delete_script", async ({ entity_id, dry_run, confirm_token }) => {
+      if (!entity_id.startsWith("script.")) throw new Error(`expected a script.* entity_id, got: ${entity_id}`);
+      return guardedDelete({ tool: "ha_delete_script", kind: "script", entityId: entity_id, dry_run, confirm_token });
+    })
+  );
 
   server.registerTool(
     "ha_add_dashboard_card",
@@ -456,7 +569,7 @@ export function registerConfigWriteTools(server: McpServer, ctx: ToolContext): v
           return {
             confirmation_required: true,
             confirm_token: token,
-            expires_in_seconds: 120,
+            expires_in_seconds: CONFIRM_TTL_SECONDS,
             would_update: label,
             diff,
             note: "Show this view diff to the user and get their approval, then call again with the SAME arguments plus confirm_token.",

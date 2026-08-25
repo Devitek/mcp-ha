@@ -58,7 +58,7 @@ A service call must pass **all** of these checks, in order:
 2. The service is not in `service_denylist`.
 3. Every targeted `entity_id` passes the allow/deny lists: allowed when the allowlist is empty or matches, and the denylist does not match. **The denylist always wins.**
 4. When any entity restriction is configured, targeting by `area_id` or `device_id` is refused (it would bypass the lists): target explicit `entity_id` values instead.
-5. On a domain listed in `confirm_domains`, the call must carry a valid `confirm_token` obtained from a first call (single use, expires after 2 minutes, bound to the exact same call).
+5. On a domain listed in `confirm_domains`, the call must carry a valid `confirm_token` obtained from a first call (single use, expires after 5 minutes, bound to the exact same call).
 
 These rules apply identically to all four write tools (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`): they share a single guarded write path. Every attempt, allowed or refused, produces a JSON audit line in the add-on log.
 

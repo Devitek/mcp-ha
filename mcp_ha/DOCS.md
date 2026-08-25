@@ -23,9 +23,9 @@ The add-on adds an entry in the Home Assistant sidebar (and an **Open Web UI** b
 |--------|---------|-------------|
 | `log_level` | `info` | Log verbosity: trace, debug, info, notice, warning, error, fatal. Write audit lines are always emitted, and also persisted to `/data/audit.log` (size-rotated; no MCP tool can read or clear it). |
 | `api_token` | empty | Token expected from MCP clients (`Authorization: Bearer ...`). Leave empty to have one generated on first start and saved back into this option. The log only shows a masked prefix. |
-| `allow_write` | `false` | Exposes the six write tools (`ha_call_service`, `ha_run_script`, `ha_trigger_automation`, `ha_set_automation`, `ha_create_helper`, `ha_delete_helper`). Without it, no write tool is even visible to the client. |
+| `allow_write` | `false` | Exposes the ten write tools: services, script/automation control, helpers, todo lists, notifications, announcements, scene snapshots. Without it, no write tool is even visible to the client. |
 | `allow_camera` | `false` | Exposes `ha_get_camera_snapshot` (camera still images). Independent from `allow_write`. |
-| `allow_config_write` | `false` | Exposes `ha_create_automation` and `ha_create_script` (creation only, HA-validated, mandatory two-step confirmation with the full YAML). Independent from `allow_write`. |
+| `allow_config_write` | `false` | Exposes the eight config write tools: creation, modification and deletion of automations and scripts, blueprint instantiation, dashboard cards. HA-validated where possible, mandatory two-step confirmation with the full YAML or a diff. Independent from `allow_write`. |
 | `enable_sessions` | `false` | Long-lived MCP sessions: entity subscriptions with notifications and in-protocol confirmations. Stateless clients keep working. 16 max, 30 min idle timeout. |
 | `filter_reads` | `false` | Also applies `entity_denylist` to reads: hidden entities disappear from listings, entity details, history, statistics and the logbook. Also disables `ha_render_template`, which could otherwise read any entity through Jinja. |
 | `entity_allowlist` | `[]` | Glob patterns of entities allowed for writes (e.g. `light.*`). When non-empty, everything else is refused. |

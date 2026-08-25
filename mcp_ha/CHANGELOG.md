@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.28.0 - 2026-08-26
+
+Lifecycle batch, from field feedback of an assistant managing a 66-automation repo through the MCP (#155, #156, #157).
+
+- **New**: `ha_delete_automation` and `ha_delete_script` (#155) complete the lifecycle. Guarded like the updates and then some: the first answer carries the complete YAML of what will disappear plus the confirm token, the base config hash rides the fingerprint (a UI edit between the passes invalidates the token), and the success answer returns `deleted_yaml` so `ha_create_automation` / `ha_create_script` can undo a mistaken deletion. UI-managed items only; entity allow/deny lists apply; DELETE is never retried. 45 tools (27 read, 18 guarded write).
+- **New**: `ha_list_automations` items carry `source: "ui" | "yaml"` (#156), so an assistant knows upfront which automations the config tools can touch instead of discovering it one failed call at a time.
+- **Change**: confirmation tokens now expire after 5 minutes instead of 2 (#157). Reading a YAML diff, showing it to a human and answering back regularly took longer than the window; the token stays single-use and bound to the exact call fingerprint, so the longer window widens no surface.
+
 ## 0.27.1 - 2026-08-24
 
 - **Fix** (#153, from an exemplary field bug report): `ha_get_system` no longer leaks raw HTTP errors. `updates` probes each endpoint independently: the add-on part always works under the minimal Supervisor role, the Core and OS parts answer a structured note when denied (they need a higher role, invalidating an assumption of #111). `error_log` moves to the modern `system_log` source (structured errors and warnings, better than the raw file the removed `/api/error_log` endpoint used to serve), with the legacy REST as fallback for old cores and a structured note if neither answers.

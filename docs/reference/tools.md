@@ -1,6 +1,6 @@
 # Tool reference
 
-43 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
+45 tools, prefixed `ha_`. All read tools carry the `readOnlyHint` annotation. Responses are compact JSON with a standard list envelope:
 
 ```json
 { "items": [...], "returned": 50, "total": 734, "has_more": true, "next_offset": 50, "note": "..." }
@@ -159,13 +159,17 @@ Creates a NEW automation (or script) from an installed blueprint: the behaviour 
 
 ### ha_update_automation / ha_update_script <Badge type="danger" text="config write" />
 
-Update an EXISTING UI-managed automation or script. Provided blocks replace the current ones wholesale (a provided `actions` list replaces all actions); untouched blocks are preserved. Blueprint-based targets take `inputs` instead (replaces the whole `use_blueprint` input set, checked against the installed blueprint); raw blocks are refused on them with a clear message, and alias/description/mode work on both kinds. A provided modern block also removes its legacy twin key (`trigger`/`condition`/`action`) from the stored config, so legacy-to-modern syntax migrations work through the tool. The confirmation shows a **before/after diff**, and the base configuration is fingerprinted: if it changes between the two passes (simultaneous UI edit), the token is refused and the flow restarts. The success answer carries the full previous YAML for manual rollback. YAML-defined targets are refused; deletion does not exist.
+Update an EXISTING UI-managed automation or script. Provided blocks replace the current ones wholesale (a provided `actions` list replaces all actions); untouched blocks are preserved. Blueprint-based targets take `inputs` instead (replaces the whole `use_blueprint` input set, checked against the installed blueprint); raw blocks are refused on them with a clear message, and alias/description/mode work on both kinds. A provided modern block also removes its legacy twin key (`trigger`/`condition`/`action`) from the stored config, so legacy-to-modern syntax migrations work through the tool. The confirmation shows a **before/after diff**, and the base configuration is fingerprinted: if it changes between the two passes (simultaneous UI edit), the token is refused and the flow restarts. The success answer carries the full previous YAML for manual rollback. YAML-defined targets are refused.
+
+### ha_delete_automation / ha_delete_script <Badge type="danger" text="config write" />
+
+Delete an EXISTING UI-managed automation or script. The most destructive tool gets the strongest belts: the first answer carries the **complete YAML** of what will disappear (not a diff) plus the `confirm_token`; the client must show it to the human before calling again. The base configuration is fingerprinted like an update: a UI edit between the two passes invalidates the token. The success answer returns `deleted_yaml`, so `ha_create_automation` / `ha_create_script` can recreate it if the deletion turns out to be a mistake; the add-on itself stores nothing. YAML-defined items are out of reach (their lifecycle belongs to the user's files), and the entity allow/deny lists apply.
 
 ## Automations and scripts
 
 ### ha_list_automations
 
-entity_id, name, enabled, last_triggered. Params: `limit`, `offset`.
+entity_id, name, enabled, last_triggered, and `source`: `ui` for automations editable through the config tools, `yaml` for those defined in the user's files (read and trace only). Params: `limit`, `offset`.
 
 ### ha_get_automation
 
