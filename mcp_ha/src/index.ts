@@ -400,7 +400,20 @@ async function main(): Promise<void> {
   // dev mode. Legacy api_tokens are imported once (hashed, grants mapped
   // from their scope) and the clear-text option is then blanked, so no
   // secret keeps living in the options or the Supervisor backups.
-  const store = await TokenStore.open(existsSync("/data") ? "/data/tokens.db" : ":memory:");
+  // The store must never take the whole add-on down (#172, doctrine #153):
+  // if the on-disk database cannot open, degrade to memory loudly. The
+  // primary token keeps working; stored tokens wait for the fix.
+  let store: TokenStore;
+  try {
+    store = await TokenStore.open(existsSync("/data") ? "/data/tokens.db" : ":memory:");
+  } catch (e) {
+    log.error(
+      `Token store unavailable (${e instanceof Error ? e.message : String(e)}); falling back to an IN-MEMORY store. ` +
+        "Tokens created from the ingress will not survive a restart and previously stored tokens cannot " +
+        "authenticate until /data/tokens.db opens again. The primary api_token keeps working."
+    );
+    store = await TokenStore.open(":memory:");
+  }
   if (cfg.apiTokens.length > 0) {
     const imported = await store.importLegacy(cfg.apiTokens);
     log.notice(`Token store: ${imported} legacy api_tokens imported (hashed); blanking the clear-text option.`);
@@ -441,6 +454,12 @@ async function main(): Promise<void> {
     ingressServer?.close();
     void closeWithGrace(httpServer, SHUTDOWN_GRACE_MS).then(() => {
       ws.shutdown();
+      try {
+        // Releases the SQLite locks before the Supervisor restarts us (#172).
+        store.close();
+      } catch {
+        // closing twice or on a broken handle must not block the shutdown
+      }
       process.exit(0);
     });
   };

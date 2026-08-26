@@ -89,14 +89,32 @@ function toRecord(row: TokenRow): TokenRecord {
   };
 }
 
+export interface TokenStoreOptions {
+  /** SQLITE_BUSY wait budget; short in tests, 5 s in production. */
+  busyTimeoutMs?: number;
+}
+
 export class TokenStore {
   private client: DatabaseSync;
   private db: ReturnType<typeof drizzle>;
   private lastTouch = new Map<string, number>();
 
-  private constructor(path: string) {
+  private constructor(path: string, opts: TokenStoreOptions = {}) {
     this.client = new DatabaseSync(path);
-    this.client.exec("PRAGMA journal_mode = WAL;");
+    // A transient lock (fast restart racing the dying process, checkpoint in
+    // flight) becomes a short wait instead of an error (#172).
+    this.client.exec(`PRAGMA busy_timeout = ${opts.busyTimeoutMs ?? 5000};`);
+    // WAL is an optimisation, never a requirement (#172): the delete-to-WAL
+    // transition needs an exclusive lock and some filesystems (network
+    // mounts, odd overlays) refuse it with "database is locked". A 10-row
+    // database is perfectly served by the rollback journal.
+    try {
+      this.client.exec("PRAGMA journal_mode = WAL;");
+    } catch (e) {
+      log.warning(
+        `tokens.db: WAL journal unavailable (${e instanceof Error ? e.message : String(e)}); staying on the rollback journal`
+      );
+    }
     // sqlite-proxy contract: rows as arrays of values in column order.
     // Single-table queries only, so Object.values keeps that order.
     this.db = drizzle(async (sql, params, method) => {
@@ -111,8 +129,8 @@ export class TokenStore {
   }
 
   /** Opens (or creates) the database and applies pending migrations. */
-  static async open(path: string): Promise<TokenStore> {
-    const store = new TokenStore(path);
+  static async open(path: string, opts: TokenStoreOptions = {}): Promise<TokenStore> {
+    const store = new TokenStore(path, opts);
     const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
     await migrate(
       store.db,
