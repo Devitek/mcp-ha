@@ -1,8 +1,22 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { readFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import { effectiveTokens, VERSION } from "./config.js";
+import type { AddonConfig } from "./config.js";
 import { maskSecret } from "./safety.js";
-import { grantsFromConfig, toolCounts } from "./mcp/registry.js";
+import { audit } from "./logger.js";
+import {
+  capGrants,
+  CATEGORIES,
+  grantsFromConfig,
+  LEVELS,
+  TOOL_REGISTRY,
+  toolCounts,
+  type Category,
+  type Grants,
+  type Level,
+} from "./mcp/registry.js";
+import type { TokenStore } from "./db/store.js";
 import type { ToolContext } from "./context.js";
 import type { UsageTracker } from "./usage.js";
 
@@ -19,6 +33,130 @@ export interface IngressOptions {
   auditPath?: string;
   /** Add-on icon location, injectable for tests (#136 follow-up). */
   iconPath?: string;
+  /** Fine-grained token store (#167): enables the Tokens management tab. */
+  store?: TokenStore;
+}
+
+/**
+ * Anti-CSRF token (#167), double-submit style: random per process, embedded
+ * in every form and required on every POST. An external page cannot read
+ * this page (same-origin), so it cannot know the value; a restart rotates
+ * it, which at worst turns a stale form into a "reload and retry" error.
+ */
+const CSRF_TOKEN = randomBytes(16).toString("hex");
+
+/** Levels that actually exist for a category, "none" always included. */
+function categoryLevels(cat: Category): Level[] {
+  const present = new Set(
+    Object.values(TOOL_REGISTRY)
+      .filter((e) => e.category === cat)
+      .map((e) => e.level as Level)
+  );
+  return LEVELS.filter((l) => l === "none" || present.has(l));
+}
+
+/** Compact one-line human summary of a grants object. */
+function grantsSummary(g: Grants): string {
+  const parts: string[] = [];
+  let reads = 0;
+  for (const c of CATEGORIES) {
+    const l = g[c] ?? "none";
+    if (l === "none") continue;
+    if (l === "read") reads += 1;
+    else parts.push(`${c}: ${l}`);
+  }
+  if (reads > 0) parts.push(`${reads} read`);
+  return parts.join(" · ") || "nothing";
+}
+
+/** Option gates currently limiting these grants ("capped by …"). */
+function cappedGates(g: Grants, cfg: AddonConfig): string[] {
+  const eff = capGrants(g, cfg);
+  const gates = new Set<string>();
+  for (const c of CATEGORIES) {
+    const asked = LEVELS.indexOf(g[c] ?? "none");
+    const got = LEVELS.indexOf(eff[c]);
+    if (got >= asked) continue;
+    if (c === "camera") gates.add("allow_camera");
+    if ((g[c] === "write" || g[c] === "manage") && got < LEVELS.indexOf("write")) gates.add("allow_write");
+    if (g[c] === "manage") gates.add("allow_config_write");
+  }
+  return [...gates].sort();
+}
+
+async function readForm(req: IncomingMessage): Promise<URLSearchParams> {
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of req) {
+    size += (chunk as Buffer).length;
+    if (size > 32_768) throw new Error("form too large");
+    chunks.push(chunk as Buffer);
+  }
+  return new URLSearchParams(Buffer.concat(chunks).toString("utf8"));
+}
+
+interface Flash {
+  kind: "created" | "revoked" | "error";
+  text: string;
+  /** The one-time clear secret, present on creation only. */
+  secret?: string;
+}
+
+/** Handles the Tokens tab POSTs; always answers with a re-rendered page. */
+async function handleTokenPost(req: IncomingMessage, store: TokenStore, cfg: AddonConfig): Promise<Flash> {
+  let form: URLSearchParams;
+  try {
+    form = await readForm(req);
+  } catch (e) {
+    return { kind: "error", text: e instanceof Error ? e.message : String(e) };
+  }
+  if (form.get("csrf") !== CSRF_TOKEN) {
+    return { kind: "error", text: "Stale form (the add-on restarted since this page loaded): reload and retry." };
+  }
+  const action = form.get("mcpha_action");
+  if (action === "revoke") {
+    const id = form.get("id") ?? "";
+    const record = (await store.list()).find((r) => r.id === id);
+    if (!record || !(await store.revoke(id))) return { kind: "error", text: "Unknown token id." };
+    audit({ event: "token_revoked", client: record.name });
+    return { kind: "revoked", text: `Token "${record.name}" revoked; requests with it now get a 401.` };
+  }
+  if (action === "create") {
+    const grants: Partial<Grants> = {};
+    for (const c of CATEGORIES) {
+      const l = form.get(`grant_${c}`);
+      if (l && l !== "none") grants[c] = l as Level;
+    }
+    // The ceiling is enforced at creation too (#167): the matrix greys these
+    // out, but the browser is not the boundary.
+    const over = cappedGates(grants as Grants, cfg);
+    if (over.length > 0) return { kind: "error", text: `These grants exceed the current option gates (${over.join(", ")} off): open the gates first or ask for less.` };
+    const parseList = (field: string): string[] =>
+      (form.get(field) ?? "")
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    const expires = form.get("expires") ?? "never";
+    const days = expires === "30d" ? 30 : expires === "90d" ? 90 : expires === "365d" ? 365 : null;
+    try {
+      const created = await store.create({
+        name: form.get("name") ?? "",
+        grants,
+        entityAllowlist: parseList("entity_allowlist"),
+        entityDenylist: parseList("entity_denylist"),
+        expiresAt: days ? new Date(Date.now() + days * 86_400_000).toISOString() : undefined,
+      });
+      audit({ event: "token_created", client: created.record.name });
+      return {
+        kind: "created",
+        text: `Token "${created.record.name}" created. Copy it NOW: it is stored hashed and will never be shown again.`,
+        secret: created.token,
+      };
+    } catch (e) {
+      return { kind: "error", text: e instanceof Error ? e.message : String(e) };
+    }
+  }
+  return { kind: "error", text: "Unknown action." };
 }
 
 /**
@@ -100,8 +238,6 @@ const STAT_VALUE = `font-size:26px;font-weight:700;margin-top:4px;${MONO}`;
 const STAT_SUB = "font-size:12px;color:var(--muted);margin-top:2px";
 const PILL_ON = "font-size:11px;font-weight:700;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:12px;padding:2px 10px";
 const PILL_OFF = "font-size:11px;font-weight:600;color:var(--muted);background:var(--border);border-radius:12px;padding:2px 10px";
-const SCOPE_READ = "font-size:11px;font-weight:700;border-radius:12px;padding:2px 10px;justify-self:start;color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border)";
-const SCOPE_WRITE = "font-size:11px;font-weight:700;border-radius:12px;padding:2px 10px;justify-self:start;color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-border)";
 
 function statCard(label: string, value: string, sub: string): string {
   return `<div style="${CARD};padding:14px 16px"><div style="${STAT_LABEL}">${label}</div><div style="${STAT_VALUE}">${value}</div><div style="${STAT_SUB}">${sub}</div></div>`;
@@ -131,6 +267,20 @@ export function createIngressHandler(
   const iconPath = opts.iconPath ?? "icon.png";
   return async (req, res) => {
     const { cfg, ws } = ctx;
+
+    // Token management POSTs (#167): routed by a form field rather than the
+    // path, because ingress serves under an arbitrary Supervisor prefix.
+    // The answer is the re-rendered page; the meta refresh then reloads it
+    // as a GET, which naturally retires the one-time secret banner.
+    let flash: Flash | null = null;
+    if (req.method === "POST") {
+      if (!opts.store) {
+        res.writeHead(405, { Allow: "GET" });
+        res.end();
+        return;
+      }
+      flash = await handleTokenPost(req, opts.store, cfg);
+    }
     const downFor = ws.disconnectedForMs();
     const wsBadge = ws.connected
       ? `<div style="display:flex;align-items:center;gap:7px;background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:20px;padding:5px 12px"><span style="width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 6px var(--ok-glow)"></span><span style="font-size:12px;font-weight:600;color:var(--ok)">WebSocket connected</span></div>`
@@ -216,13 +366,72 @@ ${safetyRow("allow / deny patterns", `<span style="font-size:12px;${MONO};color:
       )
       .join("");
 
-    // --- Tokens (#85): named tokens are ONLY ever rendered masked -------
-    const tokenRows = effectiveTokens(cfg)
+    // --- Tokens (#85/#167): the primary stays masked; store tokens only
+    // ever exist as prefix + metadata, the secret was shown once.
+    const legacyRows = effectiveTokens(cfg)
       .map(
         (t, i) =>
-          `<div style="display:grid;grid-template-columns:1.2fr 2fr .8fr 1fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:13px;font-weight:600;${MONO}">${esc(t.name)}</span><span style="font-size:12.5px;${MONO};color:var(--muted)">${esc(maskSecret(t.token))}</span><span style="${t.scope === "write" ? SCOPE_WRITE : SCOPE_READ}">${t.scope}</span><span style="font-size:12px;color:var(--muted)">${i === 0 ? "api_token (primary)" : "api_tokens"}</span></div>`
+          `<div style="display:grid;grid-template-columns:1.2fr 2fr 1.4fr 1fr .6fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:13px;font-weight:600;${MONO}">${esc(t.name)}</span><span style="font-size:12.5px;${MONO};color:var(--muted)">${esc(maskSecret(t.token))}</span><span style="font-size:12px;color:var(--muted)">${i === 0 ? "full access (bootstrap and recovery)" : `legacy scope: ${esc(t.scope)}`}</span><span style="font-size:12px;color:var(--muted)">${i === 0 ? "api_token (primary)" : "api_tokens"}</span><span></span></div>`
       )
       .join("");
+    const storeRecords = opts.store ? await opts.store.list() : [];
+    const now = Date.now();
+    const storeRows = storeRecords
+      .map((r) => {
+        const expired = r.expiresAt !== null && Date.parse(r.expiresAt) <= now;
+        const status = r.revokedAt
+          ? `<span style="font-size:11px;font-weight:700;color:var(--err)">revoked</span>`
+          : expired
+            ? `<span style="font-size:11px;font-weight:700;color:var(--warn)">expired</span>`
+            : `<span style="font-size:11px;font-weight:700;color:var(--ok)">active</span>`;
+        const capped = cappedGates(r.grants, cfg);
+        const cappedNote = capped.length
+          ? `<div style="font-size:11px;color:var(--warn)">capped by ${esc(capped.map((g) => `${g}: off`).join(", "))}</div>`
+          : "";
+        const dates = `created ${esc(r.createdAt.slice(0, 10))}${r.expiresAt ? ` · expires ${esc(r.expiresAt.slice(0, 10))}` : ""}${r.lastUsedAt ? ` · last used ${esc(r.lastUsedAt.slice(0, 10))}` : " · never used"}`;
+        const revokeForm = r.revokedAt
+          ? ""
+          : `<form method="post" action="#tokens" style="margin:0" onsubmit="return confirm('Revoke this token? Clients using it will get a 401.')"><input type="hidden" name="csrf" value="${CSRF_TOKEN}"><input type="hidden" name="mcpha_action" value="revoke"><input type="hidden" name="id" value="${esc(r.id)}"><button class="btn" type="submit">Revoke</button></form>`;
+        return `<div style="display:grid;grid-template-columns:1.2fr 2fr 1.4fr 1fr .6fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:13px;font-weight:600;${MONO}">${esc(r.name)}</span><div><div style="font-size:12.5px;${MONO};color:var(--muted)">${esc(r.prefix)}…</div>${cappedNote}</div><span style="font-size:12px;color:var(--muted)">${esc(grantsSummary(r.grants))}</span><span style="font-size:11px;color:var(--muted)">${dates}</span><span style="display:flex;align-items:center;gap:8px;justify-content:end">${status}${revokeForm}</span></div>`;
+      })
+      .join("");
+
+    // Creation form matrix: one row per category, radios per level; a level
+    // above the option gates is disabled here AND refused server-side.
+    const ceiling = grantsFromConfig(cfg, true);
+    const matrixRows = CATEGORIES.map((c) => {
+      const available = categoryLevels(c);
+      const cells = LEVELS.map((l) => {
+        if (!available.includes(l)) return `<span style="color:var(--faint);text-align:center">·</span>`;
+        const over = LEVELS.indexOf(l) > LEVELS.indexOf(ceiling[c]);
+        return `<label style="display:flex;justify-content:center;${over ? "opacity:.35" : "cursor:pointer"}" ${over ? `title="above the current allow_* gates"` : ""}><input type="radio" name="grant_${c}" value="${l}"${l === "none" ? " checked" : ""}${over ? " disabled" : ""}></label>`;
+      }).join("");
+      return `<div style="display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:6px;padding:6px 12px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:12.5px;${MONO}">${esc(c)}</span>${cells}</div>`;
+    }).join("");
+    const flashHtml = !flash
+      ? ""
+      : flash.kind === "created"
+        ? `<div style="${CARD};margin-top:20px;padding:14px 16px;border-color:var(--ok-border);background:var(--ok-bg)"><div style="font-size:13px;font-weight:700;color:var(--ok)">${esc(flash.text)}</div><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><code id="newsecret" style="${MONO};font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--code);overflow-x:auto">${esc(flash.secret ?? "")}</code><button class="btn" id="copysecret">Copy</button></div></div>`
+        : `<div style="${CARD};margin-top:20px;padding:12px 16px;border-color:${flash.kind === "error" ? "var(--warn-border)" : "var(--ok-border)"}"><span style="font-size:13px;font-weight:600;color:${flash.kind === "error" ? "var(--warn)" : "var(--ok)"}">${esc(flash.text)}</span></div>`;
+    const createCard = !opts.store
+      ? ""
+      : `<div style="${CARD};margin-top:12px">
+<div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700">New token</div>
+<form method="post" action="#tokens">
+<input type="hidden" name="csrf" value="${CSRF_TOKEN}"><input type="hidden" name="mcpha_action" value="create">
+<div style="display:flex;gap:12px;padding:14px 16px;flex-wrap:wrap;align-items:center">
+<label style="font-size:12px;color:var(--muted)">Name <input name="name" required maxlength="64" placeholder="voice-pipeline" style="font-family:inherit;font-size:13px;margin-left:6px;background:var(--bg);border:1px solid var(--btn-border);border-radius:6px;padding:6px 10px;color:var(--text)"></label>
+<label style="font-size:12px;color:var(--muted)">Expires <select name="expires" style="font-family:inherit;font-size:13px;margin-left:6px;background:var(--bg);border:1px solid var(--btn-border);border-radius:6px;padding:6px 10px;color:var(--text)"><option value="never">never</option><option value="30d">in 30 days</option><option value="90d">in 90 days</option><option value="365d">in 1 year</option></select></label>
+</div>
+<div style="display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:6px;padding:8px 12px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Category</span><span style="text-align:center">none</span><span style="text-align:center">read</span><span style="text-align:center">write</span><span style="text-align:center">manage</span></div>
+${matrixRows}
+<details style="padding:12px 16px"><summary style="font-size:12px;color:var(--muted);cursor:pointer">Entity restrictions (optional, glob patterns, one per line)</summary>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
+<label style="font-size:12px;color:var(--muted)">Allowlist (empty = all)<textarea name="entity_allowlist" rows="3" placeholder="light.*&#10;automation.*" style="display:block;width:95%;font-size:12.5px;${MONO};margin-top:4px;background:var(--bg);border:1px solid var(--btn-border);border-radius:6px;padding:8px;color:var(--text)"></textarea></label>
+<label style="font-size:12px;color:var(--muted)">Denylist (always wins)<textarea name="entity_denylist" rows="3" placeholder="lock.*" style="display:block;width:95%;font-size:12.5px;${MONO};margin-top:4px;background:var(--bg);border:1px solid var(--btn-border);border-radius:6px;padding:8px;color:var(--text)"></textarea></label>
+</div><div style="font-size:11px;color:var(--muted);margin-top:8px">Applied on writes, on top of the global lists (both must agree; deny always wins).</div></details>
+<div style="padding:0 16px 14px"><button class="btn" type="submit" style="border-color:var(--ok-border);color:var(--ok)">Create token</button> <span style="font-size:11px;color:var(--muted)">The secret is shown once, then only its hash is kept.</span></div>
+</form></div>`;
 
     // --- Write audit (#126) with client-side filters --------------------
     const auditRow = (a: Record<string, unknown>): string => {
@@ -297,11 +506,14 @@ ${logoHtml}
 </div>
 
 <div data-panel="tokens" hidden>
-<div style="${CARD};margin-top:20px;overflow:hidden">
-<div style="display:grid;grid-template-columns:1.2fr 2fr .8fr 1fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Name</span><span>Token</span><span>Scope</span><span>Source</span></div>
-${tokenRows}
+${flashHtml}
+<div style="${CARD};margin-top:${flash ? "12px" : "20px"};overflow:hidden">
+<div style="display:grid;grid-template-columns:1.2fr 2fr 1.4fr 1fr .6fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Name</span><span>Token</span><span>Grants</span><span>Lifecycle</span><span></span></div>
+${legacyRows}
+${storeRows}
 </div>
-<div style="font-size:12px;color:var(--muted);margin-top:12px">Tokens are managed in the add-on <b style="color:var(--text)">Configuration</b> tab (<code style="${MONO}">api_token</code> and <code style="${MONO}">api_tokens</code> options). Named tokens carry a read or write scope; the primary token always has write scope.</div>
+${createCard}
+<div style="font-size:12px;color:var(--muted);margin-top:12px">Tokens created here are stored <b style="color:var(--text)">hashed</b> (sha256) with fine-grained per-category grants, capped by the <code style="${MONO}">allow_*</code> options on every request. The primary <code style="${MONO}">api_token</code> (Configuration tab) keeps full access as the bootstrap and recovery path.</div>
 </div>
 
 <div data-panel="audit" hidden>
@@ -395,6 +607,16 @@ ${auditTable}
     });
   });
   render();
+
+  // One-time secret copy (#167): present only in the POST answer.
+  var copyBtn = document.getElementById("copysecret");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", function () {
+      navigator.clipboard.writeText(document.getElementById("newsecret").textContent).then(function () {
+        copyBtn.textContent = "Copied!";
+      });
+    });
+  }
 
   // Audit filters, pure client-side.
   document.querySelectorAll(".fpill").forEach(function (b) {

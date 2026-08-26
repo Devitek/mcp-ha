@@ -21,7 +21,7 @@ All options live in the add-on **Configuration** tab. Restart the add-on after c
 
 ## Named tokens
 
-The single `api_token` grants full access (it is the bootstrap and recovery token). Since 0.32.0, named tokens are stored **hashed** in a local database: entries added below are imported into it at the next start (with the grants their scope implies) and the clear-text option is blanked. Creating tokens with fine-grained per-category grants happens on the ingress page (#167).
+The single `api_token` grants full access (it is the bootstrap and recovery token). Since 0.32.0, named tokens are stored **hashed** in a local database: entries added below are imported into it at the next start (with the grants their scope implies) and the clear-text option is blanked. Creating tokens happens on the **ingress page** (sidebar entry), Tokens tab: pick a level (none / read / write / manage) per tool category, optionally an expiry and per-token entity lists (applied on writes, on top of the global ones). The secret is shown once at creation; grants are capped by the `allow_*` options on every request, so closing a gate instantly degrades every token. Revocation is one click.
 
 Legacy form, still accepted as an import source:
 

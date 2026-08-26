@@ -39,6 +39,34 @@ export function entityWriteAllowed(cfg: AddonConfig, entityId: string): Verdict 
   return { allowed: true };
 }
 
+/** Per-token entity glob lists (#167), applied ON TOP of the global ones. */
+export interface TokenEntityLists {
+  allow: string[] | null;
+  deny: string[] | null;
+}
+
+/**
+ * Global lists AND the authenticated token's lists (#167): both must agree.
+ * Two allowlists cannot be merged into one glob set (concat would OR them),
+ * hence the two-pass check. Deny always wins, in either list.
+ */
+export function entityWriteAllowedFor(
+  ctx: { cfg: AddonConfig; tokenEntityLists?: TokenEntityLists | undefined },
+  entityId: string
+): Verdict {
+  const global = entityWriteAllowed(ctx.cfg, entityId);
+  if (!global.allowed) return global;
+  const t = ctx.tokenEntityLists;
+  if (!t) return { allowed: true };
+  if (t.allow && t.allow.length > 0 && !matchesAny(entityId, t.allow)) {
+    return { allowed: false, reason: `${entityId} is not in this token's entity allowlist` };
+  }
+  if (t.deny && t.deny.length > 0 && matchesAny(entityId, t.deny)) {
+    return { allowed: false, reason: `${entityId} is in this token's entity denylist` };
+  }
+  return { allowed: true };
+}
+
 /** Service denylist, independent from entities (e.g. hassio.*). */
 export function serviceAllowed(cfg: AddonConfig, domain: string, service: string): Verdict {
   const full = `${domain}.${service}`;

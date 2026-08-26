@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.33.0 - 2026-08-26
+
+Token management UI, closing the fine-grained access epic (#164, lot C #167).
+
+- **New**: the ingress page manages tokens. The Tokens tab lists them (prefix, grants summary, lifecycle dates, active/expired/revoked state, a "capped by allow_*: off" note when the option gates limit a token) and creates them through a **category × level matrix** (levels a category does not have, or that sit above the gates, are greyed out); optional expiry and per-token entity lists. The secret is shown **exactly once** in the creation answer; one-click revocation, with `token_created` / `token_revoked` audit events.
+- **New**: per-token entity lists are enforced on writes (#167), on top of the global ones: both allowlists must agree (real intersection, not a concat), deny always wins in either list, and area/device targeting is refused as soon as the token carries any list.
+- **Security**: creation grants are validated server-side against the option gates too: the browser matrix is convenience, not the boundary. POSTs require an anti-CSRF form token on top of the HA-authenticated ingress session.
+
 ## 0.32.0 - 2026-08-26
 
 Token store batch (epic #164, lot B #166).

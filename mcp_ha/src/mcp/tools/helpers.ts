@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
-import { entityWriteAllowed } from "../../safety.js";
+import { entityWriteAllowedFor } from "../../safety.js";
 import { audit } from "../../logger.js";
 
 /**
@@ -79,7 +79,7 @@ export function registerHelperTools(server: ToolRegistrar, ctx: ToolContext): vo
       if (!HELPER_TYPES.includes(helperType)) {
         throw new Error(`expected a helper entity_id (${HELPER_TYPES.join(", ")}), got: ${entity_id}`);
       }
-      const verdict = entityWriteAllowed(ctx.cfg, entity_id);
+      const verdict = entityWriteAllowedFor(ctx, entity_id);
       if (!verdict.allowed) {
         audit({ client: client(), tool: "ha_delete_helper", entity_id, allowed: false, reason: verdict.reason });
         throw new Error(verdict.reason);

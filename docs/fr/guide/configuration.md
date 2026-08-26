@@ -21,7 +21,7 @@ Toutes les options se trouvent dans l'onglet **Configuration** de l'add-on. Red�
 
 ## Jetons nommés
 
-L'unique `api_token` donne un accès complet (c'est le jeton d'amorçage et de secours). Depuis 0.32.0, les jetons nommés sont stockés **hachés** dans une base locale : les entrées ajoutées ci-dessous y sont importées au prochain démarrage (avec les droits que leur portée implique) puis l'option en clair est vidée. La création de jetons à droits fins par catégorie se fait sur la page ingress (#167).
+L'unique `api_token` donne un accès complet (c'est le jeton d'amorçage et de secours). Depuis 0.32.0, les jetons nommés sont stockés **hachés** dans une base locale : les entrées ajoutées ci-dessous y sont importées au prochain démarrage (avec les droits que leur portée implique) puis l'option en clair est vidée. La création de jetons se fait sur la **page ingress** (entrée dans la barre latérale), onglet Tokens : un niveau (none / read / write / manage) par catégorie d'outils, une expiration optionnelle et des listes d'entités propres au jeton (appliquées aux écritures, en plus des listes globales). Le secret est montré une seule fois à la création ; les droits sont plafonnés par les options `allow_*` à chaque requête, fermer un gate dégrade donc tous les jetons instantanément. La révocation tient en un clic.
 
 Forme legacy, toujours acceptée comme source d'import :
 
