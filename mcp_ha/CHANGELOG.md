@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 - 2026-08-26
+
+- **Fix** (#172, field report): the add-on could crashloop at startup with `database is locked` raised by the token store's WAL transition (seen on filesystems with fussy locking, or racing a dying predecessor). Triple belt: `busy_timeout = 5000` turns transient locks into short waits; `journal_mode = WAL` becomes best-effort (on refusal the store logs a warning and stays on the rollback journal, functionally identical for a token table); and if the on-disk database still cannot open, the server now boots on a loud in-memory fallback instead of dying, keeping the primary token working while stored tokens wait for the fix. The store is also closed properly on shutdown, shrinking the lock window on fast restarts.
+
 ## 1.0.0 - 2026-08-26
 
 First stable release. The fine-grained access epic (#164) closed the last structural gap: per-token category × level grants, hashed at rest, managed from the ingress page, capped by the option gates. 45 tools (27 read, 18 guarded write), 7 prompts, 4 resources, 351 tests.
