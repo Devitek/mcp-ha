@@ -41,7 +41,11 @@ profile mcp_ha flags=(attach_disconnected,mediate_deleted) {
 
     /usr/local/bin/node mr,
     /app/{,**} r,
-    /data/{,**} rw,
+    # k (file locks) is required by SQLite (#176): without it every
+    # fcntl(F_SETLK) on tokens.db comes back EACCES, which SQLite reports
+    # as "database is locked". Any new kernel capability the server uses
+    # must be checked against this profile (lesson of #176).
+    /data/{,**} rwk,
 
     /etc/hosts r,
     /etc/resolv.conf r,
