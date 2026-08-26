@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3 - 2026-08-26
+
+- **Fix, root cause of the whole `database is locked` saga** (#176, closing the #172/#174 investigation): the add-on's own AppArmor profile granted `/data` read-write but NOT the `k` (file lock) permission, so under HA OS every `fcntl(F_SETLK)` from SQLite came back EACCES, which SQLite reports as "database is locked": instant, permanent, invisible in local Docker (which does not enforce the profile). The profile now grants `rwk` on `/data`; after updating, the token store boots straight into WAL with no warning. The 1.0.1/1.0.2 nets (busy_timeout, best-effort WAL, no-locking reopen, in-memory fallback) stay in place for genuinely degraded environments, and CONTRIBUTING gained the lesson: every new kernel-facing capability must be checked against `apparmor.txt`.
+
 ## 1.0.2 - 2026-08-26
 
 - **Fix** (#174, follow-up of #172 with field logs): on filesystems that never grant the fcntl locks (every operation timing out with SQLITE_BUSY, typical of network mounts), the token store now reopens itself WITHOUT SQLite locking (`nolock=1`) instead of dying into the in-memory fallback. Safe by construction: the Supervisor runs a single add-on instance, and a phantom lock holder never commits anything. The warning names the detected filesystem (fs.statfs) so the real cause shows up in the log, and DOCS.md gained a troubleshooting entry. WAL is not attempted in no-locking mode (it requires locks by design).

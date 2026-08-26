@@ -57,6 +57,7 @@ Lessons learned from the 2026-08 audit, enforced from now on:
 - **Standalone containers differ from add-ons.** `bashio::config` queries the Supervisor API, not the local file: keep `run.sh` tolerant to a missing Supervisor so dev and CI smoke runs keep working.
 - **Interacting limits are tested together** (e.g. history point caps versus the global response byte cap).
 - **Every new option key needs a migration entry.** The Supervisor materializes defaults into stored user options at install time only and never injects keys added by updates: a newly required schema key bricks every config save on existing installs (issue #81). When adding an option to `config.yaml`, add a matching entry to `OPTION_MIGRATIONS` in `src/index.ts`.
+- **Every new kernel-facing capability must be checked against `apparmor.txt`.** The Supervisor enforces our AppArmor profile; local Docker does NOT, so a missing permission only breaks on real installs (issues #72 and #176: SQLite's file locks came back EACCES and surfaced as a misleading "database is locked"). When the server starts using file locks, mmap, new sockets or any new syscall family, grep the profile first.
 
 ## Definition of done
 
