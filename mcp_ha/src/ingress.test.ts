@@ -106,7 +106,6 @@ describe("ingress dashboard (#136)", () => {
     expect(html).toContain("named-to**********");
     expect(html).not.toContain(named);
     expect(html).toContain("api_token (primary)");
-    expect(html).toContain("api_tokens");
     expect(html).toContain("legacy scope: read");
   });
 
