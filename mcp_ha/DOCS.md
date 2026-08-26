@@ -15,7 +15,7 @@ Full documentation: [devitek.github.io/mcp-ha](https://devitek.github.io/mcp-ha/
 
 ## Status page
 
-The add-on adds an entry in the Home Assistant sidebar (and an **Open Web UI** button): a status page showing version, uptime, WebSocket state and active options, plus a **Connect a client** section with ready-to-copy configs for Claude Code, Claude Desktop and Gemini CLI, a **Tokens** tab to create fine-grained tokens (per-category access levels, stored hashed, secret shown once, one-click revocation), **usage counters** (tool calls since start, per token) and the **recent write audit** (last 50 entries; MCP clients can never read or clear the audit, only you can, behind your HA session). The snippets embed the URL you browse HA through and your API token, masked on screen (the Copy button always copies the full working version). The page is served through HA ingress: your HA session authenticates you, the same trust level as the Configuration tab where the token already lives. The Supervisor token never appears.
+The add-on adds an entry in the Home Assistant sidebar (and an **Open Web UI** button): a status page showing version, uptime, WebSocket state and active options, plus a **Connect a client** section with ready-to-copy configs for Claude Code, Claude Desktop, Gemini CLI, OpenCode (token through an environment variable) and any generic MCP client, a **Tokens** tab to create fine-grained tokens (per-category access levels, stored hashed, secret shown once, one-click revocation), **usage counters** (tool calls since start, per token) and the **recent write audit** (last 50 entries; MCP clients can never read or clear the audit, only you can, behind your HA session). The snippets embed the URL you browse HA through and your API token, masked on screen (the Copy button always copies the full working version). The page is served through HA ingress: your HA session authenticates you, the same trust level as the Configuration tab where the token already lives. The Supervisor token never appears.
 
 ## Options
 
@@ -71,6 +71,25 @@ claude mcp add --transport http home-assistant \
   }
 }
 ```
+
+**OpenCode** (`opencode.json`), the exemplary setup: the token stays in an environment variable (`export HA_MCP_TOKEN="YOUR_TOKEN"` in your shell profile), never in the file:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "home-assistant": {
+      "type": "remote",
+      "url": "http://HA_IP:9583/mcp",
+      "enabled": true,
+      "oauth": false,
+      "headers": { "Authorization": "Bearer {env:HA_MCP_TOKEN}" }
+    }
+  }
+}
+```
+
+**Any other MCP client**: transport Streamable HTTP (JSON-RPC over POST), endpoint `http://HA_IP:9583/mcp`, header `Authorization: Bearer YOUR_TOKEN` on every request. Stateless by default; with `enable_sessions`, an `initialize` opens an SSE session.
 
 ## Security
 

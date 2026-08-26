@@ -49,9 +49,45 @@ Dans `~/.gemini/settings.json` :
 }
 ```
 
+## OpenCode
+
+La bonne façon : le jeton vit dans une variable d'environnement, jamais dans le fichier de config. Exportez-le depuis votre profil shell :
+
+```sh
+export HA_MCP_TOKEN="VOTRE_JETON"
+```
+
+Puis dans `opencode.json` (racine du projet, ou `~/.config/opencode/opencode.json`), avec la substitution native `{env:...}` d'OpenCode :
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "home-assistant": {
+      "type": "remote",
+      "url": "http://IP_DE_HA:9583/mcp",
+      "enabled": true,
+      "oauth": false,
+      "headers": { "Authorization": "Bearer {env:HA_MCP_TOKEN}" }
+    }
+  }
+}
+```
+
+Le `oauth: false` compte : l'add-on utilise des jetons bearer statiques (voir [pourquoi pas OAuth](https://github.com/Devitek/mcp-ha/issues/84)), il évite qu'OpenCode tente une découverte OAuth contre l'endpoint.
+
 ## Tout autre client MCP
 
-Tout client qui parle MCP en Streamable HTTP se configure pareil : endpoint `http://IP_DE_HA:9583/mcp`, en-tête `Authorization: Bearer VOTRE_JETON`. Le serveur est stateless : pas de négociation de session, chaque POST est indépendant.
+Tout client qui parle MCP en **Streamable HTTP** se configure de la même façon :
+
+| | |
+|---|---|
+| Transport | Streamable HTTP (JSON-RPC en POST) |
+| Endpoint | `http://IP_DE_HA:9583/mcp` |
+| Authentification | En-tête `Authorization: Bearer VOTRE_JETON` sur chaque requête |
+| Mode | Stateless par défaut : chaque POST est indépendant, pas de négociation de session. Avec `enable_sessions: true`, un `initialize` ouvre une session SSE (abonnements, élicitation). |
+
+Si votre client supporte la substitution de variables d'environnement dans sa config, préférez-la au jeton collé dans un fichier, comme l'exemple OpenCode ci-dessus.
 
 ## Depuis l'extérieur de votre réseau
 

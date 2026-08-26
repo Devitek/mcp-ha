@@ -67,7 +67,13 @@ describe("ingress dashboard (#136)", () => {
     expect(html).toContain("claude mcp add --transport http home-assistant");
     expect(html).toContain("mcp-remote");
     expect(html).toContain("httpUrl");
-    expect(html.match(/___TOKEN___/g)!.length).toBeGreaterThanOrEqual(3);
+    // OpenCode block (#178): token through an env var, never in the JSON.
+    expect(html).toContain("export HA_MCP_TOKEN=");
+    expect(html).toContain("Bearer {env:HA_MCP_TOKEN}");
+    expect(html).toContain("&quot;oauth&quot;: false");
+    // Generic block for any Streamable HTTP client.
+    expect(html).toContain("Streamable HTTP (JSON-RPC over POST)");
+    expect(html.match(/___TOKEN___/g)!.length).toBeGreaterThanOrEqual(5);
     // The real token feeds the page script exactly once (HA session trust).
     expect(html.split(SECRET).length - 1).toBe(1);
     expect(html).toContain("supersec**********");
