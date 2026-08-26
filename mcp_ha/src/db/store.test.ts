@@ -71,28 +71,31 @@ describe("TokenStore (#166)", () => {
     expect((await s.list())[0]!.lastUsedAt).toBe(first); // second hit inside the window: no write
   });
 
-  it("fails open cleanly under an exclusive lock, then recovers once released (#172)", async () => {
+  it("recovers from persistent foreign locks by reopening without SQLite locking (#172/#174)", async () => {
     const { mkdtemp, rm } = await import("node:fs/promises");
     const { tmpdir } = await import("node:os");
     const { join } = await import("node:path");
     const { DatabaseSync } = await import("node:sqlite");
     const dir = await mkdtemp(join(tmpdir(), "mcpha-store-lock-"));
     const file = join(dir, "tokens.db");
-    // Another handle holds an exclusive lock: the WAL transition is refused
-    // (tolerated with a warning) and the migrations hit SQLITE_BUSY, so open
-    // rejects with the readable driver error. That rejection is exactly what
-    // triggers the in-memory fallback in main(). Short timeout for speed.
+    // Another handle holds an exclusive lock and never lets go: the exact
+    // field profile of a filesystem with broken locks. The standard open
+    // times out (short budget for test speed), then the nolock reopen must
+    // succeed and be fully functional WHILE the foreign lock is still held.
     const blocker = new DatabaseSync(file);
     blocker.exec("BEGIN EXCLUSIVE;");
-    // drizzle wraps the driver's SQLITE_BUSY in a "Failed query" error
-    await expect(TokenStore.open(file, { busyTimeoutMs: 50 })).rejects.toThrow(/Failed query|locked|busy/i);
-    blocker.exec("COMMIT;");
-    blocker.close();
-    // Lock gone: the very same path opens and works.
     const s = await TokenStore.open(file, { busyTimeoutMs: 50 });
     const { token } = await s.create({ name: "post-lock", grants: readOnlyGrants() });
     expect((await s.verify(token))?.denied).toBeNull();
     s.close();
+    // A phantom lock holder never commits anything (that is what makes the
+    // nolock reopen safe); rollback models its release.
+    blocker.exec("ROLLBACK;");
+    blocker.close();
+    // And a plain reopen still works once the filesystem behaves again.
+    const healthy = await TokenStore.open(file, { busyTimeoutMs: 50 });
+    expect(await healthy.list()).toHaveLength(1);
+    healthy.close();
     await rm(dir, { recursive: true, force: true });
   });
 
