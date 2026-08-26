@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AddonConfig } from "./config.js";
-import { entityReadVisible, entityWriteAllowed, globToRegex, maskSecret, matchesAny, safeEqual, serviceAllowed } from "./safety.js";
+import { entityReadVisible, entityWriteAllowed, entityWriteAllowedFor, globToRegex, maskSecret, matchesAny, safeEqual, serviceAllowed } from "./safety.js";
 
 function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
   return {
@@ -74,6 +74,29 @@ describe("entityWriteAllowed", () => {
     const v = entityWriteAllowed(c, "lock.entrance");
     expect(v.allowed).toBe(false);
     expect(v.reason).toContain("lock.entrance");
+  });
+});
+
+describe("entityWriteAllowedFor: per-token lists on top of the global ones (#167)", () => {
+  it("requires BOTH allowlists to match (intersection, not concat)", () => {
+    const ctx = { cfg: cfg({ entityAllowlist: ["light.*", "switch.*"] }), tokenEntityLists: { allow: ["light.*"], deny: null } };
+    expect(entityWriteAllowedFor(ctx, "light.kitchen").allowed).toBe(true);
+    // globally allowed but outside the token's own allowlist
+    const v = entityWriteAllowedFor(ctx, "switch.tv");
+    expect(v.allowed).toBe(false);
+    expect(v.reason).toContain("token's entity allowlist");
+  });
+
+  it("token denylist wins even over its own allowlist", () => {
+    const ctx = { cfg: cfg(), tokenEntityLists: { allow: ["light.*"], deny: ["light.baby_room"] } };
+    expect(entityWriteAllowedFor(ctx, "light.baby_room").allowed).toBe(false);
+    expect(entityWriteAllowedFor(ctx, "light.living_room").allowed).toBe(true);
+  });
+
+  it("without token lists, behaves exactly like the global check", () => {
+    const ctx = { cfg: cfg({ entityDenylist: ["lock.*"] }) };
+    expect(entityWriteAllowedFor(ctx, "lock.entrance").allowed).toBe(false);
+    expect(entityWriteAllowedFor(ctx, "light.kitchen").allowed).toBe(true);
   });
 });
 

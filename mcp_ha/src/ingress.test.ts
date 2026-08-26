@@ -107,7 +107,7 @@ describe("ingress dashboard (#136)", () => {
     expect(html).not.toContain(named);
     expect(html).toContain("api_token (primary)");
     expect(html).toContain("api_tokens");
-    expect(html).toContain(">read</span>");
+    expect(html).toContain("legacy scope: read");
   });
 
   it("derives the MCP URL from the browsing host and rejects proxy internals (#92)", async () => {
@@ -194,5 +194,86 @@ describe("ingress dashboard (#136)", () => {
     const base = await serve(createIngressHandler(ctx(), Date.now(), { auditPath: "/nonexistent-mcpha/audit.log" }));
     const html = await (await fetch(`${base}/`)).text();
     expect(html).toContain("No audit entries yet");
+  });
+});
+
+describe("token management on the ingress (#167)", () => {
+  async function tokenSetup(cfgPartial: Partial<AddonConfig> = {}) {
+    const { TokenStore } = await import("./db/store.js");
+    const store = await TokenStore.open(":memory:");
+    const base = await serve(createIngressHandler(ctx(cfgPartial), Date.now(), { store }));
+    const html = await (await fetch(`${base}/`)).text();
+    const csrf = html.match(/name="csrf" value="([0-9a-f]{32})"/)?.[1] ?? "";
+    const post = (fields: Record<string, string>) =>
+      fetch(`${base}/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(fields).toString(),
+      });
+    return { store, base, csrf, post };
+  }
+
+  it("creates a token from the form and shows the secret exactly once", async () => {
+    const { store, base, csrf, post } = await tokenSetup({ allowWrite: true });
+    const res = await post({
+      csrf,
+      mcpha_action: "create",
+      name: "voice-pipeline",
+      expires: "30d",
+      grant_entities: "read",
+      grant_services: "write",
+      entity_denylist: "lock.*\n",
+    });
+    const html = await res.text();
+    expect(html.match(/mcpha_[A-Za-z0-9_-]{43}/g)!.length).toBe(1);
+    expect(html).toContain("Copy it NOW");
+    const records = await store.list();
+    expect(records).toHaveLength(1);
+    expect(records[0]!.grants.services).toBe("write");
+    expect(records[0]!.entityDenylist).toEqual(["lock.*"]);
+    expect(records[0]!.expiresAt).not.toBeNull();
+    // the next GET renders prefix and metadata only, never the secret again
+    const after = await (await fetch(`${base}/`)).text();
+    expect(after).not.toMatch(/mcpha_[A-Za-z0-9_-]{43}/);
+    expect(after).toContain(`${records[0]!.prefix}…`);
+    expect(after).toContain("services: write");
+  });
+
+  it("refuses a wrong CSRF value and grants above the option gates", async () => {
+    const { store, csrf, post } = await tokenSetup({ allowWrite: false });
+    const bad = await (await post({ csrf: "0".repeat(32), mcpha_action: "create", name: "x", grant_entities: "read" })).text();
+    expect(bad).toContain("Stale form");
+    const over = await (await post({ csrf, mcpha_action: "create", name: "x", grant_services: "write" })).text();
+    expect(over).toContain("exceed the current option gates");
+    expect(over).toContain("allow_write");
+    expect(await store.list()).toHaveLength(0);
+  });
+
+  it("revokes from the list with an audited event", async () => {
+    const { store, base, csrf, post } = await tokenSetup();
+    const { record } = await store.create({ name: "goner", grants: { entities: "read" } });
+    const html = await (await post({ csrf, mcpha_action: "revoke", id: record.id })).text();
+    expect(html).toContain("revoked");
+    expect((await store.list())[0]!.revokedAt).not.toBeNull();
+    const after = await (await fetch(`${base}/`)).text();
+    expect(after).toContain(">revoked</span>");
+  });
+
+  it("greys matrix levels above the gates and shows capped-by on over-granted tokens", async () => {
+    const { store, base } = await tokenSetup({ allowWrite: true, allowConfigWrite: false });
+    // manage exists for automations but sits above the current gates
+    const html = await (await fetch(`${base}/`)).text();
+    expect(html).toMatch(/name="grant_automations" value="manage" disabled/);
+    expect(html).toMatch(/name="grant_automations" value="write"(?! disabled)/);
+    // a stored token granted manage elsewhere shows the capping gate
+    await store.create({ name: "was-manager", grants: { automations: "manage" } });
+    const after = await (await fetch(`${base}/`)).text();
+    expect(after).toContain("capped by allow_config_write: off");
+  });
+
+  it("answers 405 to POST when no store is wired", async () => {
+    const base = await serve(createIngressHandler(ctx()));
+    const res = await fetch(`${base}/`, { method: "POST", body: "x=1" });
+    expect(res.status).toBe(405);
   });
 });

@@ -1,5 +1,5 @@
 import { audit } from "../logger.js";
-import { entityWriteAllowed, needsConfirmation, serviceAllowed } from "../safety.js";
+import { entityWriteAllowedFor, needsConfirmation, serviceAllowed } from "../safety.js";
 import { CONFIRM_TTL_SECONDS, ConfirmationStore } from "../confirm.js";
 import type { ToolContext } from "../context.js";
 
@@ -52,13 +52,17 @@ export async function guardedServiceCall(ctx: ToolContext, req: WriteRequest): P
   collect(req.data?.entity_id);
 
   for (const id of ids) {
-    const v = entityWriteAllowed(cfg, id);
+    const v = entityWriteAllowedFor(ctx, id);
     if (!v.allowed) deny(v.reason ?? `entity denied: ${id}`);
   }
 
   // Targeting by area or device would bypass the entity lists: refuse it as
   // soon as any entity restriction is configured.
-  const hasRestrictions = cfg.entityAllowlist.length > 0 || cfg.entityDenylist.length > 0;
+  const hasRestrictions =
+    cfg.entityAllowlist.length > 0 ||
+    cfg.entityDenylist.length > 0 ||
+    (ctx.tokenEntityLists?.allow?.length ?? 0) > 0 ||
+    (ctx.tokenEntityLists?.deny?.length ?? 0) > 0;
   if (hasRestrictions && (req.target?.area_id || req.target?.device_id)) {
     deny("entity restrictions are configured, target explicit entity_id values instead of area_id or device_id");
   }

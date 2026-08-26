@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { ToolRegistrar } from "../registry.js";
 import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
-import { entityWriteAllowed } from "../../safety.js";
+import { entityWriteAllowedFor } from "../../safety.js";
 import { guardedServiceCall } from "../writeflow.js";
 import { audit } from "../../logger.js";
 
@@ -48,7 +48,7 @@ export function registerSceneTools(server: ToolRegistrar, ctx: ToolContext): voi
       if (!sceneId) throw new Error("the name must contain at least one alphanumeric character");
       // The entity lists bound what is capturable: a snapshot reads state.
       for (const id of entities) {
-        const v = entityWriteAllowed(ctx.cfg, id);
+        const v = entityWriteAllowedFor(ctx, id);
         if (!v.allowed) {
           audit({ client: ctx.client ?? "default", tool: "ha_snapshot_scene", entity_id: id, allowed: false, reason: v.reason });
           throw new Error(v.reason ?? `entity denied: ${id}`);

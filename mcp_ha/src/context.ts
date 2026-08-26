@@ -4,6 +4,7 @@ import type { HaHttp } from "./ha/http.js";
 import type { Catalog } from "./ha/catalog.js";
 import type { ConfirmationStore } from "./confirm.js";
 import type { Grants } from "./mcp/registry.js";
+import type { TokenEntityLists } from "./safety.js";
 
 /** Shared dependencies injected into every tool registration. */
 export interface ToolContext {
@@ -22,6 +23,8 @@ export interface ToolContext {
    * the option gates and canWrite; per-token grants arrive with #166/#167.
    */
   grants?: Grants;
+  /** Per-request: the token's own entity lists (#167), on top of the global ones. */
+  tokenEntityLists?: TokenEntityLists;
   /** Per-request: name of the authenticated token, for the audit trail (#85). */
   client?: string;
   /** True when serving a long-lived session (SSE stream available, #90). */

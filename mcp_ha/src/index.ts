@@ -5,7 +5,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { effectiveTokens, loadConfig, VERSION, type AddonConfig, type ApiToken } from "./config.js";
 import { audit, enableAuditFile, getLogLevel, log } from "./logger.js";
 import { AuthRateLimiter } from "./ratelimit.js";
-import { safeEqual } from "./safety.js";
+import { safeEqual, type TokenEntityLists } from "./safety.js";
 import { HaWsClient } from "./ha/ws.js";
 import { HaHttp } from "./ha/http.js";
 import { Catalog } from "./ha/catalog.js";
@@ -169,7 +169,7 @@ export function createHandler(
     // then the store, looked up by sha256 so timing never correlates with
     // the secret. Store tokens carry real Grants, capped by the option
     // gates on every request: closing a gate degrades them instantly.
-    let identity: { name: string; scope: string; grants?: Grants } | null = null;
+    let identity: { name: string; scope: string; grants?: Grants; entityLists?: TokenEntityLists } | null = null;
     const configIdentity = presented ? authenticate(presented, tokens) : null;
     if (configIdentity) {
       identity = { name: configIdentity.name, scope: configIdentity.scope };
@@ -179,6 +179,9 @@ export function createHandler(
         audit({ event: "token_refused", client: v.record.name, reason: v.denied });
       } else if (v) {
         identity = { name: v.record.name, scope: "grants", grants: capGrants(v.record.grants, cfg) };
+        if (v.record.entityAllowlist || v.record.entityDenylist) {
+          identity.entityLists = { allow: v.record.entityAllowlist, deny: v.record.entityDenylist };
+        }
       }
     }
     if (!identity) {
@@ -194,6 +197,7 @@ export function createHandler(
       ...ctx,
       client: identity.name,
       ...(identity.grants ? { grants: identity.grants } : { canWrite: identity.scope === "write" }),
+      ...(identity.entityLists ? { tokenEntityLists: identity.entityLists } : {}),
     };
 
     try {
@@ -415,7 +419,7 @@ async function main(): Promise<void> {
   // authenticates HA users to it.
   const ingressServer =
     cfg.supervisorToken || process.env.INGRESS_TEST === "true"
-      ? createServer(createIngressHandler(ctx, Date.now(), { usage }))
+      ? createServer(createIngressHandler(ctx, Date.now(), { usage, store }))
       : null;
   ingressServer?.listen(INGRESS_PORT, "0.0.0.0", () => {
     log.info(`Ingress status page listening on port ${INGRESS_PORT}`);

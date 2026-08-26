@@ -6,7 +6,7 @@ import type { ToolContext } from "../../context.js";
 import { safe } from "../helpers.js";
 import { CONFIRM_TTL_SECONDS, ConfirmationStore } from "../../confirm.js";
 import { audit } from "../../logger.js";
-import { entityWriteAllowed } from "../../safety.js";
+import { entityWriteAllowedFor } from "../../safety.js";
 
 /**
  * Minimal unified diff (LCS on lines, full context, no hunks): the configs
@@ -374,7 +374,7 @@ export function registerConfigWriteTools(server: ToolRegistrar, ctx: ToolContext
    * the deletion reversible through ha_create_automation.
    */
   async function guardedDelete(req: { tool: string; kind: "automation" | "script"; entityId: string; dry_run?: boolean | undefined; confirm_token?: string | undefined }): Promise<unknown> {
-    const verdict0 = entityWriteAllowed(ctx.cfg, req.entityId);
+    const verdict0 = entityWriteAllowedFor(ctx, req.entityId);
     if (!verdict0.allowed) {
       audit({ client: client(), tool: req.tool, entity_id: req.entityId, allowed: false, reason: verdict0.reason });
       throw new Error(verdict0.reason ?? `entity denied: ${req.entityId}`);
