@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.0 - 2026-08-26
+
+- **New** (#178): two onboarding blocks join the ingress Connect tab, the clients guide (EN/FR) and DOCS.md. **OpenCode**, shown the exemplary way: the token lives in an environment variable and reaches `opencode.json` through OpenCode's native `{env:HA_MCP_TOKEN}` substitution, with `oauth: false` so no OAuth discovery is attempted against our static-bearer endpoint. And a **generic MCP client** block: transport, endpoint, auth header and the stateless-vs-sessions behaviour, for everything not listed by name.
+
 ## 1.0.3 - 2026-08-26
 
 - **Fix, root cause of the whole `database is locked` saga** (#176, closing the #172/#174 investigation): the add-on's own AppArmor profile granted `/data` read-write but NOT the `k` (file lock) permission, so under HA OS every `fcntl(F_SETLK)` from SQLite came back EACCES, which SQLite reports as "database is locked": instant, permanent, invisible in local Docker (which does not enforce the profile). The profile now grants `rwk` on `/data`; after updating, the token store boots straight into WAL with no warning. The 1.0.1/1.0.2 nets (busy_timeout, best-effort WAL, no-locking reopen, in-memory fallback) stay in place for genuinely degraded environments, and CONTRIBUTING gained the lesson: every new kernel-facing capability must be checked against `apparmor.txt`.

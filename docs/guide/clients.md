@@ -49,9 +49,45 @@ In `~/.gemini/settings.json`:
 }
 ```
 
+## OpenCode
+
+The clean way: the token lives in an environment variable, never in the config file. Export it from your shell profile:
+
+```sh
+export HA_MCP_TOKEN="YOUR_TOKEN"
+```
+
+Then in `opencode.json` (project root, or `~/.config/opencode/opencode.json`), using OpenCode's native `{env:...}` substitution:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "home-assistant": {
+      "type": "remote",
+      "url": "http://HA_IP:9583/mcp",
+      "enabled": true,
+      "oauth": false,
+      "headers": { "Authorization": "Bearer {env:HA_MCP_TOKEN}" }
+    }
+  }
+}
+```
+
+`oauth: false` matters: the add-on uses static bearer tokens (see [why not OAuth](https://github.com/Devitek/mcp-ha/issues/84)), so it tells OpenCode not to attempt an OAuth discovery against the endpoint.
+
 ## Any other MCP client
 
-Anything that supports MCP over Streamable HTTP works the same way: endpoint `http://HA_IP:9583/mcp`, header `Authorization: Bearer YOUR_TOKEN`. The server is stateless: no session negotiation, each POST is independent.
+Anything that speaks MCP over **Streamable HTTP** works the same way:
+
+| | |
+|---|---|
+| Transport | Streamable HTTP (JSON-RPC over POST) |
+| Endpoint | `http://HA_IP:9583/mcp` |
+| Authentication | `Authorization: Bearer YOUR_TOKEN` header on every request |
+| Mode | Stateless by default: each POST is independent, no session negotiation. With `enable_sessions: true`, an `initialize` opens an SSE session (subscriptions, elicitation). |
+
+If your client supports environment variable substitution in its config, prefer it over pasting the token in a file, like the OpenCode example above.
 
 ## From outside your network
 

@@ -353,6 +353,21 @@ ${safetyRow("allow / deny patterns", `<span style="font-size:12px;${MONO};color:
         note: "In ~/.gemini/settings.json:",
         tpl: `{\n  "mcpServers": {\n    "home-assistant": {\n      "httpUrl": "${mcpUrl}",\n      "headers": { "Authorization": "Bearer ___TOKEN___" }\n    }\n  }\n}`,
       },
+      {
+        // The exemplary setup (#178): the token lives in an environment
+        // variable, OpenCode's {env:...} substitution keeps it out of the
+        // config file; oauth:false stops any OAuth discovery (static bearer).
+        id: "opencode",
+        label: "OpenCode",
+        note: "Export the token in your shell profile, then reference it from opencode.json (project root or ~/.config/opencode/):",
+        tpl: `export HA_MCP_TOKEN="___TOKEN___"\n\n// opencode.json\n{\n  "$schema": "https://opencode.ai/config.json",\n  "mcp": {\n    "home-assistant": {\n      "type": "remote",\n      "url": "${mcpUrl}",\n      "enabled": true,\n      "oauth": false,\n      "headers": { "Authorization": "Bearer {env:HA_MCP_TOKEN}" }\n    }\n  }\n}`,
+      },
+      {
+        id: "generic",
+        label: "Any MCP client",
+        note: "Anything speaking MCP over Streamable HTTP works; prefer an environment variable for the token when your client supports it:",
+        tpl: `Transport:  Streamable HTTP (JSON-RPC over POST)\nEndpoint:   ${mcpUrl}\nAuth:       Authorization: Bearer ___TOKEN___\nMode:       stateless by default; with enable_sessions, initialize opens an SSE session`,
+      },
     ];
     const clientTabs = blocks
       .map((b, i) => `<button class="ctab${i === 0 ? " on" : ""}" data-client="${b.id}">${esc(b.label)}</button>`)
