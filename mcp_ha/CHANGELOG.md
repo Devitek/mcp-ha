@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.0 - 2026-08-26
+
+First stable release. The fine-grained access epic (#164) closed the last structural gap: per-token category × level grants, hashed at rest, managed from the ingress page, capped by the option gates. 45 tools (27 read, 18 guarded write), 7 prompts, 4 resources, 351 tests.
+
+- **Change**: the Tokens tab adopts the final mockup design: five-column table (Name / Token / Grants / Lifecycle) with status pills (active / expired / revoked) under the lifecycle dates, the "capped by allow_*: off" note beneath the token prefix, a framed grants matrix with its own header row, restyled fields and buttons, and the one-time secret banner full width with its Copy button. The add-on icon stays the page logo (the mockup placeholder is only the no-icon fallback).
+- No functional change: same flows, same guards, same tests plus the mockup assertions.
+
 ## 0.33.0 - 2026-08-26
 
 Token management UI, closing the fine-grained access epic (#164, lot C #167).

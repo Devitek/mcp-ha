@@ -119,7 +119,7 @@ async function handleTokenPost(req: IncomingMessage, store: TokenStore, cfg: Add
     const record = (await store.list()).find((r) => r.id === id);
     if (!record || !(await store.revoke(id))) return { kind: "error", text: "Unknown token id." };
     audit({ event: "token_revoked", client: record.name });
-    return { kind: "revoked", text: `Token "${record.name}" revoked; requests with it now get a 401.` };
+    return { kind: "revoked", text: `Token ${record.name} revoked. Existing clients using it are rejected immediately.` };
   }
   if (action === "create") {
     const grants: Partial<Grants> = {};
@@ -368,69 +368,95 @@ ${safetyRow("allow / deny patterns", `<span style="font-size:12px;${MONO};color:
 
     // --- Tokens (#85/#167): the primary stays masked; store tokens only
     // ever exist as prefix + metadata, the secret was shown once.
+    const TOKENS_GRID = "display:grid;grid-template-columns:1.1fr 1.4fr 2fr 1.6fr .9fr;gap:12px";
     const legacyRows = effectiveTokens(cfg)
       .map(
         (t, i) =>
-          `<div style="display:grid;grid-template-columns:1.2fr 2fr 1.4fr 1fr .6fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:13px;font-weight:600;${MONO}">${esc(t.name)}</span><span style="font-size:12.5px;${MONO};color:var(--muted)">${esc(maskSecret(t.token))}</span><span style="font-size:12px;color:var(--muted)">${i === 0 ? "full access (bootstrap and recovery)" : `legacy scope: ${esc(t.scope)}`}</span><span style="font-size:12px;color:var(--muted)">${i === 0 ? "api_token (primary)" : "api_tokens"}</span><span></span></div>`
+          `<div style="${TOKENS_GRID};padding:12px 16px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:13px;font-weight:600;${MONO}">${esc(i === 0 ? "api_token (primary)" : t.name)}</span><span style="font-size:12.5px;${MONO};color:var(--muted)">${esc(maskSecret(t.token))}</span><span style="font-size:12px;color:var(--muted);line-height:1.5">${i === 0 ? "full access (bootstrap and recovery)" : `legacy scope: ${esc(t.scope)}`}</span><span style="font-size:11.5px;color:var(--muted)">—</span><span></span></div>`
       )
       .join("");
     const storeRecords = opts.store ? await opts.store.list() : [];
     const now = Date.now();
+    const badgePill = (kind: "active" | "revoked" | "expired"): string => {
+      const base = "font-size:11px;font-weight:700;border-radius:12px;padding:1px 10px;";
+      if (kind === "active") return base + "color:var(--ok);background:var(--ok-bg);border:1px solid var(--ok-border)";
+      if (kind === "revoked") return base + "color:var(--err);background:none;border:1px solid var(--err)";
+      return base + "color:var(--warn);background:var(--warn-bg);border:1px solid var(--warn-border)";
+    };
     const storeRows = storeRecords
       .map((r) => {
         const expired = r.expiresAt !== null && Date.parse(r.expiresAt) <= now;
-        const status = r.revokedAt
-          ? `<span style="font-size:11px;font-weight:700;color:var(--err)">revoked</span>`
-          : expired
-            ? `<span style="font-size:11px;font-weight:700;color:var(--warn)">expired</span>`
-            : `<span style="font-size:11px;font-weight:700;color:var(--ok)">active</span>`;
+        const state = r.revokedAt ? "revoked" : expired ? "expired" : "active";
         const capped = cappedGates(r.grants, cfg);
         const cappedNote = capped.length
-          ? `<div style="font-size:11px;color:var(--warn)">capped by ${esc(capped.map((g) => `${g}: off`).join(", "))}</div>`
+          ? `<span style="font-size:11px;${MONO};color:var(--warn)">capped by ${esc(capped.map((g) => `${g}: off`).join(", "))}</span>`
           : "";
-        const dates = `created ${esc(r.createdAt.slice(0, 10))}${r.expiresAt ? ` · expires ${esc(r.expiresAt.slice(0, 10))}` : ""}${r.lastUsedAt ? ` · last used ${esc(r.lastUsedAt.slice(0, 10))}` : " · never used"}`;
-        const revokeForm = r.revokedAt
-          ? ""
-          : `<form method="post" action="#tokens" style="margin:0" onsubmit="return confirm('Revoke this token? Clients using it will get a 401.')"><input type="hidden" name="csrf" value="${CSRF_TOKEN}"><input type="hidden" name="mcpha_action" value="revoke"><input type="hidden" name="id" value="${esc(r.id)}"><button class="btn" type="submit">Revoke</button></form>`;
-        return `<div style="display:grid;grid-template-columns:1.2fr 2fr 1.4fr 1fr .6fr;gap:12px;padding:12px 16px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:13px;font-weight:600;${MONO}">${esc(r.name)}</span><div><div style="font-size:12.5px;${MONO};color:var(--muted)">${esc(r.prefix)}…</div>${cappedNote}</div><span style="font-size:12px;color:var(--muted)">${esc(grantsSummary(r.grants))}</span><span style="font-size:11px;color:var(--muted)">${dates}</span><span style="display:flex;align-items:center;gap:8px;justify-content:end">${status}${revokeForm}</span></div>`;
+        const lifecycle = r.revokedAt
+          ? `created ${esc(r.createdAt.slice(0, 10))} · revoked ${esc(r.revokedAt.slice(0, 10))}`
+          : `created ${esc(r.createdAt.slice(0, 10))}${expired ? ` · expired ${esc(r.expiresAt!.slice(0, 10))}` : r.expiresAt ? ` · expires ${esc(r.expiresAt.slice(0, 10))}` : ""}${r.lastUsedAt ? ` · last used ${esc(r.lastUsedAt.slice(0, 10))}` : " · never used"}`;
+        const revokeForm =
+          state === "active"
+            ? `<form method="post" action="#tokens" style="margin:0;justify-self:end" onsubmit="return confirm('Revoke this token? Clients using it will be rejected immediately.')"><input type="hidden" name="csrf" value="${CSRF_TOKEN}"><input type="hidden" name="mcpha_action" value="revoke"><input type="hidden" name="id" value="${esc(r.id)}"><button type="submit" style="font-family:inherit;font-size:12px;font-weight:600;padding:5px 12px;border:1px solid var(--btn-border);border-radius:6px;background:none;color:var(--err);cursor:pointer">Revoke</button></form>`
+            : "";
+        return `<div style="${TOKENS_GRID};padding:12px 16px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:13px;font-weight:600;${MONO}">${esc(r.name)}</span><div style="display:flex;flex-direction:column;gap:3px"><span style="font-size:12.5px;${MONO};color:var(--muted)">${esc(r.prefix)}…</span>${cappedNote}</div><span style="font-size:12px;color:var(--muted);line-height:1.5">${esc(grantsSummary(r.grants))}</span><div style="display:flex;flex-direction:column;gap:4px;align-items:flex-start"><span style="font-size:11.5px;color:var(--muted)">${lifecycle}</span><span style="${badgePill(state)}">${state}</span></div>${revokeForm}</div>`;
       })
       .join("");
 
-    // Creation form matrix: one row per category, radios per level; a level
-    // above the option gates is disabled here AND refused server-side.
+    // Creation form matrix (mockup layout): a framed grid with a header row
+    // on the panel background; one row per category, radios per level. A
+    // level a category lacks shows a dot; a level above the option gates is
+    // disabled here AND refused server-side.
     const ceiling = grantsFromConfig(cfg, true);
+    const MATRIX_HEAD = "padding:8px 0;background:var(--bg);border-bottom:1px solid var(--border);text-align:center;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600";
+    const matrixHeader =
+      `<div style="padding:8px 12px;background:var(--bg);border-bottom:1px solid var(--border)"></div>` +
+      LEVELS.map((l) => `<div style="${MATRIX_HEAD}">${l}</div>`).join("");
     const matrixRows = CATEGORIES.map((c) => {
       const available = categoryLevels(c);
+      const label = `<div style="border-top:1px solid var(--row-border);padding:7px 12px;display:flex;align-items:center"><span style="${MONO};font-size:12.5px;color:var(--text)">${esc(c)}</span></div>`;
       const cells = LEVELS.map((l) => {
-        if (!available.includes(l)) return `<span style="color:var(--faint);text-align:center">·</span>`;
+        const cell = "border-top:1px solid var(--row-border);padding:7px 0;display:flex;align-items:center;justify-content:center";
+        if (!available.includes(l)) return `<div style="${cell}"><span style="color:var(--faint);font-size:13px">·</span></div>`;
         const over = LEVELS.indexOf(l) > LEVELS.indexOf(ceiling[c]);
-        return `<label style="display:flex;justify-content:center;${over ? "opacity:.35" : "cursor:pointer"}" ${over ? `title="above the current allow_* gates"` : ""}><input type="radio" name="grant_${c}" value="${l}"${l === "none" ? " checked" : ""}${over ? " disabled" : ""}></label>`;
+        return `<div style="${cell}"${over ? ` title="above the current allow_* gates"` : ""}><input type="radio" name="grant_${c}" value="${l}"${l === "none" ? " checked" : ""}${over ? " disabled" : ""} style="accent-color:var(--accent);${over ? "opacity:.35;cursor:not-allowed" : "cursor:pointer"}"></div>`;
       }).join("");
-      return `<div style="display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:6px;padding:6px 12px;border-bottom:1px solid var(--row-border);align-items:center"><span style="font-size:12.5px;${MONO}">${esc(c)}</span>${cells}</div>`;
+      return label + cells;
     }).join("");
+    // Flash banners, straight from the Claude Design mockup (#167 follow-up):
+    // success carries the one-time secret full-width; errors sit on the warn
+    // background; revocations stay a plain card.
     const flashHtml = !flash
       ? ""
       : flash.kind === "created"
-        ? `<div style="${CARD};margin-top:20px;padding:14px 16px;border-color:var(--ok-border);background:var(--ok-bg)"><div style="font-size:13px;font-weight:700;color:var(--ok)">${esc(flash.text)}</div><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><code id="newsecret" style="${MONO};font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--code);overflow-x:auto">${esc(flash.secret ?? "")}</code><button class="btn" id="copysecret">Copy</button></div></div>`
-        : `<div style="${CARD};margin-top:20px;padding:12px 16px;border-color:${flash.kind === "error" ? "var(--warn-border)" : "var(--ok-border)"}"><span style="font-size:13px;font-weight:600;color:${flash.kind === "error" ? "var(--warn)" : "var(--ok)"}">${esc(flash.text)}</span></div>`;
+        ? `<div style="background:var(--ok-bg);border:1px solid var(--ok-border);border-radius:8px;padding:14px 16px;margin-top:20px"><div style="font-size:13px;font-weight:700;color:var(--ok)">${esc(flash.text)}</div><div style="display:flex;align-items:center;gap:10px;margin-top:10px"><code id="newsecret" style="flex:1;${MONO};font-size:12.5px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:var(--text);overflow-x:auto;white-space:nowrap">${esc(flash.secret ?? "")}</code><button id="copysecret" style="font-family:inherit;font-size:12px;font-weight:600;padding:7px 14px;border:1px solid var(--ok-border);border-radius:6px;background:var(--card);color:var(--ok);cursor:pointer;flex:none">Copy</button></div></div>`
+        : flash.kind === "error"
+          ? `<div style="background:var(--warn-bg);border:1px solid var(--warn-border);border-radius:8px;padding:12px 16px;margin-top:20px;font-size:13px;font-weight:600;color:var(--warn)">${esc(flash.text)}</div>`
+          : `<div style="${CARD};padding:12px 16px;margin-top:20px;font-size:13px;color:var(--muted)">${esc(flash.text)}</div>`;
+    const FIELD_LABEL = "font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-weight:600";
+    const FIELD_INPUT = `${MONO};font-size:13px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none`;
     const createCard = !opts.store
       ? ""
-      : `<div style="${CARD};margin-top:12px">
-<div style="padding:14px 16px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700">New token</div>
+      : `<div style="${CARD};margin-top:16px;padding:16px">
+<div style="font-size:13px;font-weight:700">New token</div>
 <form method="post" action="#tokens">
 <input type="hidden" name="csrf" value="${CSRF_TOKEN}"><input type="hidden" name="mcpha_action" value="create">
-<div style="display:flex;gap:12px;padding:14px 16px;flex-wrap:wrap;align-items:center">
-<label style="font-size:12px;color:var(--muted)">Name <input name="name" required maxlength="64" placeholder="voice-pipeline" style="font-family:inherit;font-size:13px;margin-left:6px;background:var(--bg);border:1px solid var(--btn-border);border-radius:6px;padding:6px 10px;color:var(--text)"></label>
-<label style="font-size:12px;color:var(--muted)">Expires <select name="expires" style="font-family:inherit;font-size:13px;margin-left:6px;background:var(--bg);border:1px solid var(--btn-border);border-radius:6px;padding:6px 10px;color:var(--text)"><option value="never">never</option><option value="30d">in 30 days</option><option value="90d">in 90 days</option><option value="365d">in 1 year</option></select></label>
+<div style="display:flex;gap:12px;margin-top:12px;flex-wrap:wrap">
+<label style="display:flex;flex-direction:column;gap:5px;flex:1;min-width:220px"><span style="${FIELD_LABEL}">Name</span><input name="name" required maxlength="64" placeholder="voice-pipeline" style="${FIELD_INPUT}"></label>
+<label style="display:flex;flex-direction:column;gap:5px;width:180px"><span style="${FIELD_LABEL}">Expires</span><select name="expires" style="font-family:inherit;font-size:13px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);outline:none"><option value="never">never</option><option value="30d">in 30 days</option><option value="90d">in 90 days</option><option value="365d">in 1 year</option></select></label>
 </div>
-<div style="display:grid;grid-template-columns:1.4fr repeat(4,1fr);gap:6px;padding:8px 12px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Category</span><span style="text-align:center">none</span><span style="text-align:center">read</span><span style="text-align:center">write</span><span style="text-align:center">manage</span></div>
+<div style="margin-top:18px">
+<div style="${FIELD_LABEL}">Grants</div>
+<div style="display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr;gap:0;margin-top:8px;border:1px solid var(--border);border-radius:6px;overflow:hidden">
+${matrixHeader}
 ${matrixRows}
-<details style="padding:12px 16px"><summary style="font-size:12px;color:var(--muted);cursor:pointer">Entity restrictions (optional, glob patterns, one per line)</summary>
+</div>
+</div>
+<details style="margin-top:14px"><summary style="font-size:12.5px;color:var(--muted);cursor:pointer;font-weight:600">Entity restrictions (optional, glob patterns, one per line)</summary>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">
-<label style="font-size:12px;color:var(--muted)">Allowlist (empty = all)<textarea name="entity_allowlist" rows="3" placeholder="light.*&#10;automation.*" style="display:block;width:95%;font-size:12.5px;${MONO};margin-top:4px;background:var(--bg);border:1px solid var(--btn-border);border-radius:6px;padding:8px;color:var(--text)"></textarea></label>
-<label style="font-size:12px;color:var(--muted)">Denylist (always wins)<textarea name="entity_denylist" rows="3" placeholder="lock.*" style="display:block;width:95%;font-size:12.5px;${MONO};margin-top:4px;background:var(--bg);border:1px solid var(--btn-border);border-radius:6px;padding:8px;color:var(--text)"></textarea></label>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="${FIELD_LABEL}">Allowlist (empty = all)</span><textarea name="entity_allowlist" rows="4" placeholder="light.*" style="${FIELD_INPUT};font-size:12.5px;resize:vertical"></textarea></label>
+<label style="display:flex;flex-direction:column;gap:5px"><span style="${FIELD_LABEL}">Denylist (always wins)</span><textarea name="entity_denylist" rows="4" placeholder="lock.*" style="${FIELD_INPUT};font-size:12.5px;resize:vertical"></textarea></label>
 </div><div style="font-size:11px;color:var(--muted);margin-top:8px">Applied on writes, on top of the global lists (both must agree; deny always wins).</div></details>
-<div style="padding:0 16px 14px"><button class="btn" type="submit" style="border-color:var(--ok-border);color:var(--ok)">Create token</button> <span style="font-size:11px;color:var(--muted)">The secret is shown once, then only its hash is kept.</span></div>
+<div style="display:flex;align-items:center;gap:14px;margin-top:16px"><button type="submit" style="font-family:inherit;font-size:13px;font-weight:700;padding:8px 18px;border:1px solid var(--ok-border);border-radius:6px;background:var(--ok-bg);color:var(--ok);cursor:pointer">Create token</button><span style="font-size:12px;color:var(--muted)">The secret is shown once, then only its hash is kept.</span></div>
 </form></div>`;
 
     // --- Write audit (#126) with client-side filters --------------------
@@ -447,12 +473,12 @@ ${matrixRows}
             : kind === "ok"
               ? `<span style="color:var(--ok);font-weight:600">ok</span>`
               : `<span style="color:var(--err);font-weight:600">refused</span> <span style="color:var(--muted)">${esc(a.reason ?? "")}</span>`;
-      return `<div class="arow" data-kind="${kind}" style="display:grid;grid-template-columns:.7fr .9fr 1.6fr 1.8fr 1.4fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--row-border);align-items:center;${MONO};font-size:12.5px"><span style="color:var(--muted)">${esc(time)}</span><span>${esc(a.client ?? "")}</span><span style="color:var(--code)">${esc(a.tool ?? "")}</span><span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(target)}</span><span>${status}</span></div>`;
+      return `<div class="arow" data-kind="${kind}" style="display:grid;grid-template-columns:.7fr .9fr 1.6fr 1.8fr 1fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--row-border);align-items:center;${MONO};font-size:12.5px"><span style="color:var(--muted)">${esc(time)}</span><span>${esc(a.client ?? "")}</span><span style="color:var(--code)">${esc(a.tool ?? "")}</span><span style="color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(target)}</span><span>${status}</span></div>`;
     };
     const auditTable =
       audit === null || audit.length === 0
         ? `<div style="${CARD};margin-top:12px;padding:16px;font-size:12px;color:var(--muted)">No audit entries yet. Every write attempt lands here and in /data/audit.log; MCP clients can never read or clear it.</div>`
-        : `<div style="${CARD};margin-top:12px;overflow:hidden"><div style="display:grid;grid-template-columns:.7fr .9fr 1.6fr 1.8fr 1.4fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Time</span><span>Client</span><span>Tool</span><span>Target</span><span>Status</span></div>${audit.map(auditRow).join("")}</div>
+        : `<div style="${CARD};margin-top:12px;overflow:hidden"><div style="display:grid;grid-template-columns:.7fr .9fr 1.6fr 1.8fr 1fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Time</span><span>Client</span><span>Tool</span><span>Target</span><span>Status</span></div>${audit.map(auditRow).join("")}</div>
 <div style="font-size:12px;color:var(--muted);margin-top:12px">Every write attempt lands here and in <code style="${MONO}">/data/audit.log</code>; MCP clients can never read or clear it.</div>`;
 
     const html = `<!doctype html>
@@ -507,8 +533,8 @@ ${logoHtml}
 
 <div data-panel="tokens" hidden>
 ${flashHtml}
-<div style="${CARD};margin-top:${flash ? "12px" : "20px"};overflow:hidden">
-<div style="display:grid;grid-template-columns:1.2fr 2fr 1.4fr 1fr .6fr;gap:12px;padding:10px 16px;border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Name</span><span>Token</span><span>Grants</span><span>Lifecycle</span><span></span></div>
+<div style="${CARD};margin-top:16px;overflow:hidden">
+<div style="${TOKENS_GRID};padding:10px 16px;border-bottom:1px solid var(--border);${STAT_LABEL}"><span>Name</span><span>Token</span><span>Grants</span><span>Lifecycle</span><span></span></div>
 ${legacyRows}
 ${storeRows}
 </div>
