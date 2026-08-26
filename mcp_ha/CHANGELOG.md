@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 2026-08-26
+
+- **Fix** (#174, follow-up of #172 with field logs): on filesystems that never grant the fcntl locks (every operation timing out with SQLITE_BUSY, typical of network mounts), the token store now reopens itself WITHOUT SQLite locking (`nolock=1`) instead of dying into the in-memory fallback. Safe by construction: the Supervisor runs a single add-on instance, and a phantom lock holder never commits anything. The warning names the detected filesystem (fs.statfs) so the real cause shows up in the log, and DOCS.md gained a troubleshooting entry. WAL is not attempted in no-locking mode (it requires locks by design).
+
 ## 1.0.1 - 2026-08-26
 
 - **Fix** (#172, field report): the add-on could crashloop at startup with `database is locked` raised by the token store's WAL transition (seen on filesystems with fussy locking, or racing a dying predecessor). Triple belt: `busy_timeout = 5000` turns transient locks into short waits; `journal_mode = WAL` becomes best-effort (on refusal the store logs a warning and stays on the rollback journal, functionally identical for a token table); and if the on-disk database still cannot open, the server now boots on a loud in-memory fallback instead of dying, keeping the primary token working while stored tokens wait for the fix. The store is also closed properly on shutdown, shrinking the lock window on fast restarts.

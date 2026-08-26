@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
+import { statfsSync } from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
@@ -60,6 +62,35 @@ export type VerifyResult =
 const LAST_USED_THROTTLE_MS = 60_000;
 const TOKEN_PREFIX_CHARS = 8;
 
+/** Linux filesystem magics worth naming in the broken-locks diagnostic (#174). */
+const FS_MAGICS: Record<string, string> = {
+  ef53: "ext2/3/4",
+  "9123683e": "btrfs",
+  "58465342": "xfs",
+  "2fc12fc1": "zfs",
+  "6969": "nfs",
+  "517b": "smb",
+  fe534d42: "smb2/cifs",
+  "794c7630": "overlayfs",
+  "1021994": "tmpfs",
+  "65735546": "fuse",
+};
+
+function describeFilesystem(path: string): string {
+  try {
+    const type = statfsSync(dirname(path)).type.toString(16);
+    return `${FS_MAGICS[type] ?? "unknown"} (magic 0x${type})`;
+  } catch {
+    return "unknown (statfs failed)";
+  }
+}
+
+function looksLikeLockError(e: unknown): boolean {
+  const cause = (e as { cause?: unknown })?.cause;
+  const msg = `${e instanceof Error ? e.message : String(e)} ${cause instanceof Error ? cause.message : ""}`;
+  return /locked|busy/i.test(msg);
+}
+
 function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -107,13 +138,16 @@ export class TokenStore {
     // WAL is an optimisation, never a requirement (#172): the delete-to-WAL
     // transition needs an exclusive lock and some filesystems (network
     // mounts, odd overlays) refuse it with "database is locked". A 10-row
-    // database is perfectly served by the rollback journal.
-    try {
-      this.client.exec("PRAGMA journal_mode = WAL;");
-    } catch (e) {
-      log.warning(
-        `tokens.db: WAL journal unavailable (${e instanceof Error ? e.message : String(e)}); staying on the rollback journal`
-      );
+    // database is perfectly served by the rollback journal. In no-locking
+    // mode (#174) WAL is impossible by construction, do not even try.
+    if (!path.includes("nolock=1")) {
+      try {
+        this.client.exec("PRAGMA journal_mode = WAL;");
+      } catch (e) {
+        log.warning(
+          `tokens.db: WAL journal unavailable (${e instanceof Error ? e.message : String(e)}); staying on the rollback journal`
+        );
+      }
     }
     // sqlite-proxy contract: rows as arrays of values in column order.
     // Single-table queries only, so Object.values keeps that order.
@@ -128,17 +162,44 @@ export class TokenStore {
     });
   }
 
-  /** Opens (or creates) the database and applies pending migrations. */
+  /**
+   * Opens (or creates) the database and applies pending migrations. When the
+   * filesystem never grants the fcntl locks (#174: every operation times out
+   * with SQLITE_BUSY, typical of some network mounts), retries WITHOUT
+   * SQLite locking (`nolock=1`). Safe here because exactly one process owns
+   * this database: the Supervisor runs a single add-on container. If even
+   * that fails (a WAL-marked database cannot open without locks), the
+   * caller's in-memory fallback (#172) remains the last net.
+   */
   static async open(path: string, opts: TokenStoreOptions = {}): Promise<TokenStore> {
+    try {
+      return await TokenStore.openExact(path, opts);
+    } catch (e) {
+      if (path === ":memory:" || path.startsWith("file:") || !looksLikeLockError(e)) throw e;
+      log.warning(
+        `tokens.db: filesystem locks look broken on ${describeFilesystem(path)}: ` +
+          "reopening WITHOUT SQLite locking (safe: the Supervisor runs a single instance). " +
+          "If /data lives on a network mount, consider local storage."
+      );
+      return await TokenStore.openExact(`file:${path}?nolock=1`, opts);
+    }
+  }
+
+  private static async openExact(path: string, opts: TokenStoreOptions): Promise<TokenStore> {
     const store = new TokenStore(path, opts);
     const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
-    await migrate(
-      store.db,
-      async (queries) => {
-        for (const q of queries) store.client.exec(q);
-      },
-      { migrationsFolder }
-    );
+    try {
+      await migrate(
+        store.db,
+        async (queries) => {
+          for (const q of queries) store.client.exec(q);
+        },
+        { migrationsFolder }
+      );
+    } catch (e) {
+      store.client.close();
+      throw e;
+    }
     return store;
   }
 
