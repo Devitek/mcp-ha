@@ -99,6 +99,34 @@ describe("TokenStore (#166)", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
+  it("writes an atomic consistency snapshot and restores from it when the database is torn (#181)", async () => {
+    const { mkdtemp, rm, writeFile } = await import("node:fs/promises");
+    const { existsSync } = await import("node:fs");
+    const { readdir } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = await mkdtemp(join(tmpdir(), "mcpha-store-snap-"));
+    const file = join(dir, "tokens.db");
+    const snapshot = join(dir, "tokens.snapshot.db");
+
+    const s = await TokenStore.open(file, { busyTimeoutMs: 50 });
+    expect(existsSync(snapshot)).toBe(true); // first open seeds the net
+    const { token } = await s.create({ name: "survivor", grants: readOnlyGrants() });
+    s.close();
+
+    // A torn hot backup restored by the Supervisor: garbage where SQLite
+    // expects its header. The snapshot must take over, the evidence stays.
+    await writeFile(file, "definitely not a sqlite file");
+    const recovered = await TokenStore.open(file, { busyTimeoutMs: 50 });
+    expect((await recovered.verify(token))?.denied).toBeNull();
+    expect((await recovered.list())[0]!.name).toBe("survivor");
+    recovered.close();
+    const kept = (await readdir(dir)).filter((f) => f.startsWith("tokens.db.corrupt-"));
+    expect(kept).toHaveLength(1);
+    expect((await readdir(dir))).not.toContain("tokens.snapshot.db.tmp"); // rename is atomic, no leftovers
+    await rm(dir, { recursive: true, force: true });
+  });
+
   it("imports legacy api_tokens idempotently with scope-mapped grants", async () => {
     const s = await open();
     const legacy = [

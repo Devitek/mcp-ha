@@ -112,6 +112,10 @@ Rotate immediately if you ever shared add-on logs produced by a version older th
 
 The full threat model is in the repository's [SECURITY.md](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md).
 
+## Backups
+
+Home Assistant backups include this add-on's `/data`, and with it the token store. The database only holds sha256 hashes (never token secrets), and the add-on maintains `tokens.snapshot.db`, a consistency copy written atomically after every token mutation: even though the Supervisor archives `/data` while the add-on runs, the backup always carries at least one coherent copy, and the add-on restores from it automatically if the main database is ever unreadable. Restoring a backup brings back the tokens of that moment; tokens created afterwards stop authenticating.
+
 ## Troubleshooting
 
 When asking for help in an issue, paste the output of the `ha_get_self_test` tool: it diagnoses the add-on itself (connectivity, latencies, live map) and contains no data from your home.

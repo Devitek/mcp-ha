@@ -290,7 +290,10 @@ export function createHandler(
  */
 const OPTION_MIGRATIONS: Array<{ key: string; value: unknown }> = [
   { key: "confirm_domains", value: ["lock", "alarm_control_panel"] },
-  { key: "api_tokens", value: [] },
+  // api_tokens left this list on purpose (#180): the option is deprecated
+  // and now REMOVED from the stored options at boot; re-injecting it here
+  // would fight that removal. The schema keeps the (optional) key until
+  // #182 so installs that still carry it keep starting.
   { key: "allow_camera", value: false },
   { key: "allow_config_write", value: false },
   { key: "enable_sessions", value: false },
@@ -312,7 +315,8 @@ export async function reconcileOptions(
   cfg: AddonConfig,
   http: HaHttp,
   delays: number[] = PERSIST_RETRY_DELAYS_MS,
-  extraPatch: Record<string, unknown> = {}
+  extraPatch: Record<string, unknown> = {},
+  removeKeys: string[] = []
 ): Promise<boolean> {
   if (!http.supervisorAvailable) return false;
   for (let attempt = 0; ; attempt++) {
@@ -332,12 +336,17 @@ export async function reconcileOptions(
       const tokenAlreadySet = typeof current.api_token === "string" && current.api_token.trim().length > 0;
       if (cfg.apiTokenGenerated && !tokenAlreadySet) patch.api_token = cfg.apiToken;
 
-      if (Object.keys(patch).length === 0) return false;
-      await http.supervisorPost("/addons/self/options", {
-        options: { ...current, ...patch },
-      });
+      // Deprecated keys leave the stored options entirely (#180). Only
+      // valid while the schema still declares the key as optional: dropping
+      // the schema first would brick the boot (see #182 for the ordering).
+      const toRemove = removeKeys.filter((k) => k in current);
+
+      if (Object.keys(patch).length === 0 && toRemove.length === 0) return false;
+      const options: Record<string, unknown> = { ...current, ...patch };
+      for (const k of toRemove) delete options[k];
+      await http.supervisorPost("/addons/self/options", { options });
       log.notice(
-        `Add-on options reconciled (${Object.keys(patch).join(", ")}); they are visible in the HA configuration panel.`
+        `Add-on options reconciled (${[...Object.keys(patch), ...toRemove.map((k) => `-${k}`)].join(", ")}); they are visible in the HA configuration panel.`
       );
       return true;
     } catch (e) {
@@ -416,11 +425,14 @@ async function main(): Promise<void> {
   }
   if (cfg.apiTokens.length > 0) {
     const imported = await store.importLegacy(cfg.apiTokens);
-    log.notice(`Token store: ${imported} legacy api_tokens imported (hashed); blanking the clear-text option.`);
-    void reconcileOptions(cfg, http, undefined, { api_tokens: [] });
-  } else {
-    void reconcileOptions(cfg, http);
+    log.warning(
+      `The api_tokens option is DEPRECATED (#180): ${imported} legacy entr${imported === 1 ? "y" : "ies"} imported ` +
+        "(hashed) into the token store, and the option now leaves the stored configuration. " +
+        "Manage tokens from the ingress page; the option itself will be dropped in a future release."
+    );
   }
+  // The deprecated key is removed from the stored options either way (#180).
+  void reconcileOptions(cfg, http, undefined, {}, ["api_tokens"]);
 
   // Shared between the MCP handler (which counts) and the ingress page
   // (which displays), #128.

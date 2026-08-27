@@ -8,7 +8,7 @@ Toutes les options se trouvent dans l'onglet **Configuration** de l'add-on. Red�
 |--------|--------|-------------|
 | `log_level` | `info` | Verbosité du journal : `trace`, `debug`, `info`, `notice`, `warning`, `error`, `fatal`. Voir [Journalisation](/fr/reference/logging). |
 | `api_token` | vide | Jeton principal (accès complet) attendu des clients MCP dans l'en-tête `Authorization: Bearer ...`. Laissez vide pour en générer un au premier démarrage (il est reporté dans cette option). |
-| `api_tokens` | `[]` | Jetons nommés legacy avec une portée. Depuis 0.32.0 ils sont importés (hachés) dans le store de jetons au démarrage et l'option est vidée ; la gestion passe sur la page ingress. Voir [Jetons nommés](#jetons-nommes). |
+| `api_tokens` | `[]` | **Dépréciée depuis 1.2.0.** Jetons nommés legacy avec une portée : toujours acceptés comme source d'import one-shot (hachés dans le store au démarrage), puis la clé est retirée des options stockées. Gérez les jetons depuis la page ingress ; l'option disparaîtra dans une release future. |
 | `allow_write` | `false` | Expose l'outil `ha_call_service`. Sans lui, l'add-on est strictement en lecture seule : aucun outil d'écriture n'est même visible du client. |
 | `allow_camera` | `false` | Expose `ha_get_camera_snapshot` (images fixes de caméras). Indépendant de `allow_write` ; voir chez soi n'est pas agir chez soi, mais mérite son propre interrupteur. `filter_reads` et `entity_denylist` s'appliquent toujours. |
 | `allow_config_write` | `false` | Expose les huit outils d'écriture de configuration : création, modification et suppression d'automations et de scripts, instanciation de blueprints, cartes de dashboard (validés par HA quand c'est possible, confirmation en deux temps obligatoire). Indépendant d'`allow_write`, et depuis 0.31.0 il couvre aussi les commandes runtime de ce qu'il gère (lancer, déclencher, activer/désactiver) : qui peut réécrire une automation peut de toute façon lui faire faire n'importe quoi, les niveaux d'accès ont cessé de prétendre le contraire (#165). Voir le [modèle de sécurité](https://github.com/Devitek/mcp-ha/blob/main/SECURITY.md). |
@@ -21,26 +21,24 @@ Toutes les options se trouvent dans l'onglet **Configuration** de l'add-on. Red�
 
 ## Jetons nommés
 
-L'unique `api_token` donne un accès complet (c'est le jeton d'amorçage et de secours). Depuis 0.32.0, les jetons nommés sont stockés **hachés** dans une base locale : les entrées ajoutées ci-dessous y sont importées au prochain démarrage (avec les droits que leur portée implique) puis l'option en clair est vidée. La création de jetons se fait sur la **page ingress** (entrée dans la barre latérale), onglet Tokens : un niveau (none / read / write / manage) par catégorie d'outils, une expiration optionnelle et des listes d'entités propres au jeton (appliquées aux écritures, en plus des listes globales). Le secret est montré une seule fois à la création ; les droits sont plafonnés par les options `allow_*` à chaque requête, fermer un gate dégrade donc tous les jetons instantanément. La révocation tient en un clic.
+L'unique `api_token` donne un accès complet (c'est le jeton d'amorçage et de secours). Les jetons nommés sont stockés **hachés** dans une base locale. L'option YAML `api_tokens` est **dépréciée** : les entrées ajoutées là sont encore importées une fois au prochain démarrage (avec les droits que leur portée implique), puis la clé quitte entièrement les options stockées, avec un warning dans le log. La création de jetons se fait sur la **page ingress** (entrée dans la barre latérale), onglet Tokens : un niveau (none / read / write / manage) par catégorie d'outils, une expiration optionnelle et des listes d'entités propres au jeton (appliquées aux écritures, en plus des listes globales). Le secret est montré une seule fois à la création ; les droits sont plafonnés par les options `allow_*` à chaque requête, fermer un gate dégrade donc tous les jetons instantanément. La révocation tient en un clic.
 
-Forme legacy, toujours acceptée comme source d'import :
+Forme legacy dépréciée, toujours acceptée comme source d'import one-shot (`scope: read` devient des droits lecture partout, `scope: write` des droits pleins, les deux plafonnés par les gates `allow_*`) :
 
 ```yaml
 api_tokens:
   - name: assistant-principal
     token: <une longue chaîne aléatoire>
     scope: write
-  - name: tableau-de-bord
-    token: <une autre longue chaîne aléatoire>
-    scope: read
 ```
 
-- `scope: read` ne voit que les 15 outils de lecture ; les outils d'écriture ne sont même pas enregistrés pour ce jeton.
-- `scope: write` se comporte comme le jeton principal (soumis à `allow_write` et à toutes les listes).
-- Le **nom du jeton apparaît dans le journal d'audit des écritures**, vous savez donc quel client a agi.
-- Générez vous-même des valeurs solides (32+ caractères hex) ; un jeton de moins de 16 caractères déclenche un avertissement au démarrage.
+## Sauvegardes
 
-Le jeton principal `api_token` continue de fonctionner en parallèle et garde toujours l'accès complet.
+Les backups Home Assistant (complets, ou partiels avec l'add-on coché) incluent le `/data` de l'add-on : le store de jetons voyage avec eux.
+
+- **Rien de sensible ne fuit** : la base ne contient que des hachages sha256, des noms et des droits. Un backup volé ne donne aucun jeton utilisable (contrairement à l'option `api_tokens` en clair de l'ère pré-1.0, dépréciée).
+- **La cohérence est garantie par un snapshot** : le Supervisor archive `/data` pendant que l'add-on tourne, le `tokens.db` vivant d'un backup pourrait donc être déchiré. Après chaque mutation, l'add-on écrit `tokens.snapshot.db` via le `VACUUM INTO` de SQLite suivi d'un rename atomique : le backup embarque toujours au moins une copie cohérente, et l'add-on restaure automatiquement depuis elle si la base principale devient illisible (le fichier fautif est conservé à côté comme preuve).
+- **Restaurer un backup** ramène les jetons tels qu'ils étaient au moment du backup : les clients dont le secret a été créé après reçoivent un 401 et ont besoin d'un nouveau jeton.
 
 ## Motifs glob
 
