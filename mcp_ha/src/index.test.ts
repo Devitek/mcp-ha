@@ -587,6 +587,7 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
         api_token: "user-set-token",
         allow_write: false,
         confirm_domains: ["lock", "alarm_control_panel"],
+        api_tokens: [],
         allow_camera: false,
         allow_config_write: false,
       enable_sessions: false,
@@ -607,6 +608,7 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
         log_level: "debug",
         api_token: "test-token-long-enough",
         confirm_domains: ["lock", "alarm_control_panel"],
+        api_tokens: [],
         allow_camera: false,
         allow_config_write: false,
       enable_sessions: false,
@@ -620,21 +622,37 @@ describe("reconcileOptions (audit C7/E6/F2, migration #81)", () => {
       supervisorGet: vi.fn(async () => ({ options: { ...UP_TO_DATE } })),
       supervisorPost: vi.fn(async () => ({})),
     };
-    expect(await reconcileOptions(cfg({ apiTokenGenerated: false }), http as any, [], {}, ["api_tokens"])).toBe(true);
-    const posted = (http.supervisorPost.mock.calls[0] as any)[1].options;
-    expect("api_tokens" in posted).toBe(false);
+    const stored = { ...UP_TO_DATE, some_dead_option: true };
+    const httpDead = {
+      supervisorAvailable: true,
+      supervisorGet: vi.fn(async () => ({ options: stored })),
+      supervisorPost: vi.fn(async () => ({})),
+    };
+    expect(await reconcileOptions(cfg({ apiTokenGenerated: false }), httpDead as any, [], {}, ["some_dead_option"])).toBe(true);
+    const posted = (httpDead.supervisorPost.mock.calls[0] as any)[1].options;
+    expect("some_dead_option" in posted).toBe(false);
     expect(posted.confirm_domains).toEqual(["lock"]); // untouched keys survive
     // once gone, the same call is a no-op
     const http2 = {
       supervisorAvailable: true,
-      supervisorGet: vi.fn(async () => {
-        const { api_tokens: _gone, ...rest } = UP_TO_DATE as any;
-        return { options: rest };
-      }),
+      supervisorGet: vi.fn(async () => ({ options: { ...UP_TO_DATE } })),
       supervisorPost: vi.fn(),
     };
-    expect(await reconcileOptions(cfg({ apiTokenGenerated: false }), http2 as any, [], {}, ["api_tokens"])).toBe(false);
+    expect(await reconcileOptions(cfg({ apiTokenGenerated: false }), http2 as any, [], {}, ["some_dead_option"])).toBe(false);
     expect(http2.supervisorPost).not.toHaveBeenCalled();
+  });
+
+  it("does not retry a definitive 400 schema refusal (#184)", async () => {
+    const err = Object.assign(new Error("HTTP 400: Missing option 'api_tokens' in root"), { status: 400 });
+    const http = {
+      supervisorAvailable: true,
+      supervisorGet: vi.fn(async () => ({ options: { log_level: "info", api_token: "user-set-token" } })),
+      supervisorPost: vi.fn(async () => {
+        throw err;
+      }),
+    };
+    expect(await reconcileOptions(cfg({ apiTokenGenerated: false }), http as any, [1, 1, 1])).toBe(false);
+    expect(http.supervisorPost).toHaveBeenCalledTimes(1);
   });
 
   it("never overwrites a token the user set meanwhile (audit F2 race)", async () => {

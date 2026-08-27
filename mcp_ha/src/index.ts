@@ -290,10 +290,11 @@ export function createHandler(
  */
 const OPTION_MIGRATIONS: Array<{ key: string; value: unknown }> = [
   { key: "confirm_domains", value: ["lock", "alarm_control_panel"] },
-  // api_tokens left this list on purpose (#180): the option is deprecated
-  // and now REMOVED from the stored options at boot; re-injecting it here
-  // would fight that removal. The schema keeps the (optional) key until
-  // #182 so installs that still carry it keep starting.
+  // Deprecated (#180) but REQUIRED to exist while the schema declares it:
+  // schema list keys cannot be optional and a missing one bricks every
+  // config save (#81, re-proven the hard way in #184). The whole key goes
+  // away with the schema in #182.
+  { key: "api_tokens", value: [] },
   { key: "allow_camera", value: false },
   { key: "allow_config_write", value: false },
   { key: "enable_sessions", value: false },
@@ -351,6 +352,13 @@ export async function reconcileOptions(
       return true;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      // The retries exist for a Supervisor that is not ready yet during HA
+      // boot. A 400 is a definitive schema refusal (#184): retrying can
+      // only produce the same answer four times.
+      if ((e as { status?: number }).status === 400) {
+        log.warning(`The Supervisor refused the reconciled options (${msg}); not retrying.`);
+        return false;
+      }
       const delay = delays[attempt];
       if (delay === undefined) {
         log.warning(
@@ -427,12 +435,15 @@ async function main(): Promise<void> {
     const imported = await store.importLegacy(cfg.apiTokens);
     log.warning(
       `The api_tokens option is DEPRECATED (#180): ${imported} legacy entr${imported === 1 ? "y" : "ies"} imported ` +
-        "(hashed) into the token store, and the option now leaves the stored configuration. " +
-        "Manage tokens from the ingress page; the option itself will be dropped in a future release."
+        "(hashed) into the token store, and the option is blanked. Manage tokens from the ingress page; " +
+        "the option itself will be dropped in a future release."
     );
+    // Blanked, not removed: a schema list key must exist in the stored
+    // options (#184), so the empty list stays until the schema drops (#182).
+    void reconcileOptions(cfg, http, undefined, { api_tokens: [] });
+  } else {
+    void reconcileOptions(cfg, http);
   }
-  // The deprecated key is removed from the stored options either way (#180).
-  void reconcileOptions(cfg, http, undefined, {}, ["api_tokens"]);
 
   // Shared between the MCP handler (which counts) and the ingress page
   // (which displays), #128.

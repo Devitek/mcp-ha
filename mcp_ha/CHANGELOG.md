@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.2.1 - 2026-08-27
+
+- **Fix** (#184, field report on 1.2.0): removing the deprecated `api_tokens` key from the stored options is impossible while the schema declares it: the Supervisor requires every schema list key to exist (`Missing option 'api_tokens' in root`, the exact mechanism behind #81; verified in the Supervisor source, where a stored key missing from the schema is conversely just ignored with a warning). The boot goes back to BLANKING the option (`api_tokens: []`), the migration entry is restored, and `reconcileOptions` no longer retries a definitive HTTP 400 four times. Silver lining: the same source reading proves that dropping the schema key later (#182) is safe regardless of the stored options, so the removal plan got simpler.
+
 ## 1.2.0 - 2026-08-27
 
 - **Deprecated** (#180): the `api_tokens` YAML option. It still works as a one-shot import source (entries are hashed into the token store at boot, with a deprecation warning), but the key is now REMOVED from the stored options afterwards (`reconcileOptions` learned key removal), and the docs mark it deprecated. Manage tokens from the ingress page. The option itself will be dropped in a follow-up release (#182), once existing installs have booted this version: removing the schema key first would prevent the add-on from starting (Supervisor validation, the #81 chicken-and-egg).
