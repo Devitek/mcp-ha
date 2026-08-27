@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { statfsSync } from "node:fs";
+import { copyFileSync, existsSync, renameSync, rmSync, statfsSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { eq } from "drizzle-orm";
@@ -125,10 +125,17 @@ export interface TokenStoreOptions {
   busyTimeoutMs?: number;
 }
 
+/** Sits next to the database; the Supervisor backup grabs both files. */
+export function snapshotPathFor(dbPath: string): string {
+  return dbPath.replace(/\.db$/, "") + ".snapshot.db";
+}
+
 export class TokenStore {
   private client: DatabaseSync;
   private db: ReturnType<typeof drizzle>;
   private lastTouch = new Map<string, number>();
+  /** Null for :memory:; snapshots make no sense without a disk to back up. */
+  private snapshotTarget: string | null = null;
 
   private constructor(path: string, opts: TokenStoreOptions = {}) {
     this.client = new DatabaseSync(path);
@@ -167,26 +174,57 @@ export class TokenStore {
    * filesystem never grants the fcntl locks (#174: every operation times out
    * with SQLITE_BUSY, typical of some network mounts), retries WITHOUT
    * SQLite locking (`nolock=1`). Safe here because exactly one process owns
-   * this database: the Supervisor runs a single add-on container. If even
-   * that fails (a WAL-marked database cannot open without locks), the
-   * caller's in-memory fallback (#172) remains the last net.
+   * this database: the Supervisor runs a single add-on container.
+   *
+   * If the database still cannot open (torn hot backup restored by the
+   * Supervisor, WAL leftovers on a lockless environment), the consistency
+   * snapshot (#181) is restored: the broken file is kept aside as evidence,
+   * never deleted. The caller's in-memory fallback (#172) stays the last net.
    */
   static async open(path: string, opts: TokenStoreOptions = {}): Promise<TokenStore> {
+    if (path === ":memory:" || path.startsWith("file:")) return TokenStore.openExact(path, opts, null);
+    const snapshotTarget = snapshotPathFor(path);
     try {
-      return await TokenStore.openExact(path, opts);
+      return await TokenStore.openWithLockFallback(path, opts, snapshotTarget);
     } catch (e) {
-      if (path === ":memory:" || path.startsWith("file:") || !looksLikeLockError(e)) throw e;
+      if (!existsSync(snapshotTarget)) throw e;
+      log.error(
+        `tokens.db unreadable (${e instanceof Error ? e.message : String(e)}); ` +
+          "restoring from the consistency snapshot. The broken file is kept next to it as evidence."
+      );
+      renameSync(path, `${path}.corrupt-${Date.now()}`);
+      rmSync(`${path}-wal`, { force: true });
+      rmSync(`${path}-shm`, { force: true });
+      copyFileSync(snapshotTarget, path);
+      return await TokenStore.openWithLockFallback(path, opts, snapshotTarget);
+    }
+  }
+
+  private static async openWithLockFallback(
+    path: string,
+    opts: TokenStoreOptions,
+    snapshotTarget: string | null
+  ): Promise<TokenStore> {
+    try {
+      return await TokenStore.openExact(path, opts, snapshotTarget);
+    } catch (e) {
+      if (!looksLikeLockError(e)) throw e;
       log.warning(
         `tokens.db: filesystem locks look broken on ${describeFilesystem(path)}: ` +
           "reopening WITHOUT SQLite locking (safe: the Supervisor runs a single instance). " +
           "If /data lives on a network mount, consider local storage."
       );
-      return await TokenStore.openExact(`file:${path}?nolock=1`, opts);
+      return await TokenStore.openExact(`file:${path}?nolock=1`, opts, snapshotTarget);
     }
   }
 
-  private static async openExact(path: string, opts: TokenStoreOptions): Promise<TokenStore> {
+  private static async openExact(
+    path: string,
+    opts: TokenStoreOptions,
+    snapshotTarget: string | null
+  ): Promise<TokenStore> {
     const store = new TokenStore(path, opts);
+    store.snapshotTarget = snapshotTarget;
     const migrationsFolder = fileURLToPath(new URL("../../drizzle", import.meta.url));
     try {
       await migrate(
@@ -200,7 +238,31 @@ export class TokenStore {
       store.client.close();
       throw e;
     }
+    // First successful open without a snapshot yet: create one, so the very
+    // first Supervisor backup already carries a consistent copy (#181).
+    if (snapshotTarget && !existsSync(snapshotTarget)) store.snapshot();
     return store;
+  }
+
+  /**
+   * Consistency snapshot (#181): the Supervisor tars /data while we run, so
+   * the live tokens.db in a backup can be torn (file and -wal captured at
+   * different instants). VACUUM INTO produces a coherent copy and the
+   * atomic rename guarantees the tar always sees a whole file. Called after
+   * every mutation (not for last_used_at touches); a few kilobytes, sync,
+   * milliseconds. Failures degrade the safety net, never the operation.
+   */
+  private snapshot(): void {
+    if (!this.snapshotTarget) return;
+    const tmp = `${this.snapshotTarget}.tmp`;
+    try {
+      rmSync(tmp, { force: true });
+      this.client.exec(`VACUUM INTO '${tmp.replace(/'/g, "''")}'`);
+      renameSync(tmp, this.snapshotTarget);
+    } catch (e) {
+      log.warning(`tokens.db consistency snapshot failed: ${e instanceof Error ? e.message : String(e)}`);
+      rmSync(tmp, { force: true });
+    }
   }
 
   async create(input: CreateTokenInput): Promise<CreatedToken> {
@@ -234,6 +296,7 @@ export class TokenStore {
       if (msg.includes("UNIQUE")) throw new Error(`a token named "${name}" already exists; revoke it or pick another name`);
       throw e;
     }
+    this.snapshot();
     return { token, record: toRecord(row) };
   }
 
@@ -272,6 +335,7 @@ export class TokenStore {
     if (!rows[0]) return false;
     if (!rows[0].revokedAt) {
       await this.db.update(tokens).set({ revokedAt: new Date().toISOString() }).where(eq(tokens.id, id));
+      this.snapshot();
     }
     return true;
   }
@@ -316,6 +380,7 @@ export class TokenStore {
       });
       imported += 1;
     }
+    if (imported > 0) this.snapshot();
     return imported;
   }
 

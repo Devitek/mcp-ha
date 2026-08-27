@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.0 - 2026-08-27
+
+- **Deprecated** (#180): the `api_tokens` YAML option. It still works as a one-shot import source (entries are hashed into the token store at boot, with a deprecation warning), but the key is now REMOVED from the stored options afterwards (`reconcileOptions` learned key removal), and the docs mark it deprecated. Manage tokens from the ingress page. The option itself will be dropped in a follow-up release (#182), once existing installs have booted this version: removing the schema key first would prevent the add-on from starting (Supervisor validation, the #81 chicken-and-egg).
+- **New** (#181): backup consistency for the token store. The Supervisor archives `/data` while the add-on runs, so the live `tokens.db` inside a backup could be torn; after every token mutation the add-on now writes `tokens.snapshot.db` (SQLite `VACUUM INTO` + atomic rename), seeded at first open. If the main database ever turns out unreadable, it is set aside as evidence (never deleted) and the snapshot is restored automatically. A backup therefore always carries at least one coherent copy, holding only sha256 hashes, never token secrets. New "Backups" sections in DOCS.md and the configuration guide (EN/FR).
+
 ## 1.1.0 - 2026-08-26
 
 - **New** (#178): two onboarding blocks join the ingress Connect tab, the clients guide (EN/FR) and DOCS.md. **OpenCode**, shown the exemplary way: the token lives in an environment variable and reaches `opencode.json` through OpenCode's native `{env:HA_MCP_TOKEN}` substitution, with `oauth: false` so no OAuth discovery is attempted against our static-bearer endpoint. And a **generic MCP client** block: transport, endpoint, auth header and the stateless-vs-sessions behaviour, for everything not listed by name.
