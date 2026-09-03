@@ -215,7 +215,7 @@ Agrégats du recorder (moyenne, min, max, somme) pour les capteurs numériques. 
 
 ### ha_get_logbook
 
-Événements lisibles, filtrables par `entity_id`, fenêtre de 0.25 h à 7 jours, plafonné à 100 événements.
+Événements lisibles, filtrables par `entity_id`, fenêtre de 0.25 h à 7 jours, plafonné à 100 événements. Depuis 1.5.0, filtrable aussi par `area` ou `floor` entiers (un seul périmètre à la fois) : la pièce est résolue par le catalogue en entités visibles explicites (filter_reads s'applique, 60 entités max avec note au-delà) : « que s'est-il passé dans la cuisine cette nuit ? » tient en un appel.
 
 ## Dashboards
 

@@ -215,7 +215,7 @@ Recorder aggregates (mean, min, max, sum) for numeric sensors. `statistic_id` (s
 
 ### ha_get_logbook
 
-Human-readable events, filterable by `entity_id`, window from 0.25 h up to 7 days, capped at 100 events.
+Human-readable events, window from 0.25 h up to 7 days, capped at 100 events. Filter by `entity_id`, or since 1.5.0 by a whole `area` or `floor` (one scope at a time): the room is resolved through the catalog into explicit visible entities (filter_reads applies, up to 60 entities with a note beyond), so "what happened in the kitchen tonight?" is one call.
 
 ## Dashboards
 

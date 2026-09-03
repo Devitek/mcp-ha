@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.0 - 2026-09-03
+
+Home Assistant 2026.9 batch, part three (#194).
+
+- **New** (#194): `ha_get_logbook` accepts `area` and `floor` scopes (one at a time, exclusive with `entity_id`), in the spirit of the 2026.9 Sources panel: the room is resolved through the catalog into explicit visible entity ids (filter_reads applies before anything reaches HA), capped at 60 entities with a `scope_note` beyond, and an unknown room answers an actionable error listing the known ones. `ha_get_history` deliberately stays single-scope: its 5-entity limit and shared point budget would make a whole-room chart misleading (decision recorded in the issue).
+
+
 ## 1.4.0 - 2026-09-03
 
 Home Assistant 2026.9 batch, part two (#192, #193).
