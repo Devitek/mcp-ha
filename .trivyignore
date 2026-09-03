@@ -1,0 +1,7 @@
+# CVE-2026-56854: golang.org/x/crypto/ssh inside /usr/bin/tempio, shipped by
+# the Home Assistant BASE image (not our code, not our npm tree). tempio is
+# the base image's local config templating helper; our run.sh never invokes
+# it and no SSH server exists in the container, so the vector (SSH server
+# restriction bypass) does not apply. Tracked in issue #197: remove
+# this line as soon as a rebuilt base ships x/crypto >= 0.55.0.
+CVE-2026-56854

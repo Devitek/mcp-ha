@@ -196,7 +196,7 @@ describe("ha_get_automation_trace (#106)", () => {
     }));
     registerAutomationTools(server, fakeCtx({ catalog: { index: async () => fixtures }, ws, http: { coreGet } }));
     const res = await callTool(tools, "ha_get_automation_trace", { entity_id: "automation.morning", run_id: "r1" });
-    const byPath = new Map(res.data.steps.map((st: any) => [st.path, st]));
+    const byPath = new Map<string, any>(res.data.steps.map((st: any) => [st.path, st]));
     expect(byPath.get("trigger/0").targets).toEqual({ entity_ids: ["binary_sensor.hall"] });
     expect(byPath.get("action/0").targets).toEqual({
       action: "light.turn_on",
