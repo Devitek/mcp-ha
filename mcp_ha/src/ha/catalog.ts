@@ -15,7 +15,7 @@ const STATES_TTL_MS = 3_000;
 interface RegistryCache {
   at: number;
   areas: Array<{ area_id: string; name: string; floor_id: string | null }>;
-  devices: Array<{ id: string; name: string | null; name_by_user: string | null; manufacturer: string | null; model: string | null; area_id: string | null; disabled_by: string | null }>;
+  devices: Array<{ id: string; name: string | null; name_by_user: string | null; manufacturer: string | null; model: string | null; area_id: string | null; disabled_by: string | null; parent_device_id: string | null }>;
   entities: Array<{ entity_id: string; area_id: string | null; device_id: string | null; disabled_by: string | null; hidden_by: string | null; entity_category: string | null; aliases: string[]; labels: string[] }>;
   floors: Array<{ floor_id: string; name: string; level: number | null }>;
   labels: Array<{ label_id: string; name: string }>;
@@ -207,7 +207,10 @@ export class Catalog {
     return states.map((s) => {
       const entry = entryByEid.get(s.entity_id);
       const device = entry?.device_id ? deviceById.get(entry.device_id) : undefined;
-      const areaId = entry?.area_id ?? device?.area_id ?? null;
+      // Child devices (#191) carry no area of their own; inherit the
+      // parent's, one level deep, the way the HA UI shows them.
+      const parentDevice = device?.parent_device_id ? deviceById.get(device.parent_device_id) : undefined;
+      const areaId = entry?.area_id ?? device?.area_id ?? parentDevice?.area_id ?? null;
       const area = areaId ? areaById.get(areaId) : undefined;
       return {
         entity_id: s.entity_id,
