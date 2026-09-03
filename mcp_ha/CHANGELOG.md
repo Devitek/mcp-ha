@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 - 2026-09-03
+
+Home Assistant 2026.9 batch, part two (#192, #193).
+
+- **New** (#192): `ha_get_system` gains a `mounts` section: network storage mounts with usage and the same fill thresholds as the 2026.9 Storage page (warning above 85 %, critical above 95 %). The list comes from the Supervisor `/mounts` API and each mount gets an independent `/host/disks/<name>/usage` probe (both located by reading the Supervisor source): a failing or role-denied probe degrades to a structured note (#153 doctrine), an inactive mount is not probed, and more than 10 mounts are truncated with a note.
+- **New** (#193): `ha_explain_event` opens its answer with `cause_kind`, the root-cause taxonomy the 2026.9 Activity dialog introduced: `person` (a resolved human anywhere in the chain), `schedule` (sun/time/calendar wording on the deepest link), `state_change`, `integration` (bare service call), or an honest `unknown`. `restart` is deliberately left out: it is not reliably detectable from the logbook alone.
+
+
 ## 1.3.0 - 2026-09-03
 
 Home Assistant 2026.9 batch, part one (#190, #191), carrying the planned `api_tokens` removal (#182).

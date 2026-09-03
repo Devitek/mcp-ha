@@ -193,7 +193,7 @@ Step-by-step record of recent automation or script runs, the first reflex for "w
 
 ### ha_explain_event
 
-Explains WHY an entity changed: follows Home Assistant's context chain (the immediate actor, what triggered it in turn, the human when there was one, resolved to their person entity when one is linked and visible), up to 4 hops. Without `at`: the entity's last change. Hidden causes appear as `(hidden entity)` under `filter_reads`. The missing link between the logbook (what) and `ha_get_automation_trace` (how); the answer points to the trace when an automation is in the chain.
+Explains WHY an entity changed: follows Home Assistant's context chain (the immediate actor, what triggered it in turn, the human when there was one, resolved to their person entity when one is linked and visible), up to 4 hops. Since 1.4.0 the answer opens with `cause_kind`, the same root-cause taxonomy as the 2026.9 Activity dialog: `person`, `schedule`, `state_change`, `integration`, or an honest `unknown`. Without `at`: the entity's last change. Hidden causes appear as `(hidden entity)` under `filter_reads`. The missing link between the logbook (what) and `ha_get_automation_trace` (how); the answer points to the trace when an automation is in the chain.
 
 ### ha_get_self_test
 
@@ -287,7 +287,7 @@ Evaluates a Jinja2 template server-side and returns the rendering. Read only, ve
 
 ### ha_get_system
 
-`section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: recent errors and warnings, structured, from the system log (WS), with a legacy REST fallback for old cores. `section: "updates"`: pending Core, OS and add-on updates; the Core and OS parts need a higher Supervisor role and answer a structured note under the minimal one, while the add-on part always works. `section: "backups"`: last backup age and recent backups (structured note under the minimal role). No section ever leaks a raw HTTP error.
+`section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: recent errors and warnings, structured, from the system log (WS), with a legacy REST fallback for old cores. `section: "updates"`: pending Core, OS and add-on updates; the Core and OS parts need a higher Supervisor role and answer a structured note under the minimal one, while the add-on part always works. `section: "backups"`: last backup age and recent backups (structured note under the minimal role). No section ever leaks a raw HTTP error. The `mounts` section (1.4.0) reports network storage mounts with their usage and the same fill alerts as the HA Storage page (warning above 85 %, critical above 95 %); per-mount probes are independent and degrade to structured notes.
 
 ## Resources and prompts
 

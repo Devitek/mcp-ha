@@ -145,6 +145,7 @@ export function registerExplainTools(server: ToolRegistrar, ctx: ToolContext): v
       return {
         entity_id,
         at: new Date(moment).toISOString(),
+        cause_kind: classifyCause(chain),
         chain,
         note:
           chain.some((c) => String(c.caused_by ?? "").startsWith("automation.")) ?
@@ -153,4 +154,23 @@ export function registerExplainTools(server: ToolRegistrar, ctx: ToolContext): v
       };
     })
   );
+}
+
+/**
+ * Root-cause taxonomy (#193), aligned on the categories the 2026.9 Activity
+ * dialog uses: person, schedule, state_change, integration, unknown. Built
+ * from the finished chain: a resolved human anywhere wins; otherwise the
+ * DEEPEST link's logbook wording says what fired it. Deliberately
+ * conservative: unknown beats a wrong guess ("restart" is not detectable
+ * from the logbook alone and is left out on purpose).
+ */
+export function classifyCause(chain: Array<Record<string, unknown>>): string {
+  if (chain.length === 0) return "unknown";
+  for (const link of chain) if (link.user || link.user_id) return "person";
+  const last = chain[chain.length - 1] as Record<string, unknown>;
+  const text = `${String(last.message ?? "")} ${String(last.context_message ?? "")}`.toLowerCase();
+  if (/\b(sunrise|sunset|dawn|dusk|solar|time pattern|triggered by time|calendar|schedule)\b/.test(text)) return "schedule";
+  if (/(triggered by (?:state|numeric state) of|state of |detected|motion|opened|closed)/.test(text)) return "state_change";
+  if (last.via_service) return "integration";
+  return "unknown";
 }

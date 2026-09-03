@@ -159,3 +159,59 @@ describe("ha_get_system: updates and backups (#111)", () => {
     expect(res.data.note).toContain("minimal");
   });
 });
+describe("ha_get_system mounts (#192)", () => {
+  function mountSetup(supervisorGet: any) {
+    const { server, tools } = fakeServer();
+    registerSystemTools(server, fakeCtx({ http: { supervisorGet, supervisorAvailable: true } }));
+    return { tools };
+  }
+
+  it("lists mounts with usage, thresholds matching the Storage page", async () => {
+    const supervisorGet = vi.fn(async (path: string) => {
+      if (path === "/mounts")
+        return { mounts: [
+          { name: "nas-backup", type: "cifs", usage: "backup", state: "active" },
+          { name: "media", type: "nfs", usage: "media", state: "active" },
+        ] };
+      if (path.startsWith("/host/disks/nas-backup/")) return { total_bytes: 1000e9, used_bytes: 960e9 };
+      if (path.startsWith("/host/disks/media/")) return { total_bytes: 2000e9, used_bytes: 400e9 };
+      throw new Error("unexpected " + path);
+    });
+    const { tools } = mountSetup(supervisorGet);
+    const res = await callTool(tools, "ha_get_system", { section: "mounts" });
+    const byName = new Map<string, any>(res.data.mounts.map((m: any) => [m.name, m]));
+    expect(byName.get("nas-backup")).toMatchObject({ used_percent: 96, alert: expect.stringContaining("critical") });
+    expect(byName.get("media")).toMatchObject({ used_percent: 20 });
+    expect(byName.get("media").alert).toBeUndefined();
+  });
+
+  it("keeps a failing probe per mount as a note, and skips inactive mounts (#153 doctrine)", async () => {
+    const supervisorGet = vi.fn(async (path: string) => {
+      if (path === "/mounts")
+        return { mounts: [
+          { name: "dead-nas", type: "cifs", usage: "share", state: "active" },
+          { name: "off-mount", type: "nfs", usage: "media", state: "failed" },
+        ] };
+      throw new Error("HTTP 500: probe timeout");
+    });
+    const { tools } = mountSetup(supervisorGet);
+    const res = await callTool(tools, "ha_get_system", { section: "mounts" });
+    expect(res.isError).toBe(false);
+    const byName = new Map<string, any>(res.data.mounts.map((m: any) => [m.name, m]));
+    expect(byName.get("dead-nas").note).toContain("not readable");
+    expect(byName.get("dead-nas").note).not.toContain("500");
+    expect(byName.get("off-mount").note).toContain("not active");
+  });
+
+  it("answers a structured note when /mounts itself is denied, and an honest empty list otherwise", async () => {
+    const denied = mountSetup(vi.fn(async () => { throw new Error("HTTP 403: forbidden"); }));
+    const res = await callTool(denied.tools, "ha_get_system", { section: "mounts" });
+    expect(res.data.mounts.available).toBe(false);
+    expect(res.data.mounts.note).toContain("Supervisor");
+    const empty = mountSetup(vi.fn(async () => ({ mounts: [] })));
+    const res2 = await callTool(empty.tools, "ha_get_system", { section: "mounts" });
+    expect(res2.data.mounts).toEqual([]);
+    expect(res2.data.note).toContain("No network storage mount");
+  });
+});
+
