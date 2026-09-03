@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 - 2026-09-03
+
+Home Assistant 2026.9 batch, part one (#190, #191), carrying the planned `api_tokens` removal (#182).
+
+- **New** (#190): the run detail of `ha_get_automation_trace` reports the `targets` of each step (service, entity/device/area ids), joined from the stored config through the step paths, the way the 2026.9 trace UI does. Legacy/modern twin keys are bridged (#146); YAML-defined items simply carry no targets.
+- **New** (#191): child devices (HA 2026.9) are first-class: `ha_list_devices` exposes `parent_device_id` and shows the parent's area, and entities living on a child device inherit that area too, matching the HA UI.
+- **Removed** (#182, deprecated in 1.2.0): the `api_tokens` YAML option leaves the schema, the config parsing and the boot import. Tokens previously imported by 0.32-1.2 live hashed in the store and keep working; a leftover stored key is ignored by the Supervisor (#184 rule) and swept away at boot. The primary `api_token` remains the bootstrap and recovery path.
+
+
 ## 1.2.1 - 2026-08-27
 
 - **Fix** (#184, field report on 1.2.0): removing the deprecated `api_tokens` key from the stored options is impossible while the schema declares it: the Supervisor requires every schema list key to exist (`Missing option 'api_tokens' in root`, the exact mechanism behind #81; verified in the Supervisor source, where a stored key missing from the schema is conversely just ignored with a warning). The boot goes back to BLANKING the option (`api_tokens: []`), the migration entry is restored, and `reconcileOptions` no longer retries a definitive HTTP 400 four times. Silver lining: the same source reading proves that dropping the schema key later (#182) is safe regardless of the stored options, so the removal plan got simpler.

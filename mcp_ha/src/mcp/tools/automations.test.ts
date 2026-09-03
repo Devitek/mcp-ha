@@ -173,6 +173,53 @@ describe("ha_get_automation", () => {
 });
 
 describe("ha_get_automation_trace (#106)", () => {
+  it("joins each step to its config block and reports targets (#190)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => ({
+      state: "stopped",
+      script_execution: "finished",
+      trace: {
+        "trigger/0": [{ timestamp: "t0" }],
+        "action/0": [{ timestamp: "t1", result: { ok: true } }],
+        "action/1/choose/0/sequence/0": [{ timestamp: "t2" }],
+        "condition/0": [{ timestamp: "t3", result: { result: true } }],
+      },
+    })) };
+    const coreGet = vi.fn(async () => ({
+      // legacy singular keys on purpose: the twin fallback must bridge them
+      trigger: [{ trigger: "state", entity_id: "binary_sensor.hall" }],
+      condition: [{ condition: "time", after: "22:00" }],
+      action: [
+        { action: "light.turn_on", target: { entity_id: ["light.salon", "light.cuisine"], area_id: "a1" } },
+        { choose: [{ sequence: [{ service: "media_player.play_media", entity_id: "media_player.tv" }] }] },
+      ],
+    }));
+    registerAutomationTools(server, fakeCtx({ catalog: { index: async () => fixtures }, ws, http: { coreGet } }));
+    const res = await callTool(tools, "ha_get_automation_trace", { entity_id: "automation.morning", run_id: "r1" });
+    const byPath = new Map<string, any>(res.data.steps.map((st: any) => [st.path, st]));
+    expect(byPath.get("trigger/0").targets).toEqual({ entity_ids: ["binary_sensor.hall"] });
+    expect(byPath.get("action/0").targets).toEqual({
+      action: "light.turn_on",
+      entity_ids: ["light.salon", "light.cuisine"],
+      area_ids: ["a1"],
+    });
+    expect(byPath.get("action/1/choose/0/sequence/0").targets).toEqual({
+      action: "media_player.play_media",
+      entity_ids: ["media_player.tv"],
+    });
+    expect(byPath.get("condition/0").targets).toBeUndefined(); // no target in the block
+  });
+
+  it("carries no targets when the config is unreadable (YAML automation), without failing (#190)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => ({ state: "stopped", trace: { "action/0": [{ timestamp: "t1" }] } })) };
+    const coreGet = vi.fn(async () => { throw new Error("HTTP 404: not found"); });
+    registerAutomationTools(server, fakeCtx({ catalog: { index: async () => fixtures }, ws, http: { coreGet } }));
+    const res = await callTool(tools, "ha_get_automation_trace", { entity_id: "automation.morning", run_id: "r1" });
+    expect(res.isError).toBe(false);
+    expect(res.data.steps[0].targets).toBeUndefined();
+  });
+
   function traceSetup(wsSend: (type: string, payload: any) => Promise<any>, cfgOver: any = {}) {
     const { server, tools } = fakeServer();
     const ws = { send: vi.fn(wsSend) };

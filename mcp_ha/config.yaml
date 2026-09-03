@@ -1,5 +1,5 @@
 name: MCP Home Assistant
-version: "1.2.1"
+version: "1.3.0"
 slug: mcp_ha
 description: >-
   MCP (Model Context Protocol) server to query and control Home Assistant
@@ -27,7 +27,6 @@ ports_description:
 options:
   log_level: info
   api_token: ""
-  api_tokens: []
   allow_write: false
   allow_camera: false
   allow_config_write: false
@@ -49,10 +48,6 @@ options:
 schema:
   log_level: list(trace|debug|info|notice|warning|error|fatal)
   api_token: password?
-  api_tokens:
-    - name: str
-      token: password
-      scope: list(read|write)
   allow_write: bool
   allow_camera: bool
   allow_config_write: bool

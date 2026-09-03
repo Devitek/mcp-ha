@@ -7,8 +7,7 @@ import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import { migrate } from "drizzle-orm/sqlite-proxy/migrator";
 import { tokens, type TokenRow } from "./schema.js";
-import { CATEGORIES, LEVELS, readOnlyGrants, fullGrants, type Grants, type Level } from "../mcp/registry.js";
-import type { ApiToken } from "../config.js";
+import { CATEGORIES, LEVELS, type Grants, type Level } from "../mcp/registry.js";
 import { log } from "../logger.js";
 
 /**
@@ -344,44 +343,6 @@ export class TokenStore {
   async list(): Promise<TokenRecord[]> {
     const rows = await this.db.select().from(tokens);
     return rows.map(toRecord).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-
-  /**
-   * One-shot import of the legacy api_tokens option (#166): the clear YAML
-   * tokens become hashed rows with the grants their scope meant; the option
-   * is then blanked by the caller. Idempotent: rows already present (same
-   * hash or same name) are skipped, so a failed write-back only re-skips.
-   */
-  async importLegacy(legacy: ApiToken[]): Promise<number> {
-    let imported = 0;
-    for (const t of legacy) {
-      if (!t.token) continue;
-      const digest = sha256Hex(t.token);
-      const byHash = await this.db.select().from(tokens).where(eq(tokens.hash, digest)).limit(1);
-      if (byHash[0]) continue;
-      const byName = await this.db.select().from(tokens).where(eq(tokens.name, t.name)).limit(1);
-      if (byName[0]) {
-        log.warning(`legacy token "${t.name}" not imported: a different token with that name already exists`);
-        continue;
-      }
-      const grants = t.scope === "write" ? fullGrants() : readOnlyGrants();
-      await this.db.insert(tokens).values({
-        id: randomUUID(),
-        name: t.name,
-        prefix: t.token.slice(0, TOKEN_PREFIX_CHARS),
-        hash: digest,
-        grants: JSON.stringify(grants),
-        entityAllowlist: null,
-        entityDenylist: null,
-        createdAt: new Date().toISOString(),
-        expiresAt: null,
-        lastUsedAt: null,
-        revokedAt: null,
-      });
-      imported += 1;
-    }
-    if (imported > 0) this.snapshot();
-    return imported;
   }
 
   close(): void {

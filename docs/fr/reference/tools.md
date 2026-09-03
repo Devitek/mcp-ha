@@ -43,7 +43,7 @@ Toutes les pièces avec leur étage et leur nombre d'entités. Sans paramètre.
 
 ### ha_list_devices
 
-Appareils avec fabricant, modèle, pièce. Paramètres : `area`, `limit`, `offset`.
+Appareils avec fabricant, modèle, pièce. Paramètres : `area`, `limit`, `offset`. Les child devices (HA 2026.9) portent `parent_device_id` et affichent la pièce de leur parent.
 
 ## Services
 

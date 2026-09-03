@@ -5,17 +5,22 @@ import { setLogLevel } from "../logger.js";
 const areas = [{ area_id: "ar_kitchen", name: "Kitchen" }];
 const devices = [
   { id: "dev1", name: "Hue bulb", name_by_user: null, manufacturer: "Philips", model: "LCA001", area_id: "ar_kitchen", disabled_by: null },
+  // Child device (2026.9, #191): no own area, references its parent.
+  { id: "child1", name: "Left channel", name_by_user: null, area_id: null, disabled_by: null, parent_device_id: "dev1" },
 ];
 const entities = [
   // Direct area assignment on the entity.
   { entity_id: "light.direct", area_id: "ar_kitchen", device_id: null, disabled_by: null, hidden_by: null, entity_category: null },
   // Area inherited from the device.
   { entity_id: "light.via_device", area_id: null, device_id: "dev1", disabled_by: null, hidden_by: null, entity_category: null },
+  // Entity on a child device: the area must come from the parent (#191).
+  { entity_id: "media_player.left", area_id: null, device_id: "child1", disabled_by: null, hidden_by: null, entity_category: null },
   { entity_id: "sensor.hidden_one", area_id: null, device_id: null, disabled_by: null, hidden_by: "user", entity_category: "diagnostic" },
 ];
 const states = [
   { entity_id: "light.direct", state: "on", attributes: { friendly_name: "Direct light" }, last_changed: "2026-01-01T00:00:00Z", last_updated: "2026-01-01T00:00:00Z" },
   { entity_id: "light.via_device", state: "off", attributes: {}, last_changed: "2026-01-01T00:00:00Z", last_updated: "2026-01-01T00:00:00Z" },
+  { entity_id: "media_player.left", state: "idle", attributes: {}, last_changed: "2026-01-01T00:00:00Z", last_updated: "2026-01-01T00:00:00Z" },
   { entity_id: "sensor.hidden_one", state: "42", attributes: { friendly_name: "Diag" }, last_changed: "2026-01-01T00:00:00Z", last_updated: "2026-01-01T00:00:00Z" },
   // No registry entry at all (e.g. a template entity).
   { entity_id: "sensor.orphan", state: "1", attributes: {}, last_changed: "2026-01-01T00:00:00Z", last_updated: "2026-01-01T00:00:00Z" },
@@ -47,6 +52,8 @@ describe("Catalog.index", () => {
     expect(byId.get("light.direct")).toMatchObject({ name: "Direct light", area: "Kitchen", domain: "light", state: "on" });
     // Area resolved through the device registry.
     expect(byId.get("light.via_device")).toMatchObject({ area: "Kitchen", name: "light.via_device" });
+    // #191: one-level parent hop for child devices.
+    expect(byId.get("media_player.left")).toMatchObject({ area: "Kitchen" });
     expect(byId.get("sensor.hidden_one")).toMatchObject({ hidden: true, category: "diagnostic" });
     // Entities without a registry entry survive the join.
     expect(byId.get("sensor.orphan")).toMatchObject({ area: null, hidden: false, name: "sensor.orphan" });

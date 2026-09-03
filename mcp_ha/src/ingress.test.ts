@@ -15,7 +15,6 @@ function ctx(partial: Partial<AddonConfig> = {}) {
       port: 9583,
       apiToken: SECRET,
       apiTokenGenerated: false,
-      apiTokens: [],
       allowWrite: true,
       allowCamera: false,
       allowConfigWrite: false,
@@ -102,17 +101,13 @@ describe("ingress dashboard (#136)", () => {
     expect(full).toContain("18 write");
   });
 
-  it("renders named tokens masked with their scope, never in clear (#85)", async () => {
-    const named = "named-token-value-abcdef123456789";
-    const base = await serve(
-      createIngressHandler(ctx({ apiTokens: [{ name: "voice-pipeline", token: named, scope: "read" }] }))
-    );
+  it("renders the primary token masked, never in clear outside the page script (#85/#182)", async () => {
+    const base = await serve(createIngressHandler(ctx()));
     const html = await (await fetch(`${base}/`)).text();
-    expect(html).toContain("voice-pipeline");
-    expect(html).toContain("named-to**********");
-    expect(html).not.toContain(named);
     expect(html).toContain("api_token (primary)");
-    expect(html).toContain("legacy scope: read");
+    expect(html).toContain("full access (bootstrap and recovery)");
+    expect(html).toContain("supersec**********");
+    expect(html.split(SECRET).length - 1).toBe(1); // page script only
   });
 
   it("derives the MCP URL from the browsing host and rejects proxy internals (#92)", async () => {

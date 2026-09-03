@@ -59,6 +59,9 @@ export const deviceSchema = z
     model: z.string().nullable().default(null),
     area_id: z.string().nullable().default(null),
     disabled_by: z.string().nullable().default(null),
+    // Child devices (2026.9, #191) reference their parent; regular devices
+    // simply lack the key and default to null.
+    parent_device_id: z.string().nullable().default(null),
   })
   .loose();
 

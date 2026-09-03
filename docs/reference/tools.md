@@ -43,7 +43,7 @@ All areas with their floor and entity counts. No parameters.
 
 ### ha_list_devices
 
-Devices with manufacturer, model, area. Params: `area`, `limit`, `offset`.
+Devices with manufacturer, model, area. Child devices (HA 2026.9) carry `parent_device_id` and show their parent's area. Params: `area`, `limit`, `offset`.
 
 ## Services
 
@@ -187,7 +187,7 @@ Installed automation (or script) blueprints with their inputs: name, description
 
 ### ha_get_automation_trace
 
-Step-by-step record of recent automation or script runs, the first reflex for "why did this fire (or not)?". Without `run_id`: the list of recent runs (trigger, outcome, last step, error). With `run_id`: the ordered step path with condition verdicts and errors. Variables are deliberately omitted (size, and they would leak other entities' states past `filter_reads`). Home Assistant keeps only the last few runs in memory, since its last restart.
+Step-by-step record of recent automation or script runs, the first reflex for "why did this fire (or not)?". Without `run_id`: the list of recent runs (trigger, outcome, last step, error). With `run_id`: the ordered step path with condition verdicts, errors, and since 1.3.0 the `targets` of each step (service, entity/device/area ids, joined from the stored config the way the 2026.9 trace UI does; YAML-defined items carry no targets). Variables are deliberately omitted (size, and they would leak other entities' states past `filter_reads`). Home Assistant keeps only the last few runs in memory, since its last restart.
 
 ## Diagnostics
 
