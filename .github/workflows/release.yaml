@@ -88,7 +88,7 @@ jobs:
           echo "build_from=$(grep '${{ matrix.arch }}:' mcp_ha/build.yaml | awk '{print $2}')" >> "$GITHUB_OUTPUT"
 
       - name: Build et push de l'image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: mcp_ha
           platforms: ${{ matrix.platform }}
