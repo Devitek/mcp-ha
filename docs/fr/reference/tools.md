@@ -43,7 +43,7 @@ Toutes les pièces avec leur étage et leur nombre d'entités. Sans paramètre.
 
 ### ha_list_devices
 
-Appareils avec fabricant, modèle, pièce. Paramètres : `area`, `limit`, `offset`.
+Appareils avec fabricant, modèle, pièce. Paramètres : `area`, `limit`, `offset`. Les child devices (HA 2026.9) portent `parent_device_id` et affichent la pièce de leur parent.
 
 ## Services
 
@@ -215,7 +215,7 @@ Agrégats du recorder (moyenne, min, max, somme) pour les capteurs numériques. 
 
 ### ha_get_logbook
 
-Événements lisibles, filtrables par `entity_id`, fenêtre de 0.25 h à 7 jours, plafonné à 100 événements.
+Événements lisibles, filtrables par `entity_id`, fenêtre de 0.25 h à 7 jours, plafonné à 100 événements. Depuis 1.5.0, filtrable aussi par `area` ou `floor` entiers (un seul périmètre à la fois) : la pièce est résolue par le catalogue en entités visibles explicites (filter_reads s'applique, 60 entités max avec note au-delà) : « que s'est-il passé dans la cuisine cette nuit ? » tient en un appel.
 
 ## Dashboards
 
@@ -287,7 +287,7 @@ Sans `slug` : la liste des add-ons installés. Avec `slug` : le détail d'un add
 
 ### ha_get_system
 
-`section: "config"` : version de HA, nom, fuseau, unités, nombre d'intégrations. `section: "error_log"` : erreurs et avertissements récents, structurés, depuis le system log (WS), avec repli REST legacy pour les vieux cores. `section: "updates"` : mises à jour Core, OS et add-ons en attente ; les parties Core et OS exigent un rôle Supervisor supérieur et répondent une note structurée sous le rôle minimal, la partie add-ons marche toujours. `section: "backups"` : âge de la dernière sauvegarde et sauvegardes récentes (note structurée sous le rôle minimal). Aucune section ne fuit jamais d'erreur HTTP brute.
+`section: "config"` : version de HA, nom, fuseau, unités, nombre d'intégrations. `section: "error_log"` : erreurs et avertissements récents, structurés, depuis le system log (WS), avec repli REST legacy pour les vieux cores. `section: "updates"` : mises à jour Core, OS et add-ons en attente ; les parties Core et OS exigent un rôle Supervisor supérieur et répondent une note structurée sous le rôle minimal, la partie add-ons marche toujours. `section: "backups"` : âge de la dernière sauvegarde et sauvegardes récentes (note structurée sous le rôle minimal). Aucune section ne fuit jamais d'erreur HTTP brute. La section `mounts` (1.4.0) rapporte les montages réseau avec leur usage et les mêmes seuils d'alerte que la page Storage de HA (warning au-delà de 85 %, critical au-delà de 95 %) ; les sondes par montage sont indépendantes et dégradent en notes structurées.
 
 ## Resources et prompts
 

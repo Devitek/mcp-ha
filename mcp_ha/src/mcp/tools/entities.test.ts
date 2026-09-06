@@ -196,4 +196,30 @@ describe("ha_list_areas and ha_list_devices", () => {
     expect(res.data.items).toHaveLength(1);
     expect(res.data.items[0]).toMatchObject({ device_id: "d1", name: "My bulb" });
   });
+
+  it("shows child devices in their parent's area with parent_device_id (#191)", async () => {
+    const { server, tools } = fakeServer();
+    const ctx = fakeCtx({
+      catalog: {
+        index: async () => fixtures,
+        registries: async () => ({
+          at: 0,
+          areas: [{ area_id: "a1", name: "Kitchen", floor_id: null }],
+          devices: [
+            { id: "parent1", name: "Amp", name_by_user: null, manufacturer: "Sonos", model: "Amp", area_id: "a1", disabled_by: null, parent_device_id: null },
+            { id: "child1", name: "Left channel", name_by_user: null, manufacturer: null, model: null, area_id: null, disabled_by: null, parent_device_id: "parent1" },
+          ],
+          entities: [],
+          floors: [],
+          labels: [],
+        }),
+      },
+    });
+    registerEntityTools(server, ctx);
+    const res = await callTool(tools, "ha_list_devices", {});
+    const child = res.data.items.find((d: any) => d.device_id === "child1");
+    expect(child).toMatchObject({ name: "Left channel", area: "Kitchen", parent_device_id: "parent1" });
+    const parent = res.data.items.find((d: any) => d.device_id === "parent1");
+    expect(parent.parent_device_id).toBeUndefined();
+  });
 });

@@ -39,10 +39,11 @@ export function registerSystemTools(server: ToolRegistrar, ctx: ToolContext): vo
         "section 'error_log': recent Home Assistant errors and warnings (structured). " +
         "section 'updates': pending Core, OS and add-on updates. " +
         "section 'backups': last backup age and recent backups. " +
+        "section 'mounts': network storage mounts with usage and fill alerts. " +
         "Parts of 'updates' and 'backups' depend on the Supervisor role; unavailable parts answer " +
         "a structured note, never a raw HTTP error.",
       inputSchema: {
-        section: z.enum(["config", "error_log", "updates", "backups"]).describe("Which section to read"),
+        section: z.enum(["config", "error_log", "updates", "backups", "mounts"]).describe("Which section to read"),
       },
       annotations: { readOnlyHint: true },
     },
@@ -92,6 +93,54 @@ export function registerSystemTools(server: ToolRegistrar, ctx: ToolContext): vo
             : { available: false, note: roleNote },
         };
       }
+      if (section === "mounts") {
+        // Network storage mounts (#192, parity with the 2026.9 Storage page):
+        // the list comes from /mounts, then ONE independent usage probe per
+        // mount via /host/disks/<name>/usage. Doctrine #153: a role-denied
+        // or failing probe becomes a structured note, never a raw HTTP
+        // error, and never sinks the section.
+        let mountList: any[] | null = null;
+        try {
+          const res = await ctx.http.supervisorGet("/mounts");
+          mountList = (res?.mounts as any[]) ?? [];
+        } catch {
+          return {
+            mounts: {
+              available: false,
+              note: "Listing mounts requires a Supervisor exposing /mounts to this role; check Settings > System > Storage.",
+            },
+          };
+        }
+        if (mountList.length === 0) return { mounts: [], note: "No network storage mount configured." };
+        const mounts = await Promise.all(
+          mountList.slice(0, 10).map(async (m: any) => {
+            const base = { name: m.name, type: m.type, usage: m.usage ?? null, state: m.state ?? null };
+            if (m.state !== "active") return { ...base, note: "mount is not active; no usage probe attempted" };
+            try {
+              const u: any = await ctx.http.supervisorGet(`/host/disks/${encodeURIComponent(String(m.name))}/usage?max_depth=0`);
+              const total = Number(u?.total_bytes ?? 0);
+              const used = Number(u?.used_bytes ?? 0);
+              const percent = total > 0 ? Math.round((used / total) * 100) : null;
+              return {
+                ...base,
+                used_gb: Math.round(used / 1e8) / 10,
+                total_gb: Math.round(total / 1e8) / 10,
+                used_percent: percent,
+                // Same thresholds as the HA Storage page bars (amber 85, red 95).
+                ...(percent !== null && percent >= 95
+                  ? { alert: "critical: above 95% used" }
+                  : percent !== null && percent >= 85
+                    ? { alert: "warning: above 85% used" }
+                    : {}),
+              };
+            } catch {
+              return { ...base, note: "usage not readable right now (probe failed or timed out); the mount may be unreachable" };
+            }
+          })
+        );
+        return { mounts, ...(mountList.length > 10 ? { note: `Showing 10 of ${mountList.length} mounts.` } : {}) };
+      }
+
       if (section === "backups") {
         // The add-on deliberately runs with the minimal hassio role (#57):
         // if that role cannot list backups, say so honestly instead of

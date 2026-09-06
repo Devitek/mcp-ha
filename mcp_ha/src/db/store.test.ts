@@ -127,19 +127,4 @@ describe("TokenStore (#166)", () => {
     await rm(dir, { recursive: true, force: true });
   });
 
-  it("imports legacy api_tokens idempotently with scope-mapped grants", async () => {
-    const s = await open();
-    const legacy = [
-      { name: "writer", token: "legacy-write-token-16chars", scope: "write" as const },
-      { name: "reader", token: "legacy-read-token-16charsx", scope: "read" as const },
-    ];
-    expect(await s.importLegacy(legacy)).toBe(2);
-    expect(await s.importLegacy(legacy)).toBe(0); // second boot: nothing new
-    const writer = await s.verify("legacy-write-token-16chars");
-    expect(writer?.denied).toBeNull();
-    expect(writer?.record.grants.automations).toBe("manage");
-    const reader = await s.verify("legacy-read-token-16charsx");
-    expect(reader?.record.grants.automations).toBe("read");
-    expect(reader?.record.grants.notify).toBe("read"); // read scope: nothing above read anywhere
-  });
 });

@@ -43,7 +43,7 @@ All areas with their floor and entity counts. No parameters.
 
 ### ha_list_devices
 
-Devices with manufacturer, model, area. Params: `area`, `limit`, `offset`.
+Devices with manufacturer, model, area. Child devices (HA 2026.9) carry `parent_device_id` and show their parent's area. Params: `area`, `limit`, `offset`.
 
 ## Services
 
@@ -187,13 +187,13 @@ Installed automation (or script) blueprints with their inputs: name, description
 
 ### ha_get_automation_trace
 
-Step-by-step record of recent automation or script runs, the first reflex for "why did this fire (or not)?". Without `run_id`: the list of recent runs (trigger, outcome, last step, error). With `run_id`: the ordered step path with condition verdicts and errors. Variables are deliberately omitted (size, and they would leak other entities' states past `filter_reads`). Home Assistant keeps only the last few runs in memory, since its last restart.
+Step-by-step record of recent automation or script runs, the first reflex for "why did this fire (or not)?". Without `run_id`: the list of recent runs (trigger, outcome, last step, error). With `run_id`: the ordered step path with condition verdicts, errors, and since 1.3.0 the `targets` of each step (service, entity/device/area ids, joined from the stored config the way the 2026.9 trace UI does; YAML-defined items carry no targets). Variables are deliberately omitted (size, and they would leak other entities' states past `filter_reads`). Home Assistant keeps only the last few runs in memory, since its last restart.
 
 ## Diagnostics
 
 ### ha_explain_event
 
-Explains WHY an entity changed: follows Home Assistant's context chain (the immediate actor, what triggered it in turn, the human when there was one, resolved to their person entity when one is linked and visible), up to 4 hops. Without `at`: the entity's last change. Hidden causes appear as `(hidden entity)` under `filter_reads`. The missing link between the logbook (what) and `ha_get_automation_trace` (how); the answer points to the trace when an automation is in the chain.
+Explains WHY an entity changed: follows Home Assistant's context chain (the immediate actor, what triggered it in turn, the human when there was one, resolved to their person entity when one is linked and visible), up to 4 hops. Since 1.4.0 the answer opens with `cause_kind`, the same root-cause taxonomy as the 2026.9 Activity dialog: `person`, `schedule`, `state_change`, `integration`, or an honest `unknown`. Without `at`: the entity's last change. Hidden causes appear as `(hidden entity)` under `filter_reads`. The missing link between the logbook (what) and `ha_get_automation_trace` (how); the answer points to the trace when an automation is in the chain.
 
 ### ha_get_self_test
 
@@ -215,7 +215,7 @@ Recorder aggregates (mean, min, max, sum) for numeric sensors. `statistic_id` (s
 
 ### ha_get_logbook
 
-Human-readable events, filterable by `entity_id`, window from 0.25 h up to 7 days, capped at 100 events.
+Human-readable events, window from 0.25 h up to 7 days, capped at 100 events. Filter by `entity_id`, or since 1.5.0 by a whole `area` or `floor` (one scope at a time): the room is resolved through the catalog into explicit visible entities (filter_reads applies, up to 60 entities with a note beyond), so "what happened in the kitchen tonight?" is one call.
 
 ## Dashboards
 
@@ -287,7 +287,7 @@ Evaluates a Jinja2 template server-side and returns the rendering. Read only, ve
 
 ### ha_get_system
 
-`section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: recent errors and warnings, structured, from the system log (WS), with a legacy REST fallback for old cores. `section: "updates"`: pending Core, OS and add-on updates; the Core and OS parts need a higher Supervisor role and answer a structured note under the minimal one, while the add-on part always works. `section: "backups"`: last backup age and recent backups (structured note under the minimal role). No section ever leaks a raw HTTP error.
+`section: "config"`: HA version, name, timezone, units, integration count. `section: "error_log"`: recent errors and warnings, structured, from the system log (WS), with a legacy REST fallback for old cores. `section: "updates"`: pending Core, OS and add-on updates; the Core and OS parts need a higher Supervisor role and answer a structured note under the minimal one, while the add-on part always works. `section: "backups"`: last backup age and recent backups (structured note under the minimal role). No section ever leaks a raw HTTP error. The `mounts` section (1.4.0) reports network storage mounts with their usage and the same fill alerts as the HA Storage page (warning above 85 %, critical above 95 %); per-mount probes are independent and degrade to structured notes.
 
 ## Resources and prompts
 

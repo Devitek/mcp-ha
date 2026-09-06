@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.5.0 - 2026-09-03
+
+Home Assistant 2026.9 batch, part three (#194).
+
+- **New** (#194): `ha_get_logbook` accepts `area` and `floor` scopes (one at a time, exclusive with `entity_id`), in the spirit of the 2026.9 Sources panel: the room is resolved through the catalog into explicit visible entity ids (filter_reads applies before anything reaches HA), capped at 60 entities with a `scope_note` beyond, and an unknown room answers an actionable error listing the known ones. `ha_get_history` deliberately stays single-scope: its 5-entity limit and shared point budget would make a whole-room chart misleading (decision recorded in the issue).
+
+
+## 1.4.0 - 2026-09-03
+
+Home Assistant 2026.9 batch, part two (#192, #193).
+
+- **New** (#192): `ha_get_system` gains a `mounts` section: network storage mounts with usage and the same fill thresholds as the 2026.9 Storage page (warning above 85 %, critical above 95 %). The list comes from the Supervisor `/mounts` API and each mount gets an independent `/host/disks/<name>/usage` probe (both located by reading the Supervisor source): a failing or role-denied probe degrades to a structured note (#153 doctrine), an inactive mount is not probed, and more than 10 mounts are truncated with a note.
+- **New** (#193): `ha_explain_event` opens its answer with `cause_kind`, the root-cause taxonomy the 2026.9 Activity dialog introduced: `person` (a resolved human anywhere in the chain), `schedule` (sun/time/calendar wording on the deepest link), `state_change`, `integration` (bare service call), or an honest `unknown`. `restart` is deliberately left out: it is not reliably detectable from the logbook alone.
+
+
+## 1.3.0 - 2026-09-03
+
+Home Assistant 2026.9 batch, part one (#190, #191), carrying the planned `api_tokens` removal (#182).
+
+- **New** (#190): the run detail of `ha_get_automation_trace` reports the `targets` of each step (service, entity/device/area ids), joined from the stored config through the step paths, the way the 2026.9 trace UI does. Legacy/modern twin keys are bridged (#146); YAML-defined items simply carry no targets.
+- **New** (#191): child devices (HA 2026.9) are first-class: `ha_list_devices` exposes `parent_device_id` and shows the parent's area, and entities living on a child device inherit that area too, matching the HA UI.
+- **Removed** (#182, deprecated in 1.2.0): the `api_tokens` YAML option leaves the schema, the config parsing and the boot import. Tokens previously imported by 0.32-1.2 live hashed in the store and keep working; a leftover stored key is ignored by the Supervisor (#184 rule) and swept away at boot. The primary `api_token` remains the bootstrap and recovery path.
+
+
 ## 1.2.1 - 2026-08-27
 
 - **Fix** (#184, field report on 1.2.0): removing the deprecated `api_tokens` key from the stored options is impossible while the schema declares it: the Supervisor requires every schema list key to exist (`Missing option 'api_tokens' in root`, the exact mechanism behind #81; verified in the Supervisor source, where a stored key missing from the schema is conversely just ignored with a warning). The boot goes back to BLANKING the option (`api_tokens: []`), the migration entry is restored, and `reconcileOptions` no longer retries a definitive HTTP 400 four times. Silver lining: the same source reading proves that dropping the schema key later (#182) is safe regardless of the stored options, so the removal plan got simpler.

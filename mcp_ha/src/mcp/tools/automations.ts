@@ -5,6 +5,69 @@ import { listEnvelope, safe, trunc } from "../helpers.js";
 import { entityReadVisible } from "../../safety.js";
 import { log } from "../../logger.js";
 
+/**
+ * Trace step paths (trigger/0, action/2/choose/0/sequence/1...) point into
+ * the item's stored config (#190). Walking them yields the block each step
+ * ran, best effort: an unknown segment simply ends the walk. Alpha segments
+ * try the modern/legacy twin keys (#146): traces may say "action" while the
+ * stored config uses "actions", and vice versa.
+ */
+const TWIN_SEGMENTS: Record<string, string[]> = {
+  trigger: ["triggers", "trigger"],
+  triggers: ["triggers", "trigger"],
+  condition: ["conditions", "condition"],
+  conditions: ["conditions", "condition"],
+  action: ["actions", "action"],
+  actions: ["actions", "action"],
+};
+
+function blockAtPath(config: Record<string, unknown>, path: string): Record<string, unknown> | null {
+  let node: unknown = config;
+  for (const seg of path.split("/")) {
+    if (node === null || typeof node !== "object") return null;
+    if (/^\d+$/.test(seg)) {
+      node = Array.isArray(node) ? node[Number(seg)] : null;
+    } else {
+      let next: unknown;
+      for (const key of TWIN_SEGMENTS[seg] ?? [seg]) {
+        const candidate = (node as Record<string, unknown>)[key];
+        if (candidate !== undefined) {
+          next = candidate;
+          break;
+        }
+      }
+      node = next ?? null;
+    }
+  }
+  return node !== null && typeof node === "object" && !Array.isArray(node) ? (node as Record<string, unknown>) : null;
+}
+
+/** What the block aims at: service name plus entity/device/area ids. */
+function targetsOf(block: Record<string, unknown>): Record<string, unknown> | null {
+  const entity: string[] = [];
+  const device: string[] = [];
+  const area: string[] = [];
+  const collect = (v: unknown, into: string[]): void => {
+    if (typeof v === "string") into.push(v);
+    else if (Array.isArray(v)) for (const x of v) if (typeof x === "string") into.push(x);
+  };
+  collect(block.entity_id, entity);
+  const target = block.target;
+  if (target !== null && typeof target === "object") {
+    const t = target as Record<string, unknown>;
+    collect(t.entity_id, entity);
+    collect(t.device_id, device);
+    collect(t.area_id, area);
+  }
+  const action = typeof block.action === "string" ? block.action : typeof block.service === "string" ? block.service : undefined;
+  const out: Record<string, unknown> = {};
+  if (action) out.action = action;
+  if (entity.length > 0) out.entity_ids = [...new Set(entity)];
+  if (device.length > 0) out.device_ids = [...new Set(device)];
+  if (area.length > 0) out.area_ids = [...new Set(area)];
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 export function registerAutomationTools(server: ToolRegistrar, ctx: ToolContext): void {
   server.registerTool(
     "ha_list_automations",
@@ -198,18 +261,31 @@ export function registerAutomationTools(server: ToolRegistrar, ctx: ToolContext)
       }
 
       const detail: any = await ctx.ws.send("trace/get", { domain, item_id: itemId, run_id });
+      // Per-step targets (#190): the paths point into the stored config;
+      // joining them says what each step actually aimed at, the way the
+      // 2026.9 trace UI does. Best effort: YAML-defined items have no
+      // readable config, their steps simply carry no targets.
+      let config: Record<string, unknown> | null = null;
+      try {
+        config = (await ctx.http.coreGet(`/config/${domain}/config/${encodeURIComponent(itemId)}`)) as Record<string, unknown>;
+      } catch {
+        config = null;
+      }
       // detail.trace maps step paths (trigger/0, condition/0, action/1...) to
       // arrays of executions. Flatten, order by time, and DROP the variables:
       // they embed other entities' states (filter_reads bypass) and weigh a
       // lot; the path, verdicts and errors carry the diagnosis.
       const steps: Array<Record<string, unknown>> = [];
       for (const [path, entries] of Object.entries((detail?.trace ?? {}) as Record<string, any[]>)) {
+        const block = config ? blockAtPath(config, path) : null;
+        const targets = block ? targetsOf(block) : null;
         for (const s of entries ?? []) {
           steps.push({
             path,
             t: s?.timestamp ?? null,
             ...(s?.result !== undefined ? { result: s.result } : {}),
             ...(s?.error ? { error: trunc(String(s.error), 300) } : {}),
+            ...(targets ? { targets } : {}),
           });
         }
       }

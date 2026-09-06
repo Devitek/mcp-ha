@@ -17,7 +17,6 @@ function cfg(partial: Partial<AddonConfig> = {}): AddonConfig {
     entityDenylist: [],
     serviceDenylist: [],
     confirmDomains: [],
-    apiTokens: [],
     supervisorToken: null,
     devHaUrl: null,
     devHaToken: null,

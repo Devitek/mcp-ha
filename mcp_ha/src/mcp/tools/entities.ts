@@ -219,15 +219,21 @@ export function registerEntityTools(server: ToolRegistrar, ctx: ToolContext): vo
     safe("ha_list_devices", async ({ area, limit, offset }) => {
       const regs = await ctx.catalog.registries();
       const areaById = new Map(regs.areas.map((a) => [a.area_id, a.name]));
+      const deviceById = new Map(regs.devices.map((d) => [d.id, d]));
       let devices = regs.devices
         .filter((d) => !d.disabled_by)
-        .map((d) => ({
-          device_id: d.id,
-          name: d.name_by_user ?? d.name ?? "(unnamed)",
-          manufacturer: d.manufacturer,
-          model: d.model,
-          area: d.area_id ? (areaById.get(d.area_id) ?? null) : null,
-        }));
+        .map((d) => {
+          // Child devices (#191): no own area; show the parent's, like HA.
+          const effectiveAreaId = d.area_id ?? (d.parent_device_id ? (deviceById.get(d.parent_device_id)?.area_id ?? null) : null);
+          return {
+            device_id: d.id,
+            name: d.name_by_user ?? d.name ?? "(unnamed)",
+            manufacturer: d.manufacturer,
+            model: d.model,
+            area: effectiveAreaId ? (areaById.get(effectiveAreaId) ?? null) : null,
+            ...(d.parent_device_id ? { parent_device_id: d.parent_device_id } : {}),
+          };
+        });
       if (area) {
         const a = area.toLowerCase().trim();
         devices = devices.filter((d) => (d.area ?? "").toLowerCase() === a);
