@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { registerExplainTools } from "./explain.js";
+import { classifyCause, registerExplainTools } from "./explain.js";
 import { setLogLevel } from "../../logger.js";
 import { callTool, entity, fakeCtx, fakeServer } from "./testkit.js";
 
@@ -109,5 +109,23 @@ describe("ha_explain_event (#124)", () => {
     const { tools: t2 } = setup({});
     const bad = await callTool(t2, "ha_explain_event", { entity_id: "light.hallway", at: "not a date" });
     expect(bad.isError).toBe(true);
+  });
+});
+
+describe("cause_kind taxonomy (#193)", () => {
+  it("person wins whenever a resolved user is in the chain", () => {
+    expect(classifyCause([{ entity_id: "light.x" }, { caused_by: "automation.a" }, { entity_id: "automation.a", user: "Thomas" }])).toBe("person");
+  });
+
+  it("classifies schedules and state changes from the deepest link wording", () => {
+    expect(classifyCause([{ entity_id: "light.x", message: "triggered by time pattern" }])).toBe("schedule");
+    expect(classifyCause([{ entity_id: "cover.y", context_message: "triggered by sunset" }])).toBe("schedule");
+    expect(classifyCause([{ entity_id: "light.x" }, { caused_by: "automation.a" }, { entity_id: "automation.a", message: "triggered by state of binary_sensor.hall" }])).toBe("state_change");
+  });
+
+  it("falls back to integration on a bare service call, unknown otherwise", () => {
+    expect(classifyCause([{ entity_id: "light.x", via_service: "light.turn_on" }])).toBe("integration");
+    expect(classifyCause([{ entity_id: "light.x" }])).toBe("unknown");
+    expect(classifyCause([])).toBe("unknown");
   });
 });

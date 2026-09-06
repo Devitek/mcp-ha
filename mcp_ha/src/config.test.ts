@@ -74,25 +74,6 @@ describe("loadConfig", () => {
     expect(cfg.supervisorToken).toBeNull();
     // v0.2: locks and alarms require confirmation out of the box.
     expect(cfg.confirmDomains).toEqual(["lock", "alarm_control_panel"]);
-    expect(cfg.apiTokens).toEqual([]);
-  });
-
-  it("parses named tokens with scope defaults and drops empty ones (#85)", () => {
-    withOptions(
-      JSON.stringify({
-        api_token: "primary-token-long-enough",
-        api_tokens: [
-          { name: "readonly", token: "a-read-token-16chars", scope: "read" },
-          { name: "  ", token: "b-write-token-16chars" },
-          { name: "empty", token: "  " },
-        ],
-      })
-    );
-    const cfg = loadConfig();
-    expect(cfg.apiTokens).toEqual([
-      { name: "readonly", token: "a-read-token-16chars", scope: "read" },
-      { name: "token", token: "b-write-token-16chars", scope: "write" },
-    ]);
   });
 
   it("falls back to defaults when options.json is corrupted (audit F7)", () => {
@@ -164,17 +145,10 @@ describe("loadConfig", () => {
     spy.mockRestore();
   });
 
-  it("effectiveTokens puts the primary token first with write scope (#85)", () => {
+  it("effectiveTokens returns the primary token alone since #182", () => {
     process.env.MCP_API_TOKEN = "primary-token-long-enough";
-    withOptions(
-      JSON.stringify({
-        api_token: "primary-token-long-enough",
-        api_tokens: [{ name: "ro", token: "read-token-16-chars-x", scope: "read" }],
-      })
-    );
     const set = effectiveTokens(loadConfig());
-    expect(set[0]).toMatchObject({ name: "default", scope: "write" });
-    expect(set[1]).toMatchObject({ name: "ro", scope: "read" });
+    expect(set).toEqual([{ name: "default", token: "primary-token-long-enough", scope: "write" }]);
   });
 
   it("honours environment overrides", () => {

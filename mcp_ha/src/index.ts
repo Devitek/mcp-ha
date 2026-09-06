@@ -164,9 +164,9 @@ export function createHandler(
 
     const auth = req.headers.authorization ?? "";
     const presented = auth.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
-    // Two token populations (#166): the config tokens (primary api_token,
-    // plus any legacy api_tokens not yet imported) matched in constant time,
-    // then the store, looked up by sha256 so timing never correlates with
+    // Two token populations (#166): the primary api_token matched in
+    // constant time, then the store, looked up by sha256 so timing never
+    // correlates with
     // the secret. Store tokens carry real Grants, capped by the option
     // gates on every request: closing a gate degrades them instantly.
     let identity: { name: string; scope: string; grants?: Grants; entityLists?: TokenEntityLists } | null = null;
@@ -290,11 +290,6 @@ export function createHandler(
  */
 const OPTION_MIGRATIONS: Array<{ key: string; value: unknown }> = [
   { key: "confirm_domains", value: ["lock", "alarm_control_panel"] },
-  // Deprecated (#180) but REQUIRED to exist while the schema declares it:
-  // schema list keys cannot be optional and a missing one bricks every
-  // config save (#81, re-proven the hard way in #184). The whole key goes
-  // away with the schema in #182.
-  { key: "api_tokens", value: [] },
   { key: "allow_camera", value: false },
   { key: "allow_config_write", value: false },
   { key: "enable_sessions", value: false },
@@ -414,10 +409,7 @@ async function main(): Promise<void> {
   const ctx: ToolContext = { cfg, ws, http, catalog, confirmations: new ConfirmationStore() };
 
   // Fine-grained token store (#166): on-disk in the add-on, in-memory in
-  // dev mode. Legacy api_tokens are imported once (hashed, grants mapped
-  // from their scope) and the clear-text option is then blanked, so no
-  // secret keeps living in the options or the Supervisor backups.
-  // The store must never take the whole add-on down (#172, doctrine #153):
+  // dev mode. The store must never take the whole add-on down (#172, doctrine #153):
   // if the on-disk database cannot open, degrade to memory loudly. The
   // primary token keeps working; stored tokens wait for the fix.
   let store: TokenStore;
@@ -431,19 +423,9 @@ async function main(): Promise<void> {
     );
     store = await TokenStore.open(":memory:");
   }
-  if (cfg.apiTokens.length > 0) {
-    const imported = await store.importLegacy(cfg.apiTokens);
-    log.warning(
-      `The api_tokens option is DEPRECATED (#180): ${imported} legacy entr${imported === 1 ? "y" : "ies"} imported ` +
-        "(hashed) into the token store, and the option is blanked. Manage tokens from the ingress page; " +
-        "the option itself will be dropped in a future release."
-    );
-    // Blanked, not removed: a schema list key must exist in the stored
-    // options (#184), so the empty list stays until the schema drops (#182).
-    void reconcileOptions(cfg, http, undefined, { api_tokens: [] });
-  } else {
-    void reconcileOptions(cfg, http);
-  }
+  // api_tokens left the schema in 1.3.0 (#182): a leftover stored key is
+  // ignored by the Supervisor (#184 rule 2) and swept away cosmetically.
+  void reconcileOptions(cfg, http, undefined, {}, ["api_tokens"]);
 
   // Shared between the MCP handler (which counts) and the ingress page
   // (which displays), #128.

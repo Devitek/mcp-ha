@@ -134,22 +134,52 @@ export function registerHistoryTools(server: ToolRegistrar, ctx: ToolContext): v
       title: "Logbook events",
       description:
         "Human-readable logbook events (who did what, when) over a time window " +
-        "(default 24 h, max 7 days), filterable by entity. Useful to answer 'what happened?'.",
+        "(default 24 h, max 7 days), filterable by one entity, or by a whole area or floor " +
+        "('what happened in the kitchen tonight?'). Useful to answer 'what happened?'.",
       inputSchema: {
         entity_id: z.string().optional().describe("Restrict to one entity"),
+        area: z.string().optional().describe("Area name (case insensitive): events of every visible entity in it"),
+        floor: z.string().optional().describe("Floor name: events of every visible entity on it"),
         hours: z.number().min(0.25).max(168).optional().describe("Sliding window in hours, default 24"),
         start: z.string().optional(),
         end: z.string().optional(),
       },
       annotations: { readOnlyHint: true },
     },
-    safe("ha_get_logbook", async ({ entity_id, hours, start, end }) => {
+    safe("ha_get_logbook", async ({ entity_id, area, floor, hours, start, end }) => {
+      if ([entity_id, area, floor].filter(Boolean).length > 1) {
+        throw new Error("pick ONE of entity_id, area or floor");
+      }
       if (entity_id && !entityReadVisible(ctx.cfg, entity_id)) {
         throw new Error(`entity ${entity_id} is not accessible (filter_reads)`);
       }
       const w = timeWindow({ start, end, hours }, 24, 168);
       const payload: Record<string, unknown> = { start_time: w.start, end_time: w.end };
       if (entity_id) payload.entity_ids = [entity_id];
+      // Whole-room and whole-floor scopes (#194, the 2026.9 Sources panel
+      // spirit): resolved through the catalog into explicit entity ids, so
+      // filter_reads applies before anything reaches HA.
+      let scopeNote: string | null = null;
+      if (area || floor) {
+        const wanted = (area ?? floor)!.toLowerCase().trim();
+        const index = await ctx.catalog.index();
+        const matches = index.filter(
+          (e) =>
+            entityReadVisible(ctx.cfg, e.entity_id) &&
+            ((area ? e.area : e.floor) ?? "").toLowerCase() === wanted
+        );
+        if (matches.length === 0) {
+          const known = [...new Set(index.map((e) => (area ? e.area : e.floor)).filter(Boolean) as string[])].sort();
+          throw new Error(
+            `no visible entity in ${area ? "area" : "floor"} "${area ?? floor}". Known ${area ? "areas" : "floors"}: ${known.slice(0, 30).join(", ") || "(none)"}`
+          );
+        }
+        const AREA_ENTITY_CAP = 60;
+        payload.entity_ids = matches.slice(0, AREA_ENTITY_CAP).map((e) => e.entity_id);
+        if (matches.length > AREA_ENTITY_CAP) {
+          scopeNote = `${matches.length} entities there, the first ${AREA_ENTITY_CAP} were queried; narrow with entity_id for the rest.`;
+        }
+      }
       const raw: any[] = (await ctx.ws.send("logbook/get_events", payload)) ?? [];
       const visible = raw.filter((r) => !r.entity_id || entityReadVisible(ctx.cfg, r.entity_id));
       const events = visible.slice(-MAX_LOGBOOK).map((r) => ({
@@ -167,6 +197,7 @@ export function registerHistoryTools(server: ToolRegistrar, ctx: ToolContext): v
         ...(visible.length > MAX_LOGBOOK
           ? { note: `${visible.length} events, only the last ${MAX_LOGBOOK} are returned. Narrow the window or filter by entity.` }
           : {}),
+        ...(scopeNote ? { scope_note: scopeNote } : {}),
       };
     })
   );

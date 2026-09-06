@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { registerHistoryTools } from "./history.js";
 import { setLogLevel } from "../../logger.js";
-import { callTool, fakeCtx, fakeServer } from "./testkit.js";
+import { callTool, fakeCtx, fakeServer, entity } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
@@ -143,3 +143,55 @@ describe("ha_get_logbook", () => {
     expect(res.data.events.every((e: any) => e.entity_id !== "camera.front")).toBe(true);
   });
 });
+describe("ha_get_logbook by area or floor (#194)", () => {
+  function scopeSetup(events: any[] = []) {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => events) };
+    const index = [
+      entity("light.kitchen_main", { area: "Kitchen", floor: "Ground floor" }),
+      entity("sensor.kitchen_temp", { area: "Kitchen", floor: "Ground floor" }),
+      entity("light.bedroom", { area: "Bedroom", floor: "First floor" }),
+    ];
+    const ctx = fakeCtx({ ws, catalog: { index: async () => index } });
+    registerHistoryTools(server, ctx);
+    return { tools, ws };
+  }
+
+  it("resolves an area into its visible entity ids", async () => {
+    const { tools, ws } = scopeSetup([{ when: "2026-09-03T10:00:00Z", name: "Kitchen main", entity_id: "light.kitchen_main", state: "on" }]);
+    const res = await callTool(tools, "ha_get_logbook", { area: "kitchen" });
+    const payload = (ws.send.mock.calls[0] as any)[1];
+    expect(payload.entity_ids.sort()).toEqual(["light.kitchen_main", "sensor.kitchen_temp"]);
+    expect(res.data.events[0].entity_id).toBe("light.kitchen_main");
+  });
+
+  it("resolves a floor too, and refuses combined scopes", async () => {
+    const { tools, ws } = scopeSetup();
+    await callTool(tools, "ha_get_logbook", { floor: "ground floor" });
+    const payload = (ws.send.mock.calls[0] as any)[1];
+    expect(payload.entity_ids).toHaveLength(2);
+    const both = await callTool(tools, "ha_get_logbook", { area: "Kitchen", entity_id: "light.bedroom" });
+    expect(both.isError).toBe(true);
+    expect(both.text).toContain("ONE of");
+  });
+
+  it("answers an actionable error for an unknown area, listing the known ones", async () => {
+    const { tools } = scopeSetup();
+    const res = await callTool(tools, "ha_get_logbook", { area: "Garage" });
+    expect(res.isError).toBe(true);
+    expect(res.text).toContain("Known areas");
+    expect(res.text).toContain("Kitchen");
+  });
+
+  it("caps the resolved entity list at 60 with a scope note", async () => {
+    const { server, tools } = fakeServer();
+    const ws = { send: vi.fn(async () => []) };
+    const many = Array.from({ length: 70 }, (_, i) => entity(`sensor.s${i}`, { area: "Big room" }));
+    registerHistoryTools(server, fakeCtx({ ws, catalog: { index: async () => many } }));
+    const res = await callTool(tools, "ha_get_logbook", { area: "big room" });
+    const payload = (ws.send.mock.calls[0] as any)[1];
+    expect(payload.entity_ids).toHaveLength(60);
+    expect(res.data.scope_note).toContain("70 entities");
+  });
+});
+
