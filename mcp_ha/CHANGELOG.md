@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.1 - 2026-09-26
+
+Maintenance release: ships the runtime dependency updates accumulated on main (zod 4.4.3 to 4.6.5, yaml 2.9.0 to 2.9.1) and the refreshed toolchain (vitest 5 with its v8 coverage provider, docker build actions v7/v4, mermaid 12 on the docs site). No functional change; verified against Home Assistant 2026.9.3.
+
+
 ## 1.5.0 - 2026-09-03
 
 Home Assistant 2026.9 batch, part three (#194).
