@@ -9,6 +9,9 @@ export interface WriteTarget {
   area_id?: string | string[] | undefined;
 }
 
+/** Target keys that expand to entities HA-side, out of reach of the entity lists. */
+const INDIRECT_TARGET_KEYS = ["area_id", "device_id", "floor_id", "label_id"] as const;
+
 export interface WriteRequest {
   /** Tool name, for the audit trail. */
   tool: string;
@@ -56,15 +59,20 @@ export async function guardedServiceCall(ctx: ToolContext, req: WriteRequest): P
     if (!v.allowed) deny(v.reason ?? `entity denied: ${id}`);
   }
 
-  // Targeting by area or device would bypass the entity lists: refuse it as
-  // soon as any entity restriction is configured.
+  // Targeting by area, device, floor or label would bypass the entity lists:
+  // refuse it as soon as any entity restriction is configured. HA accepts
+  // these keys in data as well as in target (#222), so both are checked.
   const hasRestrictions =
     cfg.entityAllowlist.length > 0 ||
     cfg.entityDenylist.length > 0 ||
     (ctx.tokenEntityLists?.allow?.length ?? 0) > 0 ||
     (ctx.tokenEntityLists?.deny?.length ?? 0) > 0;
-  if (hasRestrictions && (req.target?.area_id || req.target?.device_id)) {
-    deny("entity restrictions are configured, target explicit entity_id values instead of area_id or device_id");
+  const indirect = (src: Record<string, unknown> | undefined): boolean =>
+    INDIRECT_TARGET_KEYS.some((k) => src?.[k] !== undefined && src?.[k] !== null);
+  if (hasRestrictions && (indirect(req.target as Record<string, unknown> | undefined) || indirect(req.data))) {
+    deny(
+      "entity restrictions are configured, target explicit entity_id values instead of area_id, device_id, floor_id or label_id"
+    );
   }
 
   const wouldCall = { domain: dom, service: svc, target: req.target ?? null, data: req.data ?? null };

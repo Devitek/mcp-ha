@@ -20,7 +20,7 @@ flowchart TD
   C -- "yes" --> R1["Refused + audit line"]
   C -- "no" --> D{"targeted entities pass<br>allowlist / denylist?"}
   D -- "no" --> R1
-  D -- "yes" --> E{"area_id / device_id target<br>while restrictions exist?"}
+  D -- "yes" --> E{"area / device / floor / label target<br>(target or data)<br>while restrictions exist?"}
   E -- "yes" --> R1
   E -- "no" --> F{"dry_run?"}
   F -- "yes" --> P["Preview returned + audit,<br>nothing executed"]
