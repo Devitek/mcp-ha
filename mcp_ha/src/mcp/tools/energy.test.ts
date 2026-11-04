@@ -5,9 +5,11 @@ import { callTool, fakeCtx, fakeServer } from "./testkit.js";
 
 beforeAll(() => setLogLevel("fatal"));
 
+// Unified grid format (HA 2026.3+, energy storage minor version 3, #223):
+// each grid connection carries its own import/export meters.
 const PREFS = {
   energy_sources: [
-    { type: "grid", flow_from: [{ stat_energy_from: "sensor.grid_in" }], flow_to: [{ stat_energy_to: "sensor.grid_out" }] },
+    { type: "grid", stat_energy_from: "sensor.grid_in", stat_energy_to: "sensor.grid_out" },
     { type: "solar", stat_energy_from: "sensor.solar" },
     { type: "gas", stat_energy_from: "sensor.gas" },
   ],
@@ -31,7 +33,7 @@ function setup(over: any = {}) {
     send: vi.fn(async (type: string) => {
       if (type === "energy/get_prefs") {
         if (over.noPrefs) throw new Error("Energy not configured");
-        return PREFS;
+        return over.prefs ?? PREFS;
       }
       return stats;
     }),
@@ -49,6 +51,36 @@ describe("ha_get_energy (#109)", () => {
     const [, payload] = (ws.send as any).mock.calls.find((c: any[]) => c[0] === "recorder/statistics_during_period");
     expect(payload.types).toEqual(["change"]);
     expect(payload.statistic_ids).toContain("sensor.grid_in");
+  });
+
+  it("sums several unified grid connections, export-only ones included (#223)", async () => {
+    const prefs = {
+      energy_sources: [
+        { type: "grid", stat_energy_from: "sensor.grid_in", stat_energy_to: null },
+        { type: "grid", stat_energy_from: "sensor.grid_in2", stat_energy_to: "sensor.grid_out" },
+        { type: "grid", stat_energy_from: null, stat_energy_to: "sensor.grid_out2" },
+      ],
+    };
+    const stats = {
+      "sensor.grid_in": [{ change: 2 }],
+      "sensor.grid_in2": [{ change: 1.5 }],
+      "sensor.grid_out": [{ change: 0.5 }],
+      "sensor.grid_out2": [{ change: 0.25 }],
+    };
+    const { tools } = setup({ prefs, stats });
+    const res = await callTool(tools, "ha_get_energy", {});
+    expect(res.data.totals).toMatchObject({ grid_import: 3.5, grid_export: 0.75 });
+  });
+
+  it("still reads the legacy flow_from/flow_to grid format of older cores", async () => {
+    const prefs = {
+      energy_sources: [
+        { type: "grid", flow_from: [{ stat_energy_from: "sensor.grid_in" }], flow_to: [{ stat_energy_to: "sensor.grid_out" }] },
+      ],
+    };
+    const { tools } = setup({ prefs });
+    const res = await callTool(tools, "ha_get_energy", {});
+    expect(res.data.totals).toMatchObject({ grid_import: 6, grid_export: 0.5 });
   });
 
   it("compares with the previous period and computes deltas", async () => {
