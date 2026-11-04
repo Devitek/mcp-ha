@@ -67,6 +67,16 @@ export const deviceSchema = z
 
 export const devicesSchema = z.array(deviceSchema);
 
+/**
+ * Assist aliases as HA serializes them: a null entry stands for the
+ * computed entity name (HA 2026.11), already searchable as the name, so it
+ * is dropped rather than rejected.
+ */
+const aliasesSchema = z
+  .array(z.string().nullable())
+  .default([])
+  .transform((list) => list.filter((a): a is string => typeof a === "string" && a.length > 0));
+
 export const entityEntrySchema = z
   .object({
     entity_id: z.string(),
@@ -75,13 +85,23 @@ export const entityEntrySchema = z
     disabled_by: z.string().nullable().default(null),
     hidden_by: z.string().nullable().default(null),
     entity_category: z.string().nullable().default(null),
-    // Assist aliases and label ids (#89); absent on older cores.
-    aliases: z.array(z.string()).default([]),
+    // Label ids (#89). Aliases are never in the list payload (#224): they
+    // come from get_entries, the default keeps the join uniform.
+    aliases: aliasesSchema,
     labels: z.array(z.string()).default([]),
   })
   .loose();
 
 export const entityEntriesSchema = z.array(entityEntrySchema);
+
+/**
+ * config/entity_registry/get_entries: entity_id -> extended entry, or null
+ * for an unknown id. Only the aliases are read (#224).
+ */
+export const extendedEntriesSchema = z.record(
+  z.string(),
+  z.object({ aliases: aliasesSchema }).loose().nullable()
+);
 
 /** get_services: domain -> service -> definition (kept opaque). */
 export const servicesSchema = z.record(z.string(), z.record(z.string(), z.unknown()));
