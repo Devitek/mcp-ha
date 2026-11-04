@@ -32,9 +32,24 @@ describe("ha_list_dashboards (#129)", () => {
   it("lists dashboards with their editability", async () => {
     const { tools } = setup();
     const res = await callTool(tools, "ha_list_dashboards", {});
-    expect(res.data.items[0]).toMatchObject({ url_path: "lovelace" });
+    expect(res.data.items[0]).toMatchObject({ url_path: "lovelace", default: true });
     expect(res.data.items).toContainEqual(expect.objectContaining({ url_path: "mobile", editable: true }));
     expect(res.data.items).toContainEqual(expect.objectContaining({ url_path: "wall", editable: false }));
+  });
+
+  it("does not duplicate the default dashboard once the core lists it (#228)", async () => {
+    const { server, tools } = fakeServer();
+    const ws = {
+      send: vi.fn(async () => [
+        { url_path: "lovelace", title: "Home", mode: "storage" },
+        { url_path: "mobile", title: "Mobile", mode: "storage" },
+      ]),
+    };
+    registerDashboardTools(server, fakeCtx({ ws }));
+    const res = await callTool(tools, "ha_list_dashboards", {});
+    const defaults = res.data.items.filter((d: any) => d.url_path === "lovelace");
+    expect(defaults).toHaveLength(1);
+    expect(defaults[0]).toMatchObject({ title: "Home", default: true, editable: true });
   });
 
   it("lists the views of one dashboard with layout and card counts", async () => {

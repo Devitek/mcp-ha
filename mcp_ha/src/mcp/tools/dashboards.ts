@@ -24,12 +24,18 @@ export function registerDashboardTools(server: ToolRegistrar, ctx: ToolContext):
     safe("ha_list_dashboards", async ({ dashboard }) => {
       if (!dashboard) {
         const list: any[] = ((await ctx.ws.send("lovelace/dashboards/list", {})) as any[]) ?? [];
+        // Recent cores migrate the default dashboard into a real "lovelace"
+        // entry of the list (#228); older ones leave it implicit.
+        const listsDefault = list.some((d) => d.url_path === "lovelace");
         return {
           items: [
-            { url_path: "lovelace", title: "Default dashboard", editable: null, note: "editability known on read" },
+            ...(listsDefault
+              ? []
+              : [{ url_path: "lovelace", title: "Default dashboard", default: true, editable: null, note: "editability known on read" }]),
             ...list.map((d) => ({
               url_path: d.url_path,
               title: d.title,
+              ...(d.url_path === "lovelace" ? { default: true } : {}),
               editable: d.mode === "storage",
               ...(d.mode !== "storage" ? { note: "YAML-managed: not editable through the add-on" } : {}),
             })),
