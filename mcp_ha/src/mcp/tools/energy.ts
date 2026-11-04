@@ -13,6 +13,7 @@ import { entityReadVisible } from "../../safety.js";
  */
 
 const PERIOD_HOURS = { day: 24, week: 168, month: 720 } as const;
+const ENERGY_UNITS = { energy: "kWh", volume: "m³" } as const;
 
 interface Buckets {
   grid_import: string[];
@@ -91,6 +92,10 @@ export function registerEnergyTools(server: ToolRegistrar, ctx: ToolContext): vo
           statistic_ids: allStats,
           period: hours > 168 ? "day" : "hour",
           types: ["change"],
+          // Statistics come back in their stored unit otherwise: a Wh meter
+          // would be summed with kWh ones (#225). HA converts server-side,
+          // like the energy dashboard does.
+          units: ENERGY_UNITS,
         });
         const totals: Record<string, number> = {};
         for (const [id, rows] of Object.entries(res ?? {})) {
@@ -125,7 +130,7 @@ export function registerEnergyTools(server: ToolRegistrar, ctx: ToolContext): vo
         to: new Date(now).toISOString(),
         totals,
         top_devices: topDevices,
-        note: "Units follow the dashboard statistics (kWh for energy, m3 for gas and water).",
+        note: "Energy in kWh and water in m³, converted by Home Assistant whatever the meter unit; gas in m³, or kWh for an energy-rated gas meter.",
       };
       if (compare) {
         const previous = summarize(await window(now - 2 * hours * 3_600_000, now - hours * 3_600_000));
