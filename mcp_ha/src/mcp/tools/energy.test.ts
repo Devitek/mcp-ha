@@ -51,6 +51,8 @@ describe("ha_get_energy (#109)", () => {
     const [, payload] = (ws.send as any).mock.calls.find((c: any[]) => c[0] === "recorder/statistics_during_period");
     expect(payload.types).toEqual(["change"]);
     expect(payload.statistic_ids).toContain("sensor.grid_in");
+    // Totals must be homogeneous whatever the meters' stored units (#225).
+    expect(payload.units).toEqual({ energy: "kWh", volume: "m³" });
   });
 
   it("sums several unified grid connections, export-only ones included (#223)", async () => {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.3 - 2026-11-04
+
+- **Fixed** (#225): `ha_get_energy` summed statistics in their stored unit, so a meter reporting in Wh came out 1000 times too large while labelled kWh. Home Assistant now converts every statistic to kWh (energy) and m³ (volume) before the totals are computed, as the energy dashboard does. The fix in 1.5.2 (#223) made it visible on the grid; device totals in Wh were already affected.
+
+
 ## 1.5.2 - 2026-11-04
 
 Fixes found while auditing Home Assistant 2026.10 and 2026.11, plus dependency updates. Verified against Home Assistant 2026.10.4; no change required by 2026.11.0.
