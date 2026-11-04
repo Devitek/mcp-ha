@@ -183,7 +183,7 @@ entity_id, nom, running, last_triggered. Paramètres : `limit`, `offset`.
 
 ### ha_list_blueprints
 
-Les blueprints d'automations (ou de scripts) installés avec leurs inputs : nom, description, lesquels sont requis, défauts et types de selectors. Le premier arrêt naturel avant de créer une automation : `ha_create_from_blueprint` remplit des trous typés dans du comportement éprouvé.
+Les blueprints d'automations (ou de scripts) installés. Sans `path` : une liste compacte paginée (`limit`, 20 par défaut, et `offset`), filtrable par `search` sur le nom, le chemin et la description, où chaque entrée donne son nom, une description courte, son nombre d'inputs et les noms des inputs requis. Avec `path` : les inputs complets de ce blueprint (description, caractère requis, défaut, type de selector). Depuis la 1.5.4 (#227), une grosse collection ne dépasse plus le plafond de réponse. Le premier arrêt naturel avant de créer une automation : `ha_create_from_blueprint` remplit des trous typés dans du comportement éprouvé.
 
 ### ha_get_automation_trace
 
@@ -221,7 +221,7 @@ Agrégats du recorder (moyenne, min, max, somme) pour les capteurs numériques. 
 
 ### ha_list_dashboards
 
-Sans `dashboard` : les dashboards Lovelace (titre, url_path, éditable ou géré en YAML). Avec `dashboard` : ses vues (index, titre, layout, nombre de cartes), ce dont `ha_add_dashboard_card` a besoin.
+Sans `dashboard` : les dashboards Lovelace (titre, url_path, éditable ou géré en YAML), celui par défaut marqué `default: true` et listé une seule fois (#228). Avec `dashboard` : ses vues (index, titre, layout, nombre de cartes), ce dont `ha_add_dashboard_card` a besoin.
 
 ### ha_add_dashboard_card <Badge type="danger" text="écriture config" />
 

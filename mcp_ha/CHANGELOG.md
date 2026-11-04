@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.4 - 2026-11-04
+
+- **Fixed** (#227): `ha_list_blueprints` overflowed the response cap on large blueprint collections and came back truncated, with no way to page. The list is now compact and paginated (`limit`, `offset`), filterable with `search`, and each entry names its required inputs; pass `path` for the full inputs of one blueprint.
+- **Fixed** (#228): `ha_list_dashboards` listed the default dashboard twice on cores that migrated it into a regular `lovelace` entry. It now appears once, flagged `default: true`.
+
 ## 1.5.3 - 2026-11-04
 
 - **Fixed** (#225): `ha_get_energy` summed statistics in their stored unit, so a meter reporting in Wh came out 1000 times too large while labelled kWh. Home Assistant now converts every statistic to kWh (energy) and m³ (volume) before the totals are computed, as the energy dashboard does. The fix in 1.5.2 (#223) made it visible on the grid; device totals in Wh were already affected.

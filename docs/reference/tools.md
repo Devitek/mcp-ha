@@ -183,7 +183,7 @@ entity_id, name, running, last_triggered. Params: `limit`, `offset`.
 
 ### ha_list_blueprints
 
-Installed automation (or script) blueprints with their inputs: name, description, which inputs are required, defaults and selector types. The natural first stop before creating an automation: `ha_create_from_blueprint` fills typed holes in vetted behaviour.
+Installed automation (or script) blueprints. Without `path`: a compact paginated list (`limit`, default 20, and `offset`), filterable with `search` on name, path and description, where each entry gives its name, a short description, its input count and the names of its required inputs. With `path`: the full inputs of that blueprint (description, required flag, default, selector type). Since 1.5.4 (#227) large collections no longer overflow the response cap. The natural first stop before creating an automation: `ha_create_from_blueprint` fills typed holes in vetted behaviour.
 
 ### ha_get_automation_trace
 
@@ -221,7 +221,7 @@ Human-readable events, window from 0.25 h up to 7 days, capped at 100 events. Fi
 
 ### ha_list_dashboards
 
-Without `dashboard`: the Lovelace dashboards (title, url_path, editable or YAML-managed). With `dashboard`: its views (index, title, layout, card count), what `ha_add_dashboard_card` needs.
+Without `dashboard`: the Lovelace dashboards (title, url_path, editable or YAML-managed), the default one flagged `default: true` and listed once (#228). With `dashboard`: its views (index, title, layout, card count), what `ha_add_dashboard_card` needs.
 
 ### ha_add_dashboard_card <Badge type="danger" text="config write" />
 
