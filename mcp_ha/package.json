@@ -1,6 +1,6 @@
 {
   "name": "mcp-ha",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "private": true,
   "type": "module",
   "description": "Add-on Home Assistant exposant un serveur MCP (Model Context Protocol)",
@@ -15,18 +15,18 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.0",
-    "drizzle-orm": "^0.45.2",
-    "ws": "^8.18.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "drizzle-orm": "^0.45.4",
+    "ws": "^8.22.1",
     "yaml": "^2.9.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
     "@types/ws": "^8.5.0",
-    "@vitest/coverage-v8": "^5.0.0",
-    "drizzle-kit": "^0.31.10",
+    "@vitest/coverage-v8": "^5.1.0",
+    "drizzle-kit": "^0.31.11",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.1.0"
   }
 }

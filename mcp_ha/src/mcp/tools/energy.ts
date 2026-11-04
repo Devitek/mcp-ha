@@ -28,6 +28,11 @@ function collectStats(prefs: any): { buckets: Buckets; devices: Array<{ stat: st
   const buckets: Buckets = { grid_import: [], grid_export: [], solar: [], battery_in: [], battery_out: [], gas: [], water: [] };
   for (const src of (prefs?.energy_sources as any[]) ?? []) {
     if (src.type === "grid") {
+      // Unified format (HA 2026.3+, #223): one import/export pair per grid
+      // connection, several connections allowed. Older cores keep the legacy
+      // flow_from/flow_to arrays on a single grid source.
+      if (src.stat_energy_from) buckets.grid_import.push(src.stat_energy_from);
+      if (src.stat_energy_to) buckets.grid_export.push(src.stat_energy_to);
       for (const f of src.flow_from ?? []) if (f.stat_energy_from) buckets.grid_import.push(f.stat_energy_from);
       for (const f of src.flow_to ?? []) if (f.stat_energy_to) buckets.grid_export.push(f.stat_energy_to);
     } else if (src.type === "solar" && src.stat_energy_from) buckets.solar.push(src.stat_energy_from);

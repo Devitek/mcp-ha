@@ -127,6 +127,31 @@ describe("ha_call_service safety matrix", () => {
     expect(res.text).toContain("entity_id");
   });
 
+  it.each(["area_id", "device_id", "floor_id", "label_id"])(
+    "refuses %s smuggled through data when entity restrictions exist (#222)",
+    async (key) => {
+      const { tools, ws } = setup({ allowWrite: true, entityAllowlist: ["light.salon"] });
+      const res = await callTool(tools, "ha_call_service", {
+        domain: "light",
+        service: "turn_off",
+        data: { [key]: "kitchen" },
+      });
+      expect(res.isError).toBe(true);
+      expect(res.text).toContain("entity_id");
+      expect(ws.send).not.toHaveBeenCalledWith("call_service", expect.anything());
+    }
+  );
+
+  it("refuses indirect data targeting under a denylist too (#222)", async () => {
+    const { tools } = setup({ allowWrite: true, entityDenylist: ["lock.*"] });
+    const res = await callTool(tools, "ha_call_service", {
+      domain: "homeassistant",
+      service: "turn_off",
+      data: { area_id: ["entrance"] },
+    });
+    expect(res.isError).toBe(true);
+  });
+
   it("allows area targeting when no restriction is configured", async () => {
     const { tools, ws } = setup({ allowWrite: true });
     const res = await callTool(tools, "ha_call_service", {

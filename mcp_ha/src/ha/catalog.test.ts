@@ -28,7 +28,7 @@ const states = [
 
 function fakeWs(overrides: Record<string, unknown> = {}) {
   return {
-    send: vi.fn(async (type: string) => {
+    send: vi.fn(async (type: string, _params?: unknown) => {
       if (type in overrides) return overrides[type];
       switch (type) {
         case "config/area_registry/list": return areas;
@@ -67,7 +67,7 @@ describe("Catalog.index", () => {
     const calls = ws.send.mock.calls.map((c) => c[0]);
     // Everything served from cache on the second run (5 registries since #89).
     expect(calls.filter((t) => t === "get_states")).toHaveLength(1);
-    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(5);
+    expect(calls.filter((t) => t.startsWith("config/") && t.endsWith("/list"))).toHaveLength(5);
   });
 
   it("shares the in-flight promise between concurrent callers (audit B5)", async () => {
@@ -76,7 +76,7 @@ describe("Catalog.index", () => {
     await Promise.all([catalog.index(), catalog.index(), catalog.index()]);
     const calls = ws.send.mock.calls.map((c) => c[0]);
     expect(calls.filter((t) => t === "get_states")).toHaveLength(1);
-    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(5);
+    expect(calls.filter((t) => t.startsWith("config/") && t.endsWith("/list"))).toHaveLength(5);
   });
 
   it("refetches everything after invalidate(), e.g. on WS reconnection (audit C9)", async () => {
@@ -87,7 +87,7 @@ describe("Catalog.index", () => {
     await catalog.index();
     const calls = ws.send.mock.calls.map((c) => c[0]);
     expect(calls.filter((t) => t === "get_states")).toHaveLength(2);
-    expect(calls.filter((t) => t.startsWith("config/"))).toHaveLength(10);
+    expect(calls.filter((t) => t.startsWith("config/") && t.endsWith("/list"))).toHaveLength(10);
   });
 
   it("turns an unexpected HA payload into an actionable error (audit B2)", async () => {
@@ -107,10 +107,12 @@ describe("Catalog.index", () => {
             disabled_by: null,
             hidden_by: null,
             entity_category: null,
-            aliases: ["big light"],
             labels: ["lb_1", "lb_ghost"],
           },
         ],
+        // The list never carries aliases (#224): they come from the
+        // extended entries, where null stands for the computed name.
+        "config/entity_registry/get_entries": { "light.direct": { entity_id: "light.direct", aliases: [null, "big light"] } },
         "config/floor_registry/list": [{ floor_id: "fl_ground", name: "Ground floor", level: 0 }],
         "config/label_registry/list": [{ label_id: "lb_1", name: "holiday-off" }],
       }) as any
@@ -122,6 +124,24 @@ describe("Catalog.index", () => {
       // Known ids are resolved to names, unknown ones stay as ids.
       labels: ["holiday-off", "lb_ghost"],
     });
+  });
+
+  it("fetches aliases in batches and caches them across registry refreshes (#224)", async () => {
+    const many = Array.from({ length: 501 }, (_, i) => ({ entity_id: `sensor.s${i}`, area_id: null, device_id: null, disabled_by: null, hidden_by: null, entity_category: null }));
+    const ws = fakeWs({
+      "config/entity_registry/list": many,
+      "config/entity_registry/get_entries": { "sensor.s0": { aliases: ["first"] }, "sensor.ghost": null },
+    });
+    const catalog = new Catalog(ws as any);
+    const regs = await catalog.registries();
+    expect(regs.entities.find((e) => e.entity_id === "sensor.s0")?.aliases).toEqual(["first"]);
+    const calls = () => ws.send.mock.calls.filter((c) => c[0] === "config/entity_registry/get_entries");
+    expect(calls()).toHaveLength(2);
+    expect((calls()[0]![1] as any).entity_ids).toHaveLength(500);
+    // A registry rebuild inside the alias TTL reuses the alias cache.
+    (catalog as any).regCache = null;
+    await catalog.registries();
+    expect(calls()).toHaveLength(2);
   });
 
   it("degrades to empty floors and labels on an older core (#89)", async () => {
@@ -153,11 +173,17 @@ describe("event-driven registry invalidation (#93)", () => {
     await catalog.index();
     handlers.get("area_registry_updated")!({});
     await catalog.index();
-    const regCalls = ws.send.mock.calls.map((c: unknown[]) => c[0]).filter((t: any) => String(t).startsWith("config/"));
+    const regCalls = ws.send.mock.calls.map((c: unknown[]) => c[0]).filter((t: any) => String(t).startsWith("config/") && String(t).endsWith("/list"));
     // Two full registry rounds: the event dropped the cache within its TTL.
     expect(regCalls).toHaveLength(10);
     // States were untouched by the registry event.
     expect(ws.send.mock.calls.map((c: unknown[]) => c[0]).filter((t: any) => t === "get_states")).toHaveLength(1);
+    // Aliases only follow entity registry changes (#224).
+    const aliasCalls = () => ws.send.mock.calls.filter((c: unknown[]) => c[0] === "config/entity_registry/get_entries");
+    expect(aliasCalls()).toHaveLength(1);
+    handlers.get("entity_registry_updated")!({});
+    await catalog.index();
+    expect(aliasCalls()).toHaveLength(2);
   });
 
   it("survives failing subscriptions, the TTL stays as the net", async () => {

@@ -20,7 +20,7 @@ flowchart TD
   C -- "oui" --> R1["Refusé + ligne d'audit"]
   C -- "non" --> D{"entités ciblées conformes<br>aux listes blanche/noire ?"}
   D -- "non" --> R1
-  D -- "oui" --> E{"cible area_id / device_id<br>avec restrictions actives ?"}
+  D -- "oui" --> E{"cible area / device / floor / label<br>(target ou data)<br>avec restrictions actives ?"}
   E -- "oui" --> R1
   E -- "non" --> F{"dry_run ?"}
   F -- "oui" --> P["Aperçu renvoyé + audit,<br>rien d'exécuté"]

@@ -1,6 +1,6 @@
 import type { HaWsClient } from "./ws.js";
 import type { HaState, IndexedEntity } from "../types.js";
-import { areasSchema, devicesSchema, entityEntriesSchema, floorsSchema, haStateSchema, haStatesSchema, labelsSchema, parseHaPayload } from "./schemas.js";
+import { areasSchema, devicesSchema, entityEntriesSchema, extendedEntriesSchema, floorsSchema, haStateSchema, haStatesSchema, labelsSchema, parseHaPayload } from "./schemas.js";
 import { log } from "../logger.js";
 
 const REGISTRY_TTL_MS = 60_000;
@@ -11,6 +11,14 @@ const REGISTRY_TTL_MS = 60_000;
  * enough for interactive use.
  */
 const STATES_TTL_MS = 3_000;
+/**
+ * Assist aliases only exist in the extended registry entries (#224): the
+ * list command never carries them. Fetching every extended entry is far
+ * heavier than the list, so aliases get their own longer-lived cache,
+ * dropped on entity_registry_updated and on reconnection.
+ */
+const ALIASES_TTL_MS = 10 * 60_000;
+const ALIASES_BATCH = 500;
 
 interface RegistryCache {
   at: number;
@@ -30,6 +38,7 @@ interface RegistryCache {
 export class Catalog {
   private regCache: RegistryCache | null = null;
   private regInflight: Promise<RegistryCache> | null = null;
+  private aliasCache: { at: number; byEntity: Map<string, string[]> } | null = null;
   private statesCache: { at: number; states: HaState[] } | null = null;
   private statesInflight: Promise<HaState[]> | null = null;
   /** Live state map fed by state_changed events (v0.3, #79); null = TTL fallback. */
@@ -48,6 +57,7 @@ export class Catalog {
   /** Drops every cache; wired to the WS reconnection (audit B5/C9). */
   invalidate(): void {
     this.regCache = null;
+    this.aliasCache = null;
     this.statesCache = null;
     this.live = null;
   }
@@ -129,6 +139,7 @@ export class Catalog {
         try {
           await this.ws.subscribe("subscribe_events", { event_type }, () => {
             this.regCache = null;
+            if (event_type === "entity_registry_updated") this.aliasCache = null;
           });
         } catch (e) {
           log.debug(
@@ -162,11 +173,13 @@ export class Catalog {
           optional("config/floor_registry/list", (r) => parseHaPayload(floorsSchema, r, "floor registry"), "floor registry"),
           optional("config/label_registry/list", (r) => parseHaPayload(labelsSchema, r, "label registry"), "label registry"),
         ]);
+        const entities = parseHaPayload(entityEntriesSchema, entitiesRaw, "entity registry");
+        const aliases = await this.aliases(entities.map((e) => e.entity_id));
         const cache: RegistryCache = {
           at: Date.now(),
           areas: parseHaPayload(areasSchema, areasRaw, "area registry"),
           devices: parseHaPayload(devicesSchema, devicesRaw, "device registry"),
-          entities: parseHaPayload(entityEntriesSchema, entitiesRaw, "entity registry"),
+          entities: entities.map((e) => ({ ...e, aliases: e.aliases.length > 0 ? e.aliases : (aliases.get(e.entity_id) ?? []) })),
           floors,
           labels,
         };
@@ -177,6 +190,33 @@ export class Catalog {
       }
     })();
     return this.regInflight;
+  }
+
+  /**
+   * Aliases per entity from config/entity_registry/get_entries, in batches
+   * (#224). Any failure (older core, transient error) degrades to "no
+   * aliases" for one TTL instead of failing the catalog or retrying on
+   * every call.
+   */
+  private async aliases(entityIds: string[]): Promise<Map<string, string[]>> {
+    if (this.aliasCache && Date.now() - this.aliasCache.at < ALIASES_TTL_MS) return this.aliasCache.byEntity;
+    const byEntity = new Map<string, string[]>();
+    try {
+      for (let i = 0; i < entityIds.length; i += ALIASES_BATCH) {
+        const raw = await this.ws.send("config/entity_registry/get_entries", {
+          entity_ids: entityIds.slice(i, i + ALIASES_BATCH),
+        });
+        const entries = parseHaPayload(extendedEntriesSchema, raw, "entity registry entries");
+        for (const [entityId, entry] of Object.entries(entries)) {
+          if (entry && entry.aliases.length > 0) byEntity.set(entityId, entry.aliases);
+        }
+      }
+    } catch (e) {
+      log.debug(`Entity aliases unavailable (${e instanceof Error ? e.message : String(e)}), continuing without them.`);
+      byEntity.clear();
+    }
+    this.aliasCache = { at: Date.now(), byEntity };
+    return byEntity;
   }
 
   async states(): Promise<HaState[]> {
