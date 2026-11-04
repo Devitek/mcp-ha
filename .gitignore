@@ -3,6 +3,7 @@ node_modules/
 dist/
 docs/.vitepress/dist/
 docs/.vitepress/cache/
+coverage/
 
 # Environnement local
 .env
