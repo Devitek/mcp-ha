@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.5.2 - 2026-11-04
+
+Fixes found while auditing Home Assistant 2026.10 and 2026.11, plus dependency updates. Verified against Home Assistant 2026.10.4; no change required by 2026.11.0.
+
+- **Security** (#222): with an entity allowlist or denylist configured, `ha_call_service` now also refuses `area_id`, `device_id`, `floor_id` and `label_id` passed in `data`. Home Assistant accepts targeting keys there as well as in `target`, and earlier versions only checked `target.area_id` and `target.device_id`, so a call could act on a whole room without going through the lists. Setups without entity restrictions are not affected.
+- **Fixed** (#223): `ha_get_energy` reported grid import and export as 0 on Home Assistant 2026.3 and later, which store each grid connection with its own meters. Both the current format (several grid connections allowed) and the legacy one are read.
+- **Fixed** (#224): searching entities by Assist alias never matched, because the entity registry list does not carry aliases. They are now read from the extended registry entries, in batches, with their own 10 minute cache refreshed on entity registry changes.
+- **Dependencies** (#220): MCP SDK 1.32.2, ws 8.22.1, drizzle-orm 0.45.4; `proxy-addr` 2.0.8 through `npm audit fix` (CVE-2026-90711, flagged critical by the image scan). Docs site on mermaid 12.3.
+
+
 ## 1.5.1 - 2026-09-26
 
 Maintenance release: ships the runtime dependency updates accumulated on main (zod 4.4.3 to 4.6.5, yaml 2.9.0 to 2.9.1) and the refreshed toolchain (vitest 5 with its v8 coverage provider, docker build actions v7/v4, mermaid 12 on the docs site). No functional change; verified against Home Assistant 2026.9.3.
