@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
-    "@types/ws": "^8.5.0",
+    "@types/ws": "^8.18.2",
     "@vitest/coverage-v8": "^5.1.0",
     "drizzle-kit": "^0.31.11",
     "typescript": "^7.0.2",
