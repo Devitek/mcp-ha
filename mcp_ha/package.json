@@ -22,7 +22,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
-    "@types/node": "^26.5.1",
+    "@types/node": "^26.6.6",
     "@types/ws": "^8.5.0",
     "@vitest/coverage-v8": "^5.1.0",
     "drizzle-kit": "^0.31.11",
